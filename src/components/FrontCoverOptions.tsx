@@ -29,8 +29,8 @@ export const FrontCoverOptions: React.FC<FrontCoverOptionsProps> = ({ onNavigate
           <div className="bg-[#FDCB33]" />
         </div>
 
-        <div className="border border-black rounded-[9px] px-6 py-4 sm:px-10 sm:py-6 bg-white">
-          <h1 className="text-[1.65rem] sm:text-[2.25rem] md:text-[2.65rem] font-light tracking-[0.02em] text-black leading-[1.2] text-balance">
+        <div className="border border-black rounded-[9px] px-6 py-4 sm:px-10 sm:py-6 bg-black">
+          <h1 className="text-[1.65rem] sm:text-[2.25rem] md:text-[2.65rem] font-light tracking-[0.025em] text-white leading-[1.2] text-balance">
             we make things that have never been made before.
           </h1>
         </div>
