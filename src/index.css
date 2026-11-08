@@ -1,0 +1,85 @@
+@import "tailwindcss";
+
+@font-face {
+  font-family: 'Nexa Light';
+  src: url('/assets/NexaLight.ttf') format('truetype');
+  font-weight: 300 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@layer base {
+  :root {
+    --white: #FFFFFF;
+    --black: #000000;
+    --gray-cad: #CBCBCB;
+    --orange-bauhaus: #EF6922;
+    --blue-fabrication: #27AAE0;
+    --yellow-flex: #FDCB33;
+    --radius-cad: 9px;
+    --font-nexa: 'Nexa Light', 'Montserrat', 'Questrial', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    font-family: var(--font-nexa);
+    font-weight: 300;
+    background-color: var(--white);
+    color: var(--black);
+  }
+
+  body {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* Nexa Light typographic letter-spacing & proportions */
+.font-nexa {
+  font-family: var(--font-nexa);
+}
+
+.tracking-cad {
+  letter-spacing: 0.14em;
+}
+
+.tracking-cad-wide {
+  letter-spacing: 0.18em;
+}
+
+.tracking-cad-tight {
+  letter-spacing: 0.08em;
+}
+
+/* Architectural blueprint grid texture */
+.cad-grid-bg {
+  background-color: #FFFFFF;
+  background-image: 
+    linear-gradient(to right, rgba(0, 0, 0, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0, 0, 0, 0.05) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.cad-grid-dark {
+  background-color: #0d1117;
+  background-image: 
+    linear-gradient(to right, rgba(255, 255, 255, 0.07) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.07) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* Custom scrollbar for modern browsers */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+::-webkit-scrollbar-thumb {
+  background: #000000;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #EF6922;
+}
