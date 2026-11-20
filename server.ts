@@ -107,110 +107,150 @@ async function dispatchConceptEmailToOwner(record: LoggedConceptRecord) {
 }
 
 /**
- * Exact Woodworking Timber & Material Specifications for FLUX.1
+ * Strict Visual Woodworking Timber & Material Specifications (with color locks & negative exclusions)
  */
 function buildTimberConstraint(woodSpecies: string): string {
   const key = woodSpecies.trim().toLowerCase();
   if (key.includes('walnut')) {
-    return 'Select FAS heartwood American Black Walnut with continuous vertical book-matched cathedral grain, rich chocolate-brown tones, and a hand-rubbed satin oil-urethane finish.';
+    return 'PRIMARY MATERIAL — AMERICAN BLACK WALNUT: Rich, dark chocolate-espresso brown FAS heartwood walnut with dramatic dark-chocolate cathedral grain and hand-rubbed satin oil sheen. STRICT COLOR LOCK: Must be unmistakably dark chocolate brown walnut — strictly NOT pale blonde oak, NOT yellow maple, NOT reddish cherry.';
   }
   if (key.includes('white oak') || key.includes('oak')) {
-    return 'Select rift-sawn and quarter-sawn White Oak with tight straight vertical grain, subtle medullary rays, and a dead-flat clear matte waterborne finish.';
+    return 'PRIMARY MATERIAL — RIFT-SAWN WHITE OAK: Cool, pale raw wheat-straw / light champagne-blonde rift-sawn white oak with tight, straight vertical pencil grain and a dead-flat clear matte raw-wood finish. STRICT COLOR LOCK: Must be pale neutral blonde-straw oak — strictly NOT dark brown walnut, NOT orange-red cherry, NOT yellow honey oak.';
   }
   if (key.includes('maple')) {
-    return 'Select hard white Sugar Maple with creamy uniform fine grain, crisp machined edges, and a satin clear waterborne finish.';
+    return 'PRIMARY MATERIAL — HARD WHITE SUGAR MAPLE: Very bright, pale creamy ivory-blonde hard sugar maple with ultra-smooth, quiet fine grain and clear waterborne matte finish. STRICT COLOR LOCK: Must be light creamy pale blonde wood — strictly NOT dark brown walnut, NOT medium oak, NOT amber cherry.';
   }
   if (key.includes('cherry')) {
-    return 'Select American Black Cherry hardwood with warm reddish-amber heartwood grain, smooth closed pores, and a hand-rubbed satin finish.';
+    return 'PRIMARY MATERIAL — AMERICAN BLACK CHERRY: Warm reddish-cinnamon amber heartwood cherry with silky closed-pore grain and warm satin oil sheen. STRICT COLOR LOCK: Must be unmistakable warm reddish-amber cinnamon cherry — strictly NOT pale blonde oak/maple and NOT dark espresso walnut.';
   }
   if (key.includes('mahogany')) {
-    return 'Select Genuine Honduras Mahogany with deep ribbon-stripe interlocking grain and an architectural satin finish.';
+    return 'PRIMARY MATERIAL — GENUINE HONDURAS MAHOGANY: Deep rich reddish-auburn brown mahogany with lustrous straight ribbon-stripe grain and satin architectural finish. STRICT COLOR LOCK: Deep reddish-brown auburn mahogany — strictly NOT pale blonde wood.';
+  }
+  if (key.includes('ebonized') || key.includes('blackened') || key.includes('charred')) {
+    return 'PRIMARY MATERIAL — EBONIZED / BLACKENED ASH OR OAK: Deep matte jet-black stained open-pore solid hardwood where subtle tactile wood grain texture remains visible under raking light, finished dead-flat matte black. STRICT COLOR LOCK: True matte charcoal-black wood — strictly NOT natural brown or blonde wood.';
   }
   if (key.includes('laminate')) {
-    return 'Architectural-grade ultra-matte high-pressure laminate (HPL) cabinet faces bonded to exposed multi-ply Baltic Birch plywood edges with crisp CNC-machined reveals.';
+    return 'PRIMARY MATERIAL — ARCHITECTURAL MATTE LAMINATE + BALTIC BIRCH PLY EDGES: Smooth ultra-matte solid architectural high-pressure laminate (HPL) cabinet faces (crisp architectural off-white, warm putty, or matte charcoal) with clearly visible exposed multi-ply striped pale Baltic Birch plywood edges along every door and panel reveal. STRICT MATERIAL LOCK: Must show smooth matte laminate faces with exposed layered birch plywood edges — NOT solid stained timber.';
   }
-  return `Select architectural-grade ${woodSpecies} hardwood with continuous grain-matched boards and a hand-rubbed satin finish.`;
+  return `PRIMARY MATERIAL — ${woodSpecies.toUpperCase()}: Authentic architectural-grade ${woodSpecies} with unmistakable true-to-species color, continuous matched grain, and hand-rubbed satin finish.`;
 }
 
 /**
- * Exact Cabinetry & Joinery Detail Specifications for FLUX.1
+ * Single Cabinetry / Joinery Detail Specification (with high visual salience & explicit exclusions)
  */
-function buildJoineryDetailConstraint(addedDetails: string): string {
-  const key = addedDetails.trim().toLowerCase();
+function buildSingleDetailConstraint(detail: string): string {
+  const key = detail.trim().toLowerCase();
+  if (!key) return '';
   if (key.includes('full overlay')) {
-    return 'Frameless full-overlay flat-panel slab doors and drawer fronts with razor-sharp, uniform 1/16-inch vertical and horizontal shadow-line reveals.';
+    return 'DOOR CONSTRUCTION — FULL OVERLAY SLAB DOORS: Completely frameless full-overlay flat slab doors and drawer fronts covering the entire front face edge-to-edge with ZERO visible face frame and razor-sharp uniform 1/16-inch black shadow reveals between panels.';
   }
   if (key.includes('flush inset')) {
-    return 'Precision flush-inset cabinet doors and drawer fronts sitting perfectly coplanar inside a solid 3/4-inch hardwood face frame with uniform 1/16-inch perimeter reveals.';
+    return 'DOOR CONSTRUCTION — FLUSH INSET WITH FACE FRAME: Every cabinet door and drawer front sits recessed completely flush INSIDE a clearly visible solid 3/4-inch hardwood outer face frame (stiles and rails framing every opening) with crisp uniform 1/16-inch perimeter shadow gaps.';
   }
   if (key.includes('pocket') || key.includes('retracting')) {
-    return 'Tall retracting pocket doors engineered to slide cleanly back into concealed side bays, shown partially open to reveal the fitted interior millwork.';
+    return 'DOOR MECHANISM — RETRACTING POCKET DOORS: Tall solid hardwood doors slid partway back into concealed vertical side pockets along the left and right edges of the cabinet, clearly showcasing the fitted hardwood interior inside.';
   }
   if (key.includes('open cabinets') || key.includes('no doors')) {
-    return 'Open architectural shelving bays and cubbies with no doors, showcasing thick 1-1/4-inch solid hardwood dividers and clean interior joinery.';
+    return 'OPEN SHELVING — STRICTLY NO DOORS: Every single bay and cubby across the entire piece is 100% open front-facing architectural shelving with thick 1-1/4-inch solid hardwood shelves and vertical dividers. STRICT EXCLUSION: ZERO cabinet doors anywhere on the piece.';
   }
   if (key.includes('tambour')) {
-    return 'Precision-milled narrow vertical solid hardwood tambour slats tracking smoothly around radiused cabinet corners.';
+    return 'DOOR MECHANISM — SLIDING TAMBOUR DOORS: Clearly visible narrow 1/2-inch vertical solid hardwood tambour slats wrapping smoothly around curved/radiused cabinet corners, with one tambour door slid partway open to show the curved track.';
   }
   if (key.includes('glass-front') || key.includes('glass')) {
-    return 'Solid hardwood stile-and-rail display doors with narrow architectural profiles and clear low-iron tempered glass panes.';
+    return 'DOOR STYLE — GLASS-FRONT DISPLAY DOORS: Slim solid hardwood stile-and-rail frame doors fitted with crystal-clear low-iron transparent glass panes so the interior hardwood shelves behind the glass are clearly visible.';
   }
   if (key.includes('fluted') || key.includes('reeded')) {
-    return 'Deep CNC-milled vertical semicircular fluting and reeded texture carved directly into solid hardwood door and drawer panels.';
+    return 'SURFACE TEXTURE — DEEP VERTICAL FLUTED / REEDED PANELS: Every cabinet door and drawer face is covered edge-to-edge in bold, deep, CNC-carved semicircular vertical wood flutes/reeds casting crisp parallel vertical shadows across the entire front elevation — strictly NOT flat smooth slab doors.';
   }
   if (key.includes('louvered') || key.includes('slatted')) {
-    return 'Architectural horizontal slatted and louvered solid hardwood doors with uniform shadow gaps between each wood bar.';
+    return 'DOOR STYLE — HORIZONTAL LOUVERED / SLATTED DOORS: Every cabinet door is built from crisp, evenly spaced horizontal solid wood slats/louvers with dark shadow air gaps between every bar — strictly NOT solid flat slab panels.';
   }
   if (key.includes('dovetail')) {
-    return 'Exposed through-dovetail and half-blind dovetail solid hardwood drawer boxes with clean architectural drawer fronts.';
+    return 'DRAWER JOINERY — EXPOSED DOVETAIL DRAWERS: Show one solid wood drawer pulled partway open (about 6 inches) so precision interlocking angled dovetail joints along the solid hardwood drawer side are prominently visible in the photograph.';
   }
   if (key.includes('push-to-open') || key.includes('touch latch')) {
-    return 'Handleless push-to-open architectural doors and drawers with zero visible hardware pulls or knobs, relying on crisp shadow-line reveals.';
+    return 'HARDWARE — HANDLELESS PUSH-TO-OPEN (ZERO HARDWARE): Completely clean, unbroken door and drawer faces with ZERO knobs, ZERO pulls, ZERO metal handles, and ZERO finger-pull cutouts anywhere on the entire piece.';
   }
   if (key.includes('turned hardwood pulls') || key.includes('turned')) {
-    return 'Bespoke lathe-turned solid hardwood cylindrical and stacked-profile pulls mounted cleanly to the cabinet faces.';
+    return 'HARDWARE — CUSTOM LATHE-TURNED SOLID WOOD PULLS: Prominent, tactile solid hardwood lathe-turned cylindrical/stacked wood pulls mounted cleanly on every door and drawer front. STRICT EXCLUSION: ZERO metal, brass, or black iron hardware pulls.';
   }
   if (key.includes('led')) {
-    return 'Recessed warm 2700K architectural LED linear light channels milled flush into the underside of shelves and cabinet stiles, casting a soft warm graze across the wood grain.';
+    return 'LIGHTING — INTEGRATED WARM 2700K LED SHELF LIGHTING: Glowing recessed warm 2700K linear LED light strips milled flush into the underside of every upper shelf and cabinet bay, casting a clearly visible warm golden light graze downward across the hardwood back panel.';
   }
   if (key.includes('floating shelves')) {
-    return 'Thick 1-3/4-inch solid hardwood floating shelves with concealed steel knife-brackets and continuous grain wrap.';
+    return 'SHELVING — THICK CANTILEVERED FLOATING SHELVES: Thick 2-inch solid hardwood floating shelves projecting cleanly from the wall/back panel with completely concealed brackets — ZERO visible corbels, ZERO metal brackets, ZERO vertical side supports beneath the shelves.';
   }
   if (key.includes('waterfall')) {
-    return 'Precision 45-degree compound waterfall mitred top-to-side case corners where the wood grain wraps continuously over the edge and down the vertical side gable.';
+    return 'CASE CORNERS — 45-DEGREE WATERFALL MITRED EDGES: Continuous unbroken wood grain flowing seamlessly across the horizontal top and wrapping directly over razor-sharp 45-degree mitered waterfall corners straight down both vertical side panels to the floor.';
   }
   if (key.includes('finger') || key.includes('tenon')) {
-    return 'Exposed 3/4-inch box finger-joints and wedged through-tenon joinery along the solid hardwood case corners as the signature structural detail.';
+    return 'CORNER JOINERY — EXPOSED BOX FINGER / THROUGH-TENON JOINTS: Prominent, unmistakably visible interlocking 3/4-inch square box finger-joints and exposed wedged through-tenons wrapping the outer case corners with alternating contrasting end-grain blocks as the signature architectural detail.';
   }
-  return `Custom architectural millwork detail: ${addedDetails}, executed with +/- 1/32-inch shop tolerances and crisp shadow-line reveals.`;
+  return `CUSTOM MILLWORK DETAIL: Prominently feature "${detail.trim()}" executed with +/- 1/32-inch cabinetmaker precision so it is immediately unmistakable in the visual.`;
 }
 
 /**
- * Exact Architectural Design Movement Proportions for FLUX.1
+ * Supports single or multiple (' + ' separated) cabinetry/joinery details
+ */
+function buildJoineryDetailConstraint(addedDetails: string): string {
+  const parts = addedDetails
+    .split(/\s*(?:\+|\||;)\s*/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (parts.length === 0) {
+    return buildSingleDetailConstraint('Full Overlay Doors');
+  }
+  return parts.map((p, idx) => `${idx + 1}) ${buildSingleDetailConstraint(p)}`).join('\n');
+}
+
+/**
+ * Complete Architectural Design Movement Specifications (all 10 UI styles explicitly defined)
  */
 function buildStyleConstraint(designStyle: string): string {
   const key = designStyle.trim().toLowerCase();
   if (key.includes('bauhaus')) {
-    return 'Bauhaus architectural proportions with disciplined geometric grid divisions and subtle color-blocked drawer fronts or accents in Bauhaus Orange (#EF6922), Fabrication Blue (#27AAE0), and Golden Yellow (#FDCB33) paired with natural hardwood.';
+    return 'ARCHITECTURAL STYLE — BAUHAUS & COLOR-BLOCKED: Disciplined asymmetrical Bauhaus geometric grid divisions pairing the selected primary timber with bold, unmistakable solid-color matte drawer fronts or accent bays in Bauhaus Orange (#EF6922), Fabrication Blue (#27AAE0), and Golden Yellow (#FDCB33). Must clearly display geometric Bauhaus color-blocking integrated into the woodwork.';
   }
   if (key.includes('mid-century')) {
-    return 'Authentic Mid-Century Modern architectural proportions with clean horizontal lines, tapered or recessed hardwood base plinth, and continuous grain-matched casework.';
+    return 'ARCHITECTURAL STYLE — MID-CENTURY MODERN: Authentic 1950s/60s Mid-Century Modern horizontal proportions with clean low-slung casework, slender tapered or gently splayed solid hardwood legs (or recessed shadow plinth), crisp chamfered outer edges, and unbroken horizontal grain matching. Strictly NO traditional crown molding or ornate trim.';
+  }
+  if (key.includes('minimalist') || key.includes('contemporary')) {
+    return 'ARCHITECTURAL STYLE — MINIMALIST & CONTEMPORARY: Ultra-clean monolithic architectural geometry with razor-sharp 90-degree edges, completely flat uninterrupted planes, flush recessed shadow toe-kick, zero applied molding, zero decorative trim, and strict grid alignment.';
+  }
+  if (key.includes('scandinavian') || key.includes('organic')) {
+    return 'ARCHITECTURAL STYLE — SCANDINAVIAN & ORGANIC: Light, airy Nordic furniture proportions featuring softly rounded/bullnosed wood edges, slender gently tapered round solid wood legs, gentle organic curves, and calm open negative space beneath the piece.';
   }
   if (key.includes('japandi')) {
-    return 'Japandi minimalist architectural proportions with serene horizontal balance, fine slatted or flush joinery, and quiet sculptural restraint.';
+    return 'ARCHITECTURAL STYLE — JAPANDI & EXPOSED JOINERY: Serene low-slung Japanese-Scandinavian architectural balance featuring delicate timber rhythm, recessed shadow reveals, visibly celebrated wood-on-wood mortise/tenon craft, and meditative calm symmetry.';
+  }
+  if (key.includes('shaker') || key.includes('traditional') || key.includes('transitional')) {
+    return 'ARCHITECTURAL STYLE — TRADITIONAL & SHAKER: Classic crisp five-piece recessed flat-panel Shaker doors and drawer fronts with clean 2-1/4-inch stiles and rails, understated square-stepped base and crown trim, and timeless balanced symmetry — strictly NOT flat modern slab doors unless overridden.';
+  }
+  if (key.includes('art deco')) {
+    return 'ARCHITECTURAL STYLE — ART DECO & FLUTED CURVES: Bold sculptural Art Deco geometry featuring sweeping curved/radiused waterfall ends, vertical fluted relief accents, stepped architectural symmetry, and refined dark bronze or satin brass plinth trim.';
+  }
+  if (key.includes('industrial')) {
+    return 'ARCHITECTURAL STYLE — INDUSTRIAL & ARCHITECTURAL: Bold structural contrast pairing thick solid timber slabs/casework with matte blackened hot-rolled steel frame accents, dark steel leg supports or architectural steel reveal strips, and crisp workshop honesty.';
+  }
+  if (key.includes('rustic') || key.includes('live-edge')) {
+    return 'ARCHITECTURAL STYLE — RUSTIC & LIVE-EDGE MODERN: Dramatic thick solid-wood live-edge slab top or front edge preserving natural organic waney tree contours, rich grain character, and inlaid contrasting wood butterfly/bowtie keys, grounded on clean modern architectural supports.';
   }
   if (key.includes('brutalist')) {
-    return 'Architectural Brutalist woodworking with monolithic thick-slab hardwood geometry, deep carved relief shadows, and bold structural massing.';
+    return 'ARCHITECTURAL STYLE — ARCHITECTURAL BRUTALIST: Monolithic thick-slab hardwood geometry, deep carved relief shadows, heavy structural massing, and bold geometric blocks.';
   }
-  if (key.includes('shaker') || key.includes('transitional')) {
-    return 'Refined modern Shaker architectural proportions with crisp flat recessed center panels, narrow 2-1/4-inch stiles and rails, and timeless symmetry.';
-  }
-  return `${designStyle} architectural proportions with disciplined geometric alignment and bespoke cabinetmaker detailing.`;
+  return `ARCHITECTURAL STYLE — ${designStyle.toUpperCase()}: Faithfully express unmistakable ${designStyle} proportions, silhouette, edge profiles, and structural detailing throughout the entire piece.`;
 }
 
 interface SourceImagePayload {
   data: string;
   mimeType: string;
+}
+
+interface PreviousSpecsPayload {
+  visualStyle?: 'render-3d' | 'cad-2d';
+  woodSpecies?: string;
+  designStyle?: string;
+  addedDetails?: string;
 }
 
 const ALLOWED_INPUT_MIMES = new Set([
@@ -227,6 +267,14 @@ function getGeminiApiKey(): string {
   if (!key || key === 'MY_GEMINI_API_KEY') return '';
   return key;
 }
+
+const CASEGOODS_GEMINI_SYSTEM_INSTRUCTION =
+  'You are the architectural cabinetmaking and bespoke furniture visualization engine for casegoods (Omaha, Nebraska). ' +
+  'Your #1 rule is 100% LITERAL ADHERENCE to every user-selected specification in the prompt: exact wood species/color, exact architectural style silhouette, and every selected door, drawer, hardware, lighting, and joinery detail. ' +
+  'Never default to generic medium-brown wood when a specific timber (such as dark chocolate Black Walnut, pale straw White Oak, creamy blonde Maple, or reddish Cherry) is requested. ' +
+  'Never add knobs or handles when handleless/push-to-open is requested. Never add doors when open cabinets/no doors is requested. ' +
+  'When editing a room photo, preserve the room architecture, lighting, and perspective faithfully while installing the custom piece cleanly at accurate scale. ' +
+  'When generating a 2D CAD drawing, produce strictly flat pure-black technical elevation linework on stark pure white paper with zero 3D perspective and zero photorealistic shading.';
 
 /**
  * Primary Multimodal Image Engine: Google Gemini (Nano Banana 2.1 / 3.1 Flash Image / 2.5 Flash Image)
@@ -277,6 +325,8 @@ async function generateWithGeminiImage(params: {
         model,
         contents,
         config: {
+          systemInstruction: CASEGOODS_GEMINI_SYSTEM_INSTRUCTION,
+          temperature: 0.4,
           responseModalities: ['IMAGE'],
           imageConfig: supportsImageSize
             ? { aspectRatio: '16:9', imageSize: '1K' }
@@ -308,104 +358,162 @@ async function generateWithGeminiImage(params: {
   return null;
 }
 
+function buildRefinementDiffs(
+  previousSpecs: PreviousSpecsPayload | null,
+  current: {
+    visualStyle: 'render-3d' | 'cad-2d';
+    woodSpecies: string;
+    designStyle: string;
+    addedDetails: string;
+  }
+): string[] {
+  if (!previousSpecs) return [];
+  const diffs: string[] = [];
+  if (
+    previousSpecs.woodSpecies &&
+    previousSpecs.woodSpecies.trim().toLowerCase() !== current.woodSpecies.trim().toLowerCase()
+  ) {
+    diffs.push(
+      `MANDATORY MATERIAL SWAP: Replace ALL wood/finish from "${previousSpecs.woodSpecies}" to "${current.woodSpecies}".`
+    );
+  }
+  if (
+    previousSpecs.designStyle &&
+    previousSpecs.designStyle.trim().toLowerCase() !== current.designStyle.trim().toLowerCase()
+  ) {
+    diffs.push(
+      `MANDATORY STYLE SWAP: Restyle the piece from "${previousSpecs.designStyle}" into unmistakable "${current.designStyle}" proportions and detailing.`
+    );
+  }
+  if (
+    previousSpecs.addedDetails &&
+    previousSpecs.addedDetails.trim().toLowerCase() !== current.addedDetails.trim().toLowerCase()
+  ) {
+    diffs.push(
+      `MANDATORY DETAIL SWAP: Replace the previous cabinetry/joinery details ("${previousSpecs.addedDetails}") with "${current.addedDetails}".`
+    );
+  }
+  if (previousSpecs.visualStyle && previousSpecs.visualStyle !== current.visualStyle) {
+    diffs.push(
+      current.visualStyle === 'cad-2d'
+        ? 'MANDATORY FORMAT CONVERSION: Convert this exact piece from a 3D render into a flat 2D orthographic black-and-white Rhino CAD front elevation drawing.'
+        : 'MANDATORY FORMAT CONVERSION: Convert this exact 2D CAD elevation drawing into a photorealistic 3D architectural studio photograph.'
+    );
+  }
+  return diffs;
+}
+
 function buildVisualizationPrompt(opts: {
   visualStyle: 'render-3d' | 'cad-2d';
   ideaPrompt: string;
+  woodSpecies: string;
+  designStyle: string;
+  addedDetails: string;
   timberSpec: string;
   joinerySpec: string;
   styleSpec: string;
   refinementClause: string;
+  refinementDiffs: string[];
   hasSourceImage: boolean;
   sourceImageMode: 'room-photo' | 'refine-concept';
 }): string {
   const {
     visualStyle,
     ideaPrompt,
+    woodSpecies,
+    designStyle,
+    addedDetails,
     timberSpec,
     joinerySpec,
     styleSpec,
     refinementClause,
+    refinementDiffs,
     hasSourceImage,
     sourceImageMode,
   } = opts;
 
-  if (hasSourceImage && sourceImageMode === 'room-photo') {
-    if (visualStyle === 'cad-2d') {
-      return [
-        'Use the attached room photo or hand sketch strictly as the spatial layout and architectural reference.',
-        'Translate the requested custom woodwork commission into a pure 2D orthographic front elevation architectural CAD shop drawing drafted in crisp black technical ink (#000000) on stark pure white drafting paper (#FFFFFF).',
-        `Custom Millwork / Furniture Piece: ${ideaPrompt}.`,
-        `Joinery & Elevation Linework Details: ${joinerySpec}`,
-        `Architectural Proportions: ${styleSpec}`,
-        refinementClause,
-        'Match the width, height, alcove proportions, and bay layout suggested by the reference image. Include cabinet door divisions, stile-and-rail profiles, cross-section callouts, and fractional inch dimension lines. Strictly flat 2D technical vector linework: NO 3D perspective, NO photo background, NO photorealistic shading.',
-      ]
-        .filter(Boolean)
-        .join(' ');
-    }
+  const changeBlock =
+    refinementDiffs.length > 0 || refinementClause
+      ? [
+          '=== MANDATORY REVISIONS TO APPLY (HIGHEST PRIORITY) ===',
+          ...refinementDiffs,
+          refinementClause,
+        ]
+          .filter(Boolean)
+          .join('\n')
+      : '';
+
+  const checklistBlock = [
+    '=== FINAL STRICT COMPLIANCE CHECKLIST (VERIFY EVERY ITEM BEFORE RENDERING) ===',
+    `- Subject matches user description: "${ideaPrompt}"`,
+    visualStyle === 'render-3d'
+      ? `- Wood/Material visibly matches "${woodSpecies}" (exact color tone & grain, never substituted)`
+      : '- Pure flat 2D black vector linework (#000000) on stark white paper (#FFFFFF), NO 3D perspective, NO color shading',
+    `- Overall silhouette & details unmistakably reflect "${designStyle}"`,
+    `- Every selected detail is clearly and prominently visible: ${addedDetails}`,
+    '- Zero text watermarks, zero logos, zero room clutter or unrelated props.',
+  ].join('\n');
+
+  if (visualStyle === 'cad-2d') {
+    const taskHeader =
+      hasSourceImage && sourceImageMode === 'room-photo'
+        ? 'TASK: Using the attached room photo or hand sketch strictly as the spatial/layout reference, draft a pure 2D orthographic front elevation architectural CAD shop drawing (Rhino 3D style) in crisp black technical ink (#000000) on stark pure white drafting paper (#FFFFFF).'
+        : hasSourceImage && sourceImageMode === 'refine-concept'
+        ? 'TASK: Translate/update the exact custom furniture or millwork design shown in the attached image into a pure 2D orthographic front elevation architectural CAD shop drawing (Rhino 3D style) in crisp black ink (#000000) on pure white paper (#FFFFFF), preserving its bay layout and applying all mandatory revisions below.'
+        : 'TASK: Draft a pure 2D orthographic front elevation architectural CAD shop drawing (Rhino 3D style) in crisp black technical ink (#000000) on stark pure white drafting paper (#FFFFFF).';
 
     return [
-      'Use the attached image as the direct architectural reference. If it is a photograph of a room, wall, or alcove, preserve the exact existing room architecture, walls, flooring, windows, camera angle, perspective, and natural daylight while seamlessly building and installing the custom hardwood furniture or millwork piece directly into the space at realistic physical scale with accurate contact shadows. If the attached image is a hand-drawn sketch, faithfully preserve its exact layout, compartments, and proportions and render it as a finished handcrafted studio photograph.',
-      `Custom Commission to Build: ${ideaPrompt}.`,
-      `Timber & Finish Specification: ${timberSpec}`,
-      `Joinery & Construction Specification: ${joinerySpec}`,
-      `Architectural Style & Proportions: ${styleSpec}`,
-      refinementClause,
-      'Photorealistic architectural photography, crisp natural lighting, realistic wood grain continuity, +/- 1/32-inch cabinetmaker reveals, no text watermarks or labels.',
+      taskHeader,
+      '',
+      '=== SUBJECT ===',
+      ideaPrompt,
+      '',
+      changeBlock,
+      '',
+      '=== MANDATORY ARCHITECTURAL STYLE ===',
+      styleSpec,
+      '',
+      '=== MANDATORY CABINETRY, DOORS & JOINERY LINEWORK ===',
+      joinerySpec,
+      '',
+      '=== CAD DRAFTING RULES ===',
+      'Show crisp straight orthographic cabinet divisions, stile-and-rail profiles, joinery linework (fluting lines, tambour lines, finger-joints, or drawer reveals matching the selected details), section callout markers, and clean fractional inch dimension ticks. Strictly flat 2D vector linework: NO 3D perspective, NO wood color/photo texture, NO grey background, NO room scene.',
+      '',
+      checklistBlock,
     ]
-      .filter(Boolean)
-      .join(' ');
+      .filter((s) => s !== undefined && s !== '')
+      .join('\n');
   }
 
-  if (hasSourceImage && sourceImageMode === 'refine-concept') {
-    if (visualStyle === 'cad-2d') {
-      return [
-        'Edit and translate the exact custom furniture or millwork design shown in the attached image into a pure 2D orthographic front elevation architectural CAD shop drawing in crisp black technical ink (#000000) on stark pure white drafting paper (#FFFFFF).',
-        `Original Commission Context: ${ideaPrompt}.`,
-        `Joinery & Elevation Linework Details: ${joinerySpec}`,
-        `Architectural Proportions: ${styleSpec}`,
-        refinementClause,
-        'Preserve the exact bay layout, door count, drawer configuration, and overall silhouette from the attached image while applying any requested revision. Show exact cabinet divisions, stile-and-rail profiles, and fractional inch dimension lines. Strictly flat 2D CAD linework with NO perspective, NO shading, NO room background.',
-      ]
-        .filter(Boolean)
-        .join(' ');
-    }
+  // 3D Photorealistic Studio or Room-Photo Composite Render
+  const taskHeader =
+    hasSourceImage && sourceImageMode === 'room-photo'
+      ? 'TASK: Use the attached image as the direct architectural reference. If it is a photograph of a room, wall, or alcove, preserve the exact existing room walls, floor, windows, lighting, and camera perspective while seamlessly installing the specified custom hardwood furniture/millwork piece directly into the space at true physical scale with realistic contact shadows. If it is a hand-drawn sketch, preserve its exact layout and compartments and render it as a finished photorealistic studio piece.'
+      : hasSourceImage && sourceImageMode === 'refine-concept'
+      ? 'TASK: Edit the custom woodwork design shown in the attached image. Keep its core structure, silhouette, camera angle, and clean backdrop (or room setting if already in a room), while strictly applying ALL mandatory revisions and updated selections below.'
+      : 'TASK: Create a sharp architectural studio photograph of a single bespoke handcrafted furniture or architectural millwork commission, shot on a 50mm tilt-shift lens at eye level, straight-on or gentle 3/4 view with strictly vertical plumb lines, centered against a clean smooth white architectural gallery wall and neutral floor with soft natural side daylight. Strictly NO clutter, NO plants, NO rugs, NO pillows, NO people.';
 
-    return [
-      'Edit the custom furniture or architectural millwork design shown in the attached image while preserving its core structure, silhouette, camera framing, and clean studio setting (or room setting if already placed in a room).',
-      `Commission Context: ${ideaPrompt}.`,
-      `Timber & Finish Specification: ${timberSpec}`,
-      `Joinery & Construction Specification: ${joinerySpec}`,
-      `Architectural Style & Proportions: ${styleSpec}`,
-      refinementClause,
-      'Apply the requested refinement accurately with photorealistic studio architectural lighting, continuous hardwood grain, crisp +/- 1/32-inch joinery reveals, and zero text watermarks.',
-    ]
-      .filter(Boolean)
-      .join(' ');
-  }
-
-  return visualStyle === 'cad-2d'
-    ? [
-        'Pure 2D orthographic front elevation architectural CAD shop drawing drafted in crisp black technical ink (#000000) on stark pure white drafting paper (#FFFFFF).',
-        `Custom Millwork / Furniture Piece: ${ideaPrompt}.`,
-        `Joinery & Elevation Linework Details: ${joinerySpec}`,
-        `Architectural Proportions: ${styleSpec}`,
-        refinementClause,
-        'Show exact cabinet door divisions, stile-and-rail profiles, cross-section callout lines, and fractional inch dimension ticks. Strictly flat 2D technical vector linework: NO 3D perspective, NO room background, NO photorealistic wood shading, NO grey gradients.',
-      ]
-        .filter(Boolean)
-        .join(' ')
-    : [
-        'Architectural studio photography of a single bespoke handcrafted furniture or architectural millwork commission, shot on a 50mm tilt-shift lens at eye level, straight-on front elevation or gentle 3/4 view with strictly vertical plumb lines and zero wide-angle distortion.',
-        `Hero Piece: ${ideaPrompt}.`,
-        `Timber & Finish Specification: ${timberSpec}`,
-        `Joinery & Construction Specification: ${joinerySpec}`,
-        `Architectural Style & Proportions: ${styleSpec}`,
-        refinementClause,
-        'Environment & Framing Constraint: The custom woodwork piece fills the center of the frame against a clean, quiet smooth white architectural gallery wall and neutral floor with soft natural side daylight. Strictly NO room clutter, NO houseplants, NO throw pillows, NO rugs, NO decorative knick-knacks, NO people.',
-      ]
-        .filter(Boolean)
-        .join(' ');
+  return [
+    taskHeader,
+    '',
+    '=== SUBJECT ===',
+    ideaPrompt,
+    '',
+    changeBlock,
+    '',
+    '=== MANDATORY TIMBER / MATERIAL (DO NOT SUBSTITUTE) ===',
+    timberSpec,
+    '',
+    '=== MANDATORY ARCHITECTURAL STYLE ===',
+    styleSpec,
+    '',
+    '=== MANDATORY CABINETRY, DOORS & JOINERY DETAILS (MAKE UNMISTAKABLY VISIBLE) ===',
+    joinerySpec,
+    '',
+    checklistBlock,
+  ]
+    .filter((s) => s !== undefined && s !== '')
+    .join('\n');
 }
 
 /**
@@ -824,6 +932,7 @@ async function startServer() {
         refinementPrompt = '',
         sourceImage = null,
         sourceImageMode = 'room-photo',
+        previousSpecs = null,
       } = req.body || {};
 
       const cleanIdeaPrompt = typeof ideaPrompt === 'string' ? ideaPrompt.trim() : '';
@@ -863,20 +972,43 @@ async function startServer() {
         }
       }
 
-      const timberSpec = buildTimberConstraint(String(woodSpecies));
-      const joinerySpec = buildJoineryDetailConstraint(String(addedDetails));
-      const styleSpec = buildStyleConstraint(String(designStyle));
+      const cleanWood = String(woodSpecies).trim() || 'American Black Walnut';
+      const cleanStyle = String(designStyle).trim() || 'Mid-Century Modern';
+      const cleanDetails = String(addedDetails).trim() || 'Full Overlay Doors';
+
+      const timberSpec = buildTimberConstraint(cleanWood);
+      const joinerySpec = buildJoineryDetailConstraint(cleanDetails);
+      const styleSpec = buildStyleConstraint(cleanStyle);
       const refinementClause = cleanRefinement
-        ? `Mandatory design revision: ${cleanRefinement}.`
+        ? `USER REVISION REQUEST: ${cleanRefinement}`
         : '';
+
+      const refinementDiffs =
+        validatedSourceImage && safeSourceMode === 'refine-concept'
+          ? buildRefinementDiffs(
+              previousSpecs && typeof previousSpecs === 'object'
+                ? (previousSpecs as PreviousSpecsPayload)
+                : null,
+              {
+                visualStyle: safeVisualStyle,
+                woodSpecies: cleanWood,
+                designStyle: cleanStyle,
+                addedDetails: cleanDetails,
+              }
+            )
+          : [];
 
       const prompt = buildVisualizationPrompt({
         visualStyle: safeVisualStyle,
         ideaPrompt: cleanIdeaPrompt || 'Custom handcrafted hardwood furniture commission',
+        woodSpecies: cleanWood,
+        designStyle: cleanStyle,
+        addedDetails: cleanDetails,
         timberSpec,
         joinerySpec,
         styleSpec,
         refinementClause,
+        refinementDiffs,
         hasSourceImage: Boolean(validatedSourceImage),
         sourceImageMode: safeSourceMode,
       });

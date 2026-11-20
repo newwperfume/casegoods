@@ -122,6 +122,7 @@ export interface GeneratedConceptItem {
   designStyle: string;
   addedDetails: string;
   summarySpec: string;
+  modelEngine?: string;
   timestamp: string;
 }
 
@@ -160,9 +161,21 @@ const WOOD_OPTIONS = [
   'Maple',
   'Cherry',
   'Mahogany',
+  'Ebonized / Blackened Ash',
   'Laminate',
   'Something Exotic',
 ];
+
+const WOOD_SWATCH_META: Record<string, { color: string; hint: string }> = {
+  'American Black Walnut': { color: '#4A3222', hint: 'Dark chocolate brown' },
+  'White Oak': { color: '#CBB89D', hint: 'Pale raw wheat-straw' },
+  Maple: { color: '#E8D8BE', hint: 'Bright creamy blonde' },
+  Cherry: { color: '#9E4B2B', hint: 'Warm reddish-cinnamon' },
+  Mahogany: { color: '#6E2E1D', hint: 'Deep auburn-brown' },
+  'Ebonized / Blackened Ash': { color: '#1E1E1E', hint: 'Matte jet-black grain' },
+  Laminate: { color: '#D9D6D0', hint: 'Matte HPL + birch ply edge' },
+  'Something Exotic': { color: '#EF6922', hint: 'Custom timber / finish' },
+};
 
 const DESIGN_STYLE_OPTIONS = [
   'Mid-Century Modern',
@@ -195,6 +208,24 @@ const ADDED_DETAILS_OPTIONS = [
   'Exposed Finger / Through-Tenon Joinery',
   'Custom Detail',
 ];
+
+/**
+ * Mutually exclusive detail groups so the user never sends contradictory instructions to Gemini
+ * (e.g., "Open Cabinets (No Doors)" vs "Full Overlay Doors", or "No Hardware" vs "Turned Pulls").
+ */
+const EXCLUSIVE_DETAIL_GROUPS: string[][] = [
+  ['Full Overlay Doors', 'Flush Inset Doors & Drawers', 'Open Cabinets (No Doors)'],
+  ['Push-to-Open (Touch Latch, No Hardware)', 'Custom Turned Hardwood Pulls'],
+  [
+    'Open Cabinets (No Doors)',
+    'Pocket / Retracting Doors',
+    'Sliding Tambour Doors',
+    'Glass-Front Display Doors',
+    'Louvered / Slatted Doors',
+  ],
+];
+
+const MAX_SELECTED_DETAILS = 3;
 
 /**
  * 4 Very Different, Basic Project Concept Templates
@@ -281,15 +312,69 @@ export const ConceptVisualizer: React.FC<ConceptVisualizerProps> = ({
       ? state.customWoodText.trim() || 'Exotic Hardwood'
       : state.woodSpecies;
 
+  const selectedDetailsList = state.addedDetails
+    .split(/\s*\+\s*/)
+    .map((d) => d.trim())
+    .filter(Boolean);
+
+  const hasCustomDetailSelected = selectedDetailsList.includes('Custom Detail');
+
+  const toggleAddedDetail = (detailOpt: string) => {
+    onChangeState((prev) => {
+      const current = prev.addedDetails
+        .split(/\s*\+\s*/)
+        .map((d) => d.trim())
+        .filter(Boolean);
+
+      if (current.includes(detailOpt)) {
+        const next = current.filter((d) => d !== detailOpt);
+        return {
+          ...prev,
+          addedDetails: next.length > 0 ? next.join(' + ') : 'Full Overlay Doors',
+        };
+      }
+
+      // Remove any mutually exclusive option from the same group
+      let filtered = [...current];
+      for (const group of EXCLUSIVE_DETAIL_GROUPS) {
+        if (group.includes(detailOpt)) {
+          filtered = filtered.filter((d) => !group.includes(d));
+        }
+      }
+
+      // Cap at MAX_SELECTED_DETAILS (dropping the oldest selected if already at max)
+      if (filtered.length >= MAX_SELECTED_DETAILS) {
+        filtered = filtered.slice(filtered.length - (MAX_SELECTED_DETAILS - 1));
+      }
+      filtered.push(detailOpt);
+
+      return {
+        ...prev,
+        addedDetails: filtered.join(' + '),
+      };
+    });
+  };
+
   const resolvedDesignStyle =
     state.designStyle === 'Custom Style'
       ? state.customStyleText.trim() || 'Custom Studio Style'
       : state.designStyle;
 
   const resolvedAddedDetails =
-    state.addedDetails === 'Custom Detail'
-      ? state.customDetailsText.trim() || 'Custom Millwork Detail'
-      : state.addedDetails;
+    selectedDetailsList
+      .map((d) =>
+        d === 'Custom Detail' ? state.customDetailsText.trim() || 'Custom Millwork Detail' : d
+      )
+      .filter(Boolean)
+      .join(' + ') || 'Full Overlay Doors';
+
+  const hasSettingsChanged = Boolean(
+    activeConcept &&
+      (activeConcept.woodSpecies !== resolvedWoodSpecies ||
+        activeConcept.designStyle !== resolvedDesignStyle ||
+        activeConcept.addedDetails !== resolvedAddedDetails ||
+        activeConcept.visualStyle !== state.visualStyle)
+  );
 
   const fetchServerArchive = async () => {
     setLoadingArchive(true);
@@ -402,17 +487,15 @@ export const ConceptVisualizer: React.FC<ConceptVisualizerProps> = ({
       return;
     }
 
-    if (
-      state.addedDetails === 'Custom Detail' &&
-      !state.customDetailsText.trim() &&
-      mode === 'new'
-    ) {
+    if (hasCustomDetailSelected && !state.customDetailsText.trim() && mode === 'new') {
       setErrorMsg('Please enter the custom cabinetry or furniture detail you have in mind.');
       return;
     }
 
-    if (mode === 'refine' && !refinementText.trim() && !overrideStyle) {
-      setErrorMsg('Enter a refinement note (e.g., "Add brass pulls or change to white oak") first.');
+    if (mode === 'refine' && !refinementText.trim() && !overrideStyle && !hasSettingsChanged) {
+      setErrorMsg(
+        'Change a timber, style, or detail setting above — or enter a refinement note first.'
+      );
       return;
     }
 
@@ -443,6 +526,26 @@ export const ConceptVisualizer: React.FC<ConceptVisualizerProps> = ({
         headers.Authorization = `Bearer ${token}`;
       }
 
+      const previousSpecs =
+        mode === 'refine' && activeConcept
+          ? {
+              visualStyle: activeConcept.visualStyle,
+              woodSpecies: activeConcept.woodSpecies,
+              designStyle: activeConcept.designStyle,
+              addedDetails: activeConcept.addedDetails,
+            }
+          : null;
+
+      const effectiveRefinementPrompt =
+        mode === 'refine'
+          ? refinementText.trim() ||
+            (overrideStyle === 'cad-2d'
+              ? 'Convert this exact design into a dimensioned 2D Rhino CAD elevation shop drawing'
+              : overrideStyle === 'render-3d'
+              ? 'Render this exact design as a photorealistic 3D studio hardwood proposal'
+              : 'Update this exact piece to match the newly selected timber, style, and cabinetry details while keeping its core layout and proportions')
+          : '';
+
       const response = await fetch('/api/visualize-concept', {
         method: 'POST',
         headers,
@@ -452,15 +555,10 @@ export const ConceptVisualizer: React.FC<ConceptVisualizerProps> = ({
           woodSpecies: resolvedWoodSpecies,
           designStyle: resolvedDesignStyle,
           addedDetails: resolvedAddedDetails,
-          refinementPrompt:
-            mode === 'refine'
-              ? refinementText.trim() ||
-                (overrideStyle === 'cad-2d'
-                  ? 'Convert this exact design into a dimensioned 2D Rhino CAD elevation and section shop drawing'
-                  : 'Render this exact design as a photorealistic 3D studio hardwood proposal')
-              : '',
+          refinementPrompt: effectiveRefinementPrompt,
           sourceImage,
           sourceImageMode,
+          previousSpecs,
         }),
       });
 
@@ -485,6 +583,7 @@ export const ConceptVisualizer: React.FC<ConceptVisualizerProps> = ({
         designStyle: resolvedDesignStyle,
         addedDetails: resolvedAddedDetails,
         summarySpec: data.summarySpec,
+        modelEngine: data.modelEngine,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
 
@@ -758,15 +857,24 @@ Concept Image Link: ${imageLink}`;
             />
           </div>
 
-          {/* Row 3: Full-Width 3-Column Bauhaus Selectors (02 Primary Timber · 03 Design Style · 04 Added Details) */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Row 3: 2-Column Bauhaus Selectors (02 Primary Timber with Swatch · 03 Design Style) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* 02 / PRIMARY TIMBER */}
             <div className="space-y-2">
               <label
                 htmlFor={`visualizer-wood-${placement}`}
-                className="block bg-[#27AAE0] text-black border border-black rounded-[9px] py-2 px-3.5 text-[0.70rem] tracking-cad uppercase font-medium cursor-pointer"
+                className="flex items-center justify-between gap-2 bg-[#27AAE0] text-black border border-black rounded-[9px] py-2 px-3.5 text-[0.70rem] tracking-cad uppercase font-medium cursor-pointer"
               >
-                02 / PRIMARY TIMBER
+                <span>02 / PRIMARY TIMBER</span>
+                {WOOD_SWATCH_META[state.woodSpecies] && (
+                  <span className="inline-flex items-center gap-1.5 text-[0.62rem] tracking-normal normal-case font-medium bg-white/90 px-2 py-0.5 rounded-[5px] border border-black">
+                    <span
+                      className="w-2.5 h-2.5 rounded-full border border-black shrink-0"
+                      style={{ backgroundColor: WOOD_SWATCH_META[state.woodSpecies].color }}
+                    />
+                    <span>{WOOD_SWATCH_META[state.woodSpecies].hint}</span>
+                  </span>
+                )}
               </label>
               <select
                 id={`visualizer-wood-${placement}`}
@@ -835,44 +943,54 @@ Concept Image Link: ${imageLink}`;
                 />
               )}
             </div>
+          </div>
 
-            {/* 04 / ADDED DETAILS */}
-            <div className="space-y-2">
-              <label
-                htmlFor={`visualizer-details-${placement}`}
-                className="block bg-[#EF6922] text-black border border-black rounded-[9px] py-2 px-3.5 text-[0.70rem] tracking-cad uppercase font-medium cursor-pointer"
-              >
-                04 / ADDED DETAILS
-              </label>
-              <select
-                id={`visualizer-details-${placement}`}
-                value={state.addedDetails}
-                onChange={(e) =>
-                  onChangeState((prev) => ({ ...prev, addedDetails: e.target.value }))
-                }
-                className="w-full h-[44px] bg-white text-black text-[0.86rem] px-3 rounded-[9px] border border-black font-normal focus:outline-none cursor-pointer"
-              >
-                {ADDED_DETAILS_OPTIONS.map((detailOpt) => (
-                  <option key={detailOpt} value={detailOpt}>
-                    {detailOpt === 'Custom Detail'
-                      ? 'Custom Detail (Enter Own Text)'
-                      : detailOpt}
-                  </option>
-                ))}
-              </select>
-
-              {state.addedDetails === 'Custom Detail' && (
-                <input
-                  type="text"
-                  value={state.customDetailsText}
-                  onChange={(e) =>
-                    onChangeState((prev) => ({ ...prev, customDetailsText: e.target.value }))
-                  }
-                  placeholder="Enter custom door, drawer, hardware, or joinery details..."
-                  className="w-full h-[42px] bg-white text-black text-[0.86rem] px-3.5 rounded-[9px] border-[0.75px] border-black font-light focus:outline-none focus:bg-[#EF6922]/10 placeholder:text-black/45"
-                />
-              )}
+          {/* Row 3B: Full-Width Multi-Select 04 / ADDED DETAILS (Pick up to 3 compatible details) */}
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2 bg-[#EF6922] text-black border border-black rounded-[9px] py-2 px-3.5 text-[0.70rem] tracking-cad uppercase font-medium select-none">
+              <span>04 / ADDED DETAILS — PICK UP TO {MAX_SELECTED_DETAILS}</span>
+              <span className="bg-white text-black border border-black rounded-[5px] px-2 py-0.5 text-[0.62rem]">
+                {selectedDetailsList.length} / {MAX_SELECTED_DETAILS} SELECTED
+              </span>
             </div>
+
+            <div
+              className="flex flex-wrap gap-2 p-3 rounded-[9px] border border-black bg-white"
+              role="group"
+              aria-label="Added cabinetry and joinery details"
+            >
+              {ADDED_DETAILS_OPTIONS.map((detailOpt) => {
+                const isSelected = selectedDetailsList.includes(detailOpt);
+                return (
+                  <button
+                    key={detailOpt}
+                    type="button"
+                    aria-pressed={isSelected}
+                    onClick={() => toggleAddedDetail(detailOpt)}
+                    className={`px-3 py-1.5 rounded-[7px] border border-black text-[0.76rem] transition-colors cursor-pointer inline-flex items-center gap-1.5 ${
+                      isSelected
+                        ? 'bg-[#EF6922] text-black font-medium shadow-[2px_2px_0_#000]'
+                        : 'bg-white text-black hover:bg-[#CBCBCB]/60 font-light'
+                    }`}
+                  >
+                    {isSelected && <Check className="w-3.5 h-3.5 shrink-0" />}
+                    <span>{detailOpt}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {hasCustomDetailSelected && (
+              <input
+                type="text"
+                value={state.customDetailsText}
+                onChange={(e) =>
+                  onChangeState((prev) => ({ ...prev, customDetailsText: e.target.value }))
+                }
+                placeholder="Enter custom door, drawer, hardware, or joinery details..."
+                className="w-full h-[42px] bg-white text-black text-[0.86rem] px-3.5 rounded-[9px] border-[0.75px] border-black font-light focus:outline-none focus:bg-[#EF6922]/10 placeholder:text-black/45"
+              />
+            )}
           </div>
 
           {/* Row 4: 05 / Room Photo or Sketch Upload (Full Width) */}
@@ -1065,7 +1183,34 @@ Concept Image Link: ${imageLink}`;
                   <p className="text-[0.82rem] font-light text-black">
                     {activeConcept.summarySpec}
                   </p>
+                  {activeConcept.modelEngine && (
+                    <p className="text-[0.65rem] tracking-cad uppercase text-black/65 font-medium pt-0.5">
+                      ENGINE: {activeConcept.modelEngine}
+                    </p>
+                  )}
                 </div>
+
+                {/* Live Settings-Changed Banner so changing Timber / Style / Details applies directly to the active image */}
+                {hasSettingsChanged && (
+                  <div className="bg-[#FDCB33]/35 border border-black rounded-[9px] px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="space-y-0.5">
+                      <span className="block text-[0.68rem] tracking-cad uppercase font-medium text-black">
+                        SETTINGS UPDATED — READY TO APPLY TO THIS DESIGN
+                      </span>
+                      <span className="block text-[0.80rem] font-light text-black">
+                        {resolvedWoodSpecies} · {resolvedDesignStyle} · {resolvedAddedDetails}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={isGenerating}
+                      onClick={() => runGeneration('refine')}
+                      className="shrink-0 bg-[#FDCB33] hover:bg-black text-black hover:text-white border border-black rounded-[9px] px-4 py-2 text-[0.70rem] tracking-cad uppercase font-medium transition-colors cursor-pointer whitespace-nowrap"
+                    >
+                      APPLY TO THIS IMAGE →
+                    </button>
+                  </div>
+                )}
 
                 {/* Direct Send Concept Link & Specs to Josh via SMS or Email */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -1093,16 +1238,24 @@ Concept Image Link: ${imageLink}`;
                     type="text"
                     value={refinementText}
                     onChange={(e) => setRefinementText(e.target.value)}
-                    placeholder="Refine this concept (e.g., 'Add fluted doors' or 'Make it wider')..."
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !isGenerating && (refinementText.trim() || hasSettingsChanged)) {
+                        e.preventDefault();
+                        runGeneration('refine');
+                      }
+                    }}
+                    placeholder="Refine this concept (e.g., 'Make it 96 inches wide' or 'Add brass toe-kick')..."
                     className="flex-1 h-[42px] bg-white text-black text-[0.84rem] px-3.5 rounded-[9px] border-[0.75px] border-black font-light focus:outline-none placeholder:text-black/45"
                   />
                   <button
                     type="button"
-                    disabled={isGenerating || !refinementText.trim()}
+                    disabled={isGenerating || (!refinementText.trim() && !hasSettingsChanged)}
                     onClick={() => runGeneration('refine')}
                     className="shrink-0 bg-[#27AAE0] text-black disabled:opacity-50 hover:bg-black hover:text-white text-[0.70rem] tracking-cad uppercase px-5 py-2.5 rounded-[9px] border-[0.75px] border-black font-medium transition-colors cursor-pointer whitespace-nowrap"
                   >
-                    REFINE IMAGE
+                    {hasSettingsChanged && !refinementText.trim()
+                      ? 'APPLY UPDATED SETTINGS'
+                      : 'REFINE IMAGE'}
                   </button>
                 </div>
 
