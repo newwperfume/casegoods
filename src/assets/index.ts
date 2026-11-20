@@ -1,8 +1,8 @@
 // Centralized High-Resolution Brand & Project Assets
-import logoFull from './logo_full.png';
+const logoFull = '/assets/aistudio/CASEGOODS_LOGO_FINAL6.png';
 import logoMark from './logo_mark.png';
-import brandIconsBc from './brand_icons_bc.png';
-import brandIconsPdf from './brand_icons_pdf.png';
+const brandIconsBc = '/assets/aistudio/LOGO_4_IMAGES.png';
+const brandIconsPdf = '/assets/aistudio/LOGO_4_IMAGES.png';
 import businessCardFront from './business_card_front.png';
 import businessCardBack from './business_card_back.png';
 

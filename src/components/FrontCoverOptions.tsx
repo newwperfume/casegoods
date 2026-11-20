@@ -2,62 +2,124 @@ import React from 'react';
 import { ArrowRight } from 'lucide-react';
 import { ASSETS } from '../assets/index.ts';
 import { ProposedPageId } from './ProposedStudio.tsx';
+import {
+  MortiseWallController,
+  MortiseWallToolbar,
+  PillarColorKey,
+} from './MortiseWallSystem.tsx';
 
 interface FrontCoverOptionsProps {
   onNavigate: (page: ProposedPageId) => void;
+  wall: MortiseWallController;
 }
 
-export const FrontCoverOptions: React.FC<FrontCoverOptionsProps> = ({ onNavigate }) => {
+export const FrontCoverOptions: React.FC<FrontCoverOptionsProps> = ({
+  onNavigate,
+  wall,
+}) => {
+  const triggerPillarAccent = (
+    pillar: PillarColorKey,
+    el: HTMLElement | null
+  ) => {
+    if (el && typeof window !== 'undefined') {
+      const rect = el.getBoundingClientRect();
+      wall.setActivePillar(pillar, {
+        x: (rect.left + rect.width * 0.5) / Math.max(1, window.innerWidth),
+        y: (rect.top + rect.height * 0.5) / Math.max(1, window.innerHeight),
+      });
+    } else {
+      wall.setActivePillar(pillar, { x: 0.5, y: 0.58 });
+    }
+  };
+
   return (
     <section
+      id="hero-center-stack"
       aria-label="casegoods — handcrafted in omaha"
-      className="w-full bg-white border-[1.5px] border-black rounded-[9px] px-6 py-10 sm:px-12 sm:py-12 flex flex-col items-center justify-center gap-8 text-center"
+      className="w-full max-w-[780px] mx-auto py-4 sm:py-6 flex flex-col gap-4 sm:gap-5"
     >
-      {/* Centerpiece: Casegoods Logo + Core Statement */}
-      <div className="max-w-3xl mx-auto flex flex-col items-center gap-7">
+      {/* 1. Full-Width Logo (No Outline — Scaled to Line Up Flush with the Lower Text Bubble Edges) */}
+      <div className="w-full ui-surface">
         <img
           src={ASSETS.brand.logoFull}
           alt="casegoods — handcrafted in omaha"
-          className="h-28 sm:h-36 md:h-40 w-auto object-contain select-none"
+          className="w-full h-auto block select-none"
           referrerPolicy="no-referrer"
         />
-
-        {/* 3-Color Bauhaus Divider */}
-        <div className="w-36 h-[3px] grid grid-cols-3 rounded-full overflow-hidden">
-          <div className="bg-[#EF6922]" />
-          <div className="bg-[#27AAE0]" />
-          <div className="bg-[#FDCB33]" />
-        </div>
-
-        <div className="border border-black rounded-[9px] px-6 py-4 sm:px-10 sm:py-6 bg-black">
-          <h1 className="text-[1.65rem] sm:text-[2.25rem] md:text-[2.65rem] font-light tracking-[0.025em] text-white leading-[1.2] text-balance">
-            we make things that have never been made before.
-          </h1>
-        </div>
-
-        <p className="text-[0.76rem] sm:text-[0.82rem] tracking-cad-wide uppercase text-black/70 font-light">
-          handcrafted in omaha · custom furniture &amp; architectural millwork
-        </p>
       </div>
 
-      {/* Clean Entry Actions */}
-      <div className="w-full flex flex-col sm:flex-row items-center justify-center gap-3">
+      {/* 2. Full-Width Thin Black Divider Line */}
+      <div
+        className="w-full h-[1px] bg-black"
+        aria-hidden="true"
+      />
+
+      {/* 3. Full-Width Black Statement Box (Lowercase White Single-Line Scaled Text) */}
+      <div className="@container ui-surface w-full bg-black text-white border-[1.5px] border-black rounded-[9px] py-4 sm:py-5 px-3 sm:px-5 text-center overflow-hidden flex items-center justify-center">
+        <h1 className="w-full text-[3.55cqw] font-light tracking-[0.025em] lowercase text-white leading-none whitespace-nowrap select-none">
+          we make the things that have never been made before
+        </h1>
+      </div>
+
+      {/* 4. 3-Column Flush Bauhaus Entry Doors (Aligned to the Same Left & Right Edges) */}
+      <div className="w-full grid grid-cols-1 md:grid-cols-3 gap-3.5">
         <button
           type="button"
           onClick={() => onNavigate('methodology')}
-          className="bg-black text-white hover:bg-[#EF6922] hover:text-black text-[0.75rem] tracking-cad uppercase py-3.5 px-8 rounded-[9px] border border-black transition-colors cursor-pointer font-medium inline-flex items-center gap-2.5 whitespace-nowrap"
+          onMouseEnter={(e) => triggerPillarAccent('01', e.currentTarget)}
+          onFocus={(e) => triggerPillarAccent('01', e.currentTarget)}
+          className="ui-surface bg-[#EF6922] text-black border border-black rounded-[9px] p-4 sm:px-4 sm:py-4 flex items-center justify-between text-left hover:bg-black hover:text-white transition-colors cursor-pointer group"
         >
-          <span>ENTER STUDIO</span>
-          <ArrowRight className="w-4 h-4" />
+          <div>
+            <div className="text-[0.62rem] tracking-cad uppercase font-medium opacity-80">
+              01 / DESIGN &amp; METHODOLOGY
+            </div>
+            <div className="text-[0.80rem] tracking-cad uppercase font-medium mt-0.5">
+              ENTER STUDIO
+            </div>
+          </div>
+          <ArrowRight className="w-4 h-4 shrink-0 transition-transform group-hover:translate-x-1" />
         </button>
+
         <button
           type="button"
           onClick={() => onNavigate('work')}
-          className="bg-white text-black hover:bg-[#27AAE0] hover:text-black text-[0.75rem] tracking-cad uppercase py-3.5 px-7 rounded-[9px] border border-black transition-colors cursor-pointer font-medium whitespace-nowrap"
+          onMouseEnter={(e) => triggerPillarAccent('02', e.currentTarget)}
+          onFocus={(e) => triggerPillarAccent('02', e.currentTarget)}
+          className="ui-surface bg-[#27AAE0] text-black border border-black rounded-[9px] p-4 sm:px-4 sm:py-4 flex items-center justify-between text-left hover:bg-black hover:text-white transition-colors cursor-pointer group"
         >
-          SELECTED WORK
+          <div>
+            <div className="text-[0.62rem] tracking-cad uppercase font-medium opacity-80">
+              02 / SELECTED WORK
+            </div>
+            <div className="text-[0.80rem] tracking-cad uppercase font-medium mt-0.5">
+              3D RENDERS &amp; 2D CAD
+            </div>
+          </div>
+          <ArrowRight className="w-4 h-4 shrink-0 transition-transform group-hover:translate-x-1" />
+        </button>
+
+        <button
+          type="button"
+          onClick={() => onNavigate('visualizer')}
+          onMouseEnter={(e) => triggerPillarAccent('06', e.currentTarget)}
+          onFocus={(e) => triggerPillarAccent('06', e.currentTarget)}
+          className="ui-surface bg-[#FDCB33] text-black border border-black rounded-[9px] p-4 sm:px-4 sm:py-4 flex items-center justify-between text-left hover:bg-black hover:text-white transition-colors cursor-pointer group"
+        >
+          <div>
+            <div className="text-[0.62rem] tracking-cad uppercase font-medium opacity-80">
+              06 / CONCEPT VISUALIZER
+            </div>
+            <div className="text-[0.80rem] tracking-cad uppercase font-medium mt-0.5">
+              BUILD YOUR IDEA
+            </div>
+          </div>
+          <ArrowRight className="w-4 h-4 shrink-0 transition-transform group-hover:translate-x-1" />
         </button>
       </div>
+
+      {/* 5. Compact Bauhaus Modular Wall Toolbar */}
+      <MortiseWallToolbar controller={wall} />
     </section>
   );
 };

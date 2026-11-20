@@ -8,7 +8,7 @@ export interface ProjectImage {
   label: string;
   alt: string;
   sheetNumber: string;
-  type: 'render' | 'cad';
+  type: 'render' | 'cad' | 'photo';
 }
 
 export interface ProjectData {
@@ -142,20 +142,26 @@ export const CadModal: React.FC<CadModalProps> = ({
     setCurrentIndex((prev) => (prev === project.images.length - 1 ? 0 : prev + 1));
   };
 
+  const imageTypeBadge =
+    activeImage?.type === 'cad'
+      ? '2D CAD DRAWING'
+      : activeImage?.type === 'photo'
+      ? 'FINISHED PHOTO'
+      : '3D RENDERING';
+
   const drawingTypeLabel = isSpecsOpen
     ? 'SPECIFICATION SCHEDULE'
-    : `${activeImage.sheetNumber} · ${
-        activeImage.type === 'cad' ? '2D CAD DRAWING' : '3D RENDERING'
-      }`;
+    : activeImage
+    ? `${activeImage.sheetNumber} · ${imageTypeBadge}`
+    : 'COMMISSION SHEET';
 
   const handleSavePortfolioSheet = async () => {
+    if (!activeImage) return;
     await downloadWatermarkedSheet(
       {
         imageSrc: activeImage.src,
         projectHeader: `${project.code} — ${project.title}`,
-        drawingTypeLabel: `${activeImage.sheetNumber} · ${
-          activeImage.type === 'cad' ? '2D CAD DRAWING' : '3D RENDERING'
-        }`,
+        drawingTypeLabel: `${activeImage.sheetNumber} · ${imageTypeBadge}`,
         bottomSpecLine: `${activeImage.label} · ${project.materials}`,
         leftBoxFill: '#EF6922',
         leftBoxText: '#000000',
@@ -231,7 +237,7 @@ export const CadModal: React.FC<CadModalProps> = ({
             }}
             className="w-full h-full flex items-center justify-center"
           >
-            {!isSpecsOpen ? (
+            {!isSpecsOpen && activeImage ? (
               <img
                 src={activeImage.src}
                 alt={activeImage.alt}
@@ -343,7 +349,7 @@ export const CadModal: React.FC<CadModalProps> = ({
               const isSheetActive = !isSpecsOpen && currentIndex === idx;
               return (
                 <button
-                  key={img.src}
+                  key={`${img.sheetNumber}-${idx}`}
                   type="button"
                   onClick={() => {
                     setIsSpecsOpen(false);

@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /invoice-studio
+Disallow: /api/
+
+Sitemap: https://casegoodsomaha.com/sitemap.xml

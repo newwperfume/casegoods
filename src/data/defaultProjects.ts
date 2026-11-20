@@ -1,0 +1,218 @@
+import type { ProjectData, ProjectImage } from '../components/CadModal.tsx';
+
+export type PortfolioCategoryTag = 'architectural' | 'furniture' | 'commercial';
+
+export interface PortfolioProject extends ProjectData {
+  dbId?: number;
+  pillarBg: string;
+  pillarCode: string;
+  tolerance: string;
+  published?: boolean;
+  sortOrder?: number;
+}
+
+export const PILLAR_PRESETS = [
+  {
+    id: 'pillar-01',
+    label: '01 / ORANGE — ARCHITECTURAL MILLWORK',
+    pillarBg: 'bg-[#EF6922]',
+    pillarCode: 'PILLAR 01 / ARCHITECTURAL MILLWORK',
+    categoryTag: 'architectural' as PortfolioCategoryTag,
+    defaultCategory: 'ARCHITECTURAL BUILT-IN',
+  },
+  {
+    id: 'pillar-02',
+    label: '02 / BLUE — WET BARS, ISLANDS & COMMERCIAL',
+    pillarBg: 'bg-[#27AAE0]',
+    pillarCode: 'PILLAR 02 / SPATIAL & COMMERCIAL FABRICATION',
+    categoryTag: 'commercial' as PortfolioCategoryTag,
+    defaultCategory: 'WET BAR & SPECIALTY CABINETRY',
+  },
+  {
+    id: 'pillar-03',
+    label: '03 / YELLOW — HEIRLOOM FURNITURE & 2D CAD',
+    pillarBg: 'bg-[#FDCB33]',
+    pillarCode: 'PILLAR 03 / HEIRLOOM PRODUCTS & 2D CAD',
+    categoryTag: 'furniture' as PortfolioCategoryTag,
+    defaultCategory: 'HEIRLOOM FURNITURE & CAD SUBMITTAL',
+  },
+] as const;
+
+export const DEFAULT_PORTFOLIO_PROJECTS: PortfolioProject[] = [
+  {
+    id: 'family-room',
+    code: '1064HEM',
+    pillarCode: 'PILLAR 01 / ARCHITECTURAL MILLWORK',
+    pillarBg: 'bg-[#EF6922]',
+    tolerance: '± 1/32" RHINO 3D',
+    title: 'FAMILY ROOM CABINETS & WINDOW BENCH',
+    recipient: 'HOLLYE HEMPEL',
+    category: 'ARCHITECTURAL BUILT-IN',
+    categoryTag: 'architectural',
+    materials: 'FLUTED BLACK WALNUT · FINGER-JOINTED WHITE OAK · TURNED PULLS',
+    dimensions: '144" W × 96" H FULL-WALL INSTALLATION',
+    description:
+      'Vertical and horizontal fluted American Black Walnut doors paired with exposed box-jointed Rift White Oak casework, integrated window bench storage, and custom lathe-turned cylindrical pulls.',
+    images: [
+      {
+        src: '/assets/render_1064HEM_1.jpg',
+        sheetNumber: 'SHEET 01',
+        label: 'Full architectural elevation — fluted walnut tower, window bench & floating shelves',
+        alt: '3D architectural elevation of 144-inch full-wall built-in showing 96-inch fluted black walnut tower, 18-inch-high window bench storage, floating shelves, and exposed box finger-jointed white oak casework',
+        type: 'render',
+      },
+      {
+        src: '/assets/render_1064HEM_4.jpg',
+        sheetNumber: 'SHEET 02',
+        label: 'Corner return & tower perspective — exposed finger-joint white oak casing',
+        alt: 'Corner return perspective detailing 24-inch-deep rift-sawn white oak casework with 0.75-inch exposed box finger-jointed corners and full-height semicircular fluted walnut doors',
+        type: 'render',
+      },
+      {
+        src: '/assets/render_1064HEM_2.jpg',
+        sheetNumber: 'SHEET 03',
+        label: 'Close-up detail — vertical & horizontal fluted walnut doors & turned hardware',
+        alt: 'Close-up millwork detail showing 0.5-inch-radius vertical and horizontal semicircular fluted black walnut doors paired with 1.25-inch lathe-turned solid wood cylindrical pulls',
+        type: 'render',
+      },
+      {
+        src: '/assets/render_1064HEM_3.jpg',
+        sheetNumber: 'SHEET 04',
+        label: 'Joinery detail — exposed finger-joint casework & scalloped drawer profiles',
+        alt: 'Joinery detail highlighting precision 0.75-inch exposed box finger-jointed solid white oak case corners, custom scalloped drawer fronts, and concealed soft-close undermount runners',
+        type: 'render',
+      },
+    ] as ProjectImage[],
+    specs: [
+      {
+        label: 'PRIMARY HARDWOODS',
+        value: 'Select American Black Walnut & Rift/Quarter-Sawn White Oak',
+      },
+      {
+        label: 'DOOR & DRAWER MILLWORK',
+        value: 'Custom vertical and horizontal semicircular fluting machined in-house',
+      },
+      {
+        label: 'CASEWORK JOINERY',
+        value: 'Exposed 3/4" box finger-joints along solid white oak case corners',
+      },
+      {
+        label: 'HARDWARE & PULLS',
+        value: 'Custom lathe-turned solid wood cylindrical pulls & concealed soft-close runners',
+      },
+    ],
+    published: true,
+    sortOrder: 0,
+  },
+  {
+    id: 'wet-bar',
+    code: '1064HEM-WB',
+    pillarCode: 'PILLAR 02 / SPATIAL & COMMERCIAL FABRICATION',
+    pillarBg: 'bg-[#27AAE0]',
+    tolerance: '± 1/32" RHINO 3D',
+    title: 'WET BAR CREDENZA & FLUTED TAMBOUR ISLAND',
+    recipient: 'HOLLYE HEMPEL',
+    category: 'WET BAR & SPECIALTY CABINETRY',
+    categoryTag: 'commercial',
+    materials: 'BAUHAUS COLOR-BLOCKED DRAWERS · FLUTED OAK TAMBOUR · WALNUT RAIL',
+    dimensions: '96" BACK BAR + 84" × 36" RADIUS ISLAND',
+    description:
+      'Radiused White Oak fluted tambour peninsula island with a mortised solid walnut foot rail and matte black top, paired with a book-matched walnut back bar concealing Bauhaus color-blocked dovetail drawers.',
+    images: [
+      {
+        src: '/assets/render_1064HEM_7.jpg',
+        sheetNumber: 'SHEET 01',
+        label: 'Island perspective — fluted oak tambour front, walnut foot rail & matte black top',
+        alt: '3D rendering of 84-inch by 36-inch radiused wet bar peninsula island featuring 42-inch-high oversized vertical fluted white oak tambour columns, mortised solid walnut foot rail, and 1.5-inch matte black top',
+        type: 'render',
+      },
+      {
+        src: '/assets/render_1064HEM_6.jpg',
+        sheetNumber: 'SHEET 02',
+        label: 'Interior elevation — color-blocked drawer stack in gray, blue & Bauhaus orange',
+        alt: 'Interior elevation of 96-inch walnut back bar credenza showing 36-inch counter height, book-matched walnut doors with routed finger-pull joinery, and Bauhaus color-blocked dovetail drawer stack',
+        type: 'render',
+      },
+      {
+        src: '/assets/render_1064HEM_5.jpg',
+        sheetNumber: 'SHEET 03',
+        label: 'Overhead spatial layout — back bar credenza & peninsula sink island',
+        alt: 'Overhead architectural plan view showing 96-inch back bar credenza, 42-inch walkway clearance, and 84-inch radiused fluted white oak tambour peninsula island with undermount stainless bar sink',
+        type: 'render',
+      },
+    ] as ProjectImage[],
+    specs: [
+      {
+        label: 'ISLAND FRONT',
+        value: 'Oversized vertical fluted white oak columns with solid walnut base rail',
+      },
+      {
+        label: 'ACCENT DRAWER FRONTS',
+        value:
+          'Color-blocked in Bauhaus Orange (#EF6922), Fabrication Blue (#27AAE0) & Gray (#CBCBCB)',
+      },
+      {
+        label: 'CASEWORK & DOORS',
+        value: 'Vertical book-matched walnut doors with integrated black finger pulls',
+      },
+      {
+        label: 'COUNTERTOPS',
+        value: 'Matte black radiused countertop with stainless undermount bar sink',
+      },
+    ],
+    published: true,
+    sortOrder: 1,
+  },
+  {
+    id: 'kids-kitchen',
+    code: '1070MCG',
+    pillarCode: 'PILLAR 03 / HEIRLOOM PRODUCTS & 2D CAD',
+    pillarBg: 'bg-[#FDCB33]',
+    tolerance: 'FRACTIONAL 2D CAD',
+    title: 'HEIRLOOM PLAY KITCHEN & BUILT-IN WALL — SHOP DRAWINGS',
+    recipient: 'LAUREN & JOE MCGILL',
+    category: 'HEIRLOOM FURNITURE & CAD SUBMITTAL',
+    categoryTag: 'furniture',
+    materials: 'SOLID BLACK WALNUT · STACKED-BALL LATHE LEGS · SCALLOPED APRON',
+    dimensions: '48 1/4" W KITCHENETTE + 72 3/4" W × 101" H BUILT-IN',
+    description:
+      'Dimensioned 2D Rhino CAD elevation and section shop drawings for a solid walnut heirloom play kitchen featuring lathe-turned stacked-ball legs, a continuous scalloped apron, and full-height adjacent storage.',
+    images: [
+      {
+        src: '/assets/cad_1070MCG_elevation.png',
+        sheetNumber: 'ELEVATION A1',
+        label:
+          'Kids kitchen elevation drawing — full fractional dimensions (48 1/4" width / 101" height)',
+        alt: 'Rhino 2D CAD elevation drawing showing 48.25-inch overall countertop span and stacked-ball lathe legs',
+        type: 'cad',
+      },
+      {
+        src: '/assets/cad_1070MCG_section.png',
+        sheetNumber: 'SECTION B1',
+        label: 'Section view through kids kitchen & plumbing clearance detail',
+        alt: 'Rhino 2D CAD section B1 shop drawing detailing 30.5-inch countertop height, 9.75-inch stacked-ball lathe leg tenon joinery, continuous scalloped apron profile, and 72.75-inch by 101-inch built-in storage wall',
+        type: 'cad',
+      },
+    ] as ProjectImage[],
+    specs: [
+      {
+        label: 'ENGINEERING SOFTWARE',
+        value: 'Rhino 3D CAD Modeling & Dimensioned 2D Architectural Shop Drawings',
+      },
+      {
+        label: 'KITCHENETTE WIDTH',
+        value: '48 1/4" Overall Countertop Span × 30 1/2" Counter Height',
+      },
+      {
+        label: 'TURNED & SHAPED DETAILS',
+        value: 'Lathe-turned stacked-ball legs (9 3/4" H) with continuous scalloped apron',
+      },
+      {
+        label: 'ADJACENT MILLWORK',
+        value: '72 3/4" W × 101" H full-height architectural storage cabinetry',
+      },
+    ],
+    published: true,
+    sortOrder: 2,
+  },
+];
