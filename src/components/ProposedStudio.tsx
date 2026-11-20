@@ -123,7 +123,7 @@ export const STUDIO_INDEX_PAGES: ProposedPageMeta[] = [
     shortTag: '05 / INQUIRE',
     label: '05 / COMMISSION INQUIRY',
     headerTitle: '05 / COMMISSION A BUILD — PROJECT INQUIRY SCHEDULE',
-    headerRight: 'DIRECT: 402-720-1377',
+    headerRight: 'DIRECT: 402-830-8782',
     bgClass: 'bg-black',
     textClass: 'text-white',
     hoverBgClass: 'hover:bg-black',
@@ -291,9 +291,9 @@ export const ProposedStudio: React.FC = () => {
   const headerRef = useRef<HTMLElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const OWNER_PHONE = '+14027201377';
-  const OWNER_PHONE_DISPLAY = '402-720-1377';
-  const OWNER_EMAIL = 'casegoodsne@gmail.com';
+  const OWNER_PHONE = '+14028308782';
+  const OWNER_PHONE_DISPLAY = '402-830-8782';
+  const OWNER_EMAIL = 'josh@casegoodsomaha.com';
 
   const activePageMeta =
     STUDIO_INDEX_PAGES.find((p) => p.id === activePage) || STUDIO_INDEX_PAGES[0];
@@ -1475,10 +1475,10 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
                         SUBMIT FLOOR PLANS OR DRAWINGS →
                       </button>
                       <a
-                        href="mailto:casegoodsne@gmail.com?subject=Trade%20%2F%20Architectural%20Collaboration%20Inquiry"
+                        href="mailto:josh@casegoodsomaha.com?subject=Trade%20%2F%20Architectural%20Collaboration%20Inquiry"
                         className="bg-white text-black hover:bg-[#CBCBCB] text-[0.74rem] tracking-cad uppercase py-3 px-5 rounded-[9px] border border-black transition-colors font-medium"
                       >
-                        EMAIL CASEGOODSNE@GMAIL.COM
+                        EMAIL JOSH@CASEGOODSOMAHA.COM
                       </a>
                     </div>
                   </div>

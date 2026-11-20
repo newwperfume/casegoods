@@ -82,10 +82,10 @@ export const TradePartners: React.FC<TradePartnersProps> = ({ onNavigateInquire 
                 SUBMIT FLOOR PLANS OR DRAWINGS
               </button>
               <a
-                href="mailto:casegoodsne@gmail.com?subject=Trade%20%2F%20Architectural%20Collaboration%20Inquiry"
+                href="mailto:josh@casegoodsomaha.com?subject=Trade%20%2F%20Architectural%20Collaboration%20Inquiry"
                 className="bg-white text-black text-[0.76rem] tracking-cad uppercase py-3 px-6 rounded-[9px] border border-[#FDCB33] hover:bg-[#FDCB33]/10 transition-all text-center font-normal"
               >
-                EMAIL CASEGOODSNE@GMAIL.COM
+                EMAIL JOSH@CASEGOODSOMAHA.COM
               </a>
             </div>
           </div>

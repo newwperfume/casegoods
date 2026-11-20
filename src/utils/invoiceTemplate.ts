@@ -338,7 +338,7 @@ export async function generateInkscapeInvoiceSvg(
       height="41"
       preserveAspectRatio="xMidYMid meet"
       xlink:href="data:image/png;base64,${logoIconsB64}" />
-    <text x="408" y="1004" text-anchor="middle" font-family="${fontStack}" font-size="8.5" font-weight="400" fill="#000000" letter-spacing="0.14em">CASEGOODS  •  JOSH HEINKE  •  402-720-1377  •  CASEGOODSNE@GMAIL.COM  •  OMAHA, NEBRASKA</text>
+    <text x="408" y="1004" text-anchor="middle" font-family="${fontStack}" font-size="8.5" font-weight="400" fill="#000000" letter-spacing="0.14em">CASEGOODS  •  JOSH HEINKE  •  402-830-8782  •  JOSH@CASEGOODSOMAHA.COM  •  OMAHA, NEBRASKA</text>
   </g>
 
   <!-- LAYER 03: Client & Project Info (Double-Click Any Text to Edit) -->
@@ -789,7 +789,7 @@ export async function generatePdfCraftInvoicePdf(
   });
 
   drawTextCenter(
-    'CASEGOODS  •  JOSH HEINKE  •  402-720-1377  •  CASEGOODSNE@GMAIL.COM  •  OMAHA, NEBRASKA',
+    'CASEGOODS  •  JOSH HEINKE  •  402-830-8782  •  JOSH@CASEGOODSOMAHA.COM  •  OMAHA, NEBRASKA',
     408,
     1004,
     8,

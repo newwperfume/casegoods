@@ -26,9 +26,9 @@ export const InquiryForm: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Exact Studio Owner Contact Details from Uploaded Business Card
-  const OWNER_PHONE = '+14027201377';
-  const OWNER_PHONE_DISPLAY = '402-720-1377';
-  const OWNER_EMAIL = 'casegoodsne@gmail.com';
+  const OWNER_PHONE = '+14028308782';
+  const OWNER_PHONE_DISPLAY = '402-830-8782';
+  const OWNER_EMAIL = 'josh@casegoodsomaha.com';
 
   const formatFileSize = (bytes: number) => {
     if (bytes < 1024) return `${bytes} B`;

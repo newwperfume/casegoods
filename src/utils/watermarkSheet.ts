@@ -271,7 +271,7 @@ export async function renderWatermarkedSheet(
     ctx.textAlign = 'right';
     ctx.font = '500 13px "Plus Jakarta Sans", sans-serif';
     ctx.fillText(
-      'CASEGOODS · HANDCRAFTED IN OMAHA · 402-720-1377',
+      'CASEGOODS · HANDCRAFTED IN OMAHA · 402-830-8782',
       artX + artWidth,
       specY
     );

@@ -77,7 +77,7 @@ function appendConceptLog(record: LoggedConceptRecord) {
 
 async function dispatchConceptEmailToOwner(record: LoggedConceptRecord) {
   try {
-    const response = await fetch('https://formsubmit.co/ajax/casegoodsne@gmail.com', {
+    const response = await fetch('https://formsubmit.co/ajax/josh@casegoodsomaha.com', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

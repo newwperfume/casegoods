@@ -371,7 +371,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterStudio }) => {
         <footer className="w-full py-5">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-[0.72rem] tracking-cad uppercase text-black/75 font-light">
             <span>CASEGOODS • HANDCRAFTED IN OMAHA, NEBRASKA</span>
-            <span>JOSH HEINKE • MAKER OF THINGS • 402-720-1377</span>
+            <span>JOSH HEINKE • MAKER OF THINGS • 402-830-8782</span>
           </div>
         </footer>
       </div>

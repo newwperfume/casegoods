@@ -298,9 +298,9 @@ export const ConceptVisualizer: React.FC<ConceptVisualizerProps> = ({
   const { user, getFreshToken, signInWithGoogle, signOutUser } = useAuth();
   const photoInputRef = useRef<HTMLInputElement | null>(null);
 
-  const OWNER_PHONE = '+14027201377';
-  const OWNER_PHONE_DISPLAY = '402-720-1377';
-  const OWNER_EMAIL = 'casegoodsne@gmail.com';
+  const OWNER_PHONE = '+14028308782';
+  const OWNER_PHONE_DISPLAY = '402-830-8782';
+  const OWNER_EMAIL = 'josh@casegoodsomaha.com';
 
   const activeConcept =
     state.history.find((item) => item.id === state.activeConceptId) ||
