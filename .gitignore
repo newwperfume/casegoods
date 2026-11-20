@@ -6,7 +6,3 @@ coverage/
 *.log
 .env*
 !.env.example
-.aistudio/
-public/generated-concepts/*.png
-public/generated-concepts/*.jpg
-public/generated-concepts/*.webp

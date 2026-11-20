@@ -84,20 +84,9 @@
   background: #EF6922;
 }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-.animate-fadeIn {
-  animation: fadeIn 0.16s ease-out both;
-}
-
-/* Interactive Mortise & Tenon Modular Wall System */
+/* ==========================================================================
+   Casegoods Interactive Modular Mortise Wall
+   ========================================================================== */
 :root {
   --cg-white: #FFFFFF;
   --cg-black: #000000;
@@ -122,16 +111,19 @@ body.wall-slot-hover {
   display: block;
 }
 
+/* Landing page wrapper passes clicks through open margins to the wall */
 .mortise-page-shell {
   position: relative;
   z-index: 1;
   pointer-events: none;
 }
 
+/* Interactive UI surfaces receive normal pointer events */
 .ui-surface {
   pointer-events: auto;
 }
 
+/* Compact Bauhaus Wall Control Strip */
 .wall-toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -139,10 +131,10 @@ body.wall-slot-hover {
   justify-content: space-between;
   gap: 10px 14px;
   padding: 9px 12px;
-  background-color: rgba(255, 255, 255, 0.92);
+  background-color: rgba(255, 255, 255, 0.94);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
-  border: 1px solid var(--cg-gray);
+  border: 1.5px solid var(--cg-black);
   border-radius: var(--radius-cg);
 }
 
@@ -160,7 +152,13 @@ body.wall-slot-hover {
   padding: 0 11px;
   border: 1.5px solid var(--cg-gray);
   border-radius: 6px;
-  background-color: var(--cg-white);
+  background-color: #eadbc4;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.36), rgba(255, 255, 255, 0.36)),
+    url('/assets/aistudio/watermarked_img_13606778923742787615_7e162b39.webp');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
   color: var(--cg-black);
   font-size: 0.7rem;
   font-weight: 500;
@@ -168,19 +166,21 @@ body.wall-slot-hover {
   text-transform: uppercase;
   white-space: nowrap;
   cursor: pointer;
-  transition: border-color 140ms ease, background-color 140ms ease, box-shadow 140ms ease, transform 120ms ease;
+  transition: border-color 140ms ease, filter 140ms ease;
 }
 
 .wall-tool-btn:hover {
   border-color: var(--cg-black);
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.14)),
+    url('/assets/aistudio/watermarked_img_13606778923742787615_7e162b39.webp');
 }
 
 .wall-tool-btn[aria-pressed="true"] {
   border-color: var(--cg-black);
-  background-color: var(--pillar-active);
+  background-image: url('/assets/aistudio/watermarked_img_13606778923742787615_7e162b39.webp');
   color: var(--cg-black);
-  box-shadow: 2px 2px 0 var(--cg-black);
-  transform: translate(-1px, -1px);
+  font-weight: 600;
 }
 
 .wall-tool-icon {
@@ -194,33 +194,6 @@ body.wall-slot-hover {
   display: inline-flex;
   align-items: center;
   gap: 12px;
-}
-
-.swatch-group {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.swatch-btn {
-  width: 20px;
-  height: 20px;
-  border-radius: 5px;
-  border: 2px solid var(--cg-black);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: transform 140ms ease, box-shadow 140ms ease;
-}
-
-.swatch-btn[data-swatch="01"] { background-color: var(--cg-orange); }
-.swatch-btn[data-swatch="02"] { background-color: var(--cg-blue); }
-.swatch-btn[data-swatch="06"] { background-color: var(--cg-yellow); }
-
-.swatch-btn[aria-pressed="true"] {
-  transform: translateY(-2px);
-  box-shadow: 0 2px 0 var(--cg-black);
 }
 
 .text-action-link {
@@ -241,3 +214,4 @@ body.wall-slot-hover {
 .text-action-link:hover {
   border-bottom-color: var(--cg-black);
 }
+

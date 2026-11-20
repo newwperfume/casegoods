@@ -16,18 +16,23 @@ import {
   ArrowLeft,
 } from 'lucide-react';
 import { ASSETS } from '../assets/index.ts';
-import { type ProjectData, CadModal } from './CadModal.tsx';
+import { ProjectData, CadModal } from './CadModal.tsx';
 import { Footer } from './Footer.tsx';
 import {
   ConceptVisualizer,
-  type ConceptVisualizerState,
-  type GeneratedConceptItem,
+  ConceptVisualizerState,
+  GeneratedConceptItem,
 } from './ConceptVisualizer.tsx';
 import { FrontCoverOptions } from './FrontCoverOptions.tsx';
+import { useAuth } from '../context/AuthContext.tsx';
 import {
   MortiseWallCanvas,
   useMortiseWallController,
 } from './MortiseWallSystem.tsx';
+import {
+  DEFAULT_PORTFOLIO_PROJECTS,
+  type PortfolioProject,
+} from '../data/defaultProjects.ts';
 
 type HeroViewMode = 'split' | 'cad' | 'render';
 type TeaserLensId = 'joint' | 'grain' | 'line' | 'color';
@@ -212,24 +217,8 @@ interface AttachedFile {
   previewUrl?: string;
 }
 
-const VALID_PAGE_IDS: ProposedPageId[] = [
-  'cover',
-  'methodology',
-  'work',
-  'capabilities',
-  'process',
-  'inquire',
-  'visualizer',
-];
-
-function getPageFromHash(): ProposedPageId {
-  if (typeof window === 'undefined') return 'cover';
-  const raw = window.location.hash.replace(/^#/, '').toLowerCase() as ProposedPageId;
-  return VALID_PAGE_IDS.includes(raw) ? raw : 'cover';
-}
-
 export const ProposedStudio: React.FC = () => {
-  const [activePage, setActivePage] = useState<ProposedPageId>(() => getPageFromHash());
+  const [activePage, setActivePage] = useState<ProposedPageId>('cover');
   const wall = useMortiseWallController('01');
   const [menuOpen, setMenuOpen] = useState(false);
   const [heroView, setHeroView] = useState<HeroViewMode>('split');
@@ -301,20 +290,6 @@ export const ProposedStudio: React.FC = () => {
 
   const headerRef = useRef<HTMLElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const inquiryFormRef = useRef<HTMLFormElement | null>(null);
-  const attachmentsRef = useRef<AttachedFile[]>([]);
-
-  useEffect(() => {
-    attachmentsRef.current = attachments;
-  }, [attachments]);
-
-  useEffect(() => {
-    return () => {
-      attachmentsRef.current.forEach((item) => {
-        if (item.previewUrl) URL.revokeObjectURL(item.previewUrl);
-      });
-    };
-  }, []);
 
   const OWNER_PHONE = '+14027201377';
   const OWNER_PHONE_DISPLAY = '402-720-1377';
@@ -327,48 +302,15 @@ export const ProposedStudio: React.FC = () => {
   const nextPageMeta =
     currentPageIdx < STUDIO_INDEX_PAGES.length - 1 ? STUDIO_INDEX_PAGES[currentPageIdx + 1] : null;
 
-  // Sync browser Back/Forward navigation with activePage
-  useEffect(() => {
-    const syncFromUrl = () => {
-      setActivePage(getPageFromHash());
-      setMenuOpen(false);
-    };
-    window.addEventListener('hashchange', syncFromUrl);
-    window.addEventListener('popstate', syncFromUrl);
-    return () => {
-      window.removeEventListener('hashchange', syncFromUrl);
-      window.removeEventListener('popstate', syncFromUrl);
-    };
-  }, []);
-
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (headerRef.current && !headerRef.current.contains(e.target as Node)) {
         setMenuOpen(false);
       }
     };
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        if (menuOpen) setMenuOpen(false);
-        if (submitState === 'modal') setSubmitState('idle');
-      }
-    };
     document.addEventListener('mousedown', handleClickOutside);
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [menuOpen, submitState]);
-
-  useEffect(() => {
-    if (submitState !== 'modal') return;
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = prevOverflow;
-    };
-  }, [submitState]);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const pendingTargetRef = useRef<string | undefined>(undefined);
 
@@ -412,14 +354,6 @@ export const ProposedStudio: React.FC = () => {
     pendingTargetRef.current = targetElementId;
     setActivePage(pageId);
 
-    const targetHash = pageId === 'cover' ? '' : `#${pageId}`;
-    if (typeof window !== 'undefined' && window.location.hash !== targetHash) {
-      const nextUrl = targetHash
-        ? `${window.location.pathname}${window.location.search}${targetHash}`
-        : `${window.location.pathname}${window.location.search}`;
-      window.history.pushState(null, '', nextUrl);
-    }
-
     if (!targetElementId) {
       scrollToTopImmediate();
       requestAnimationFrame(() => {
@@ -428,176 +362,31 @@ export const ProposedStudio: React.FC = () => {
     }
   };
 
-  /**
-   * Each project is anchored to one of the Three Core Pillars:
-   * - 1064HEM Family Room -> Pillar 01: #EF6922 (Bauhaus Orange)
-   * - 1064HEM-WB Wet Bar  -> Pillar 02: #27AAE0 (Fabrication Blue)
-   * - 1070MCG Kids Kitchen-> Pillar 03: #FDCB33 (Flex Yellow)
-   */
-  const projects: (ProjectData & {
-    pillarBg: string;
-    pillarCode: string;
-    tolerance: string;
-  })[] = [
-    {
-      id: 'family-room',
-      code: '1064HEM',
-      pillarCode: 'PILLAR 01 / ARCHITECTURAL MILLWORK',
-      pillarBg: 'bg-[#EF6922]',
-      tolerance: '± 1/32" RHINO 3D',
-      title: 'FAMILY ROOM CABINETS & WINDOW BENCH',
-      category: 'ARCHITECTURAL BUILT-IN',
-      categoryTag: 'architectural',
-      materials: 'FLUTED BLACK WALNUT · FINGER-JOINTED WHITE OAK · TURNED PULLS',
-      dimensions: '144" W × 96" H FULL-WALL INSTALLATION',
-      description:
-        'Vertical and horizontal fluted American Black Walnut doors paired with exposed box-jointed Rift White Oak casework, integrated window bench storage, and custom lathe-turned cylindrical pulls.',
-      images: [
-        {
-          src: ASSETS.familyRoom.sheet1FullElevation,
-          sheetNumber: 'SHEET 01',
-          label: 'Full architectural elevation — fluted walnut tower, window bench & floating shelves',
-          alt: '3D architectural elevation of 144-inch full-wall built-in showing 96-inch fluted black walnut tower, 18-inch-high window bench storage, floating shelves, and exposed box finger-jointed white oak casework',
-          type: 'render',
-        },
-        {
-          src: ASSETS.familyRoom.sheet2CornerReturn,
-          sheetNumber: 'SHEET 02',
-          label: 'Corner return & tower perspective — exposed finger-joint white oak casing',
-          alt: 'Corner return perspective detailing 24-inch-deep rift-sawn white oak casework with 0.75-inch exposed box finger-jointed corners and full-height semicircular fluted walnut doors',
-          type: 'render',
-        },
-        {
-          src: ASSETS.familyRoom.sheet3FlutedDetail,
-          sheetNumber: 'SHEET 03',
-          label: 'Close-up detail — vertical & horizontal fluted walnut doors & turned hardware',
-          alt: 'Close-up millwork detail showing 0.5-inch-radius vertical and horizontal semicircular fluted black walnut doors paired with 1.25-inch lathe-turned solid wood cylindrical pulls',
-          type: 'render',
-        },
-        {
-          src: ASSETS.familyRoom.sheet4JoineryDetail,
-          sheetNumber: 'SHEET 04',
-          label: 'Joinery detail — exposed finger-joint casework & scalloped drawer profiles',
-          alt: 'Joinery detail highlighting precision 0.75-inch exposed box finger-jointed solid white oak case corners, custom scalloped drawer fronts, and concealed soft-close undermount runners',
-          type: 'render',
-        },
-      ],
-      specs: [
-        { label: 'PRIMARY HARDWOODS', value: 'Select American Black Walnut & Rift/Quarter-Sawn White Oak' },
-        { label: 'DOOR & DRAWER MILLWORK', value: 'Custom vertical and horizontal semicircular fluting machined in-house' },
-        { label: 'CASEWORK JOINERY', value: 'Exposed 3/4" box finger-joints along solid white oak case corners' },
-        { label: 'HARDWARE & PULLS', value: 'Custom lathe-turned solid wood cylindrical pulls & concealed soft-close runners' },
-      ],
-    },
-    {
-      id: 'wet-bar',
-      code: '1064HEM-WB',
-      pillarCode: 'PILLAR 02 / SPATIAL & COMMERCIAL FABRICATION',
-      pillarBg: 'bg-[#27AAE0]',
-      tolerance: '± 1/32" RHINO 3D',
-      title: 'WET BAR CREDENZA & FLUTED TAMBOUR ISLAND',
-      category: 'WET BAR & SPECIALTY CABINETRY',
-      categoryTag: 'commercial',
-      materials: 'BAUHAUS COLOR-BLOCKED DRAWERS · FLUTED OAK TAMBOUR · WALNUT RAIL',
-      dimensions: '96" BACK BAR + 84" × 36" RADIUS ISLAND',
-      description:
-        'Radiused White Oak fluted tambour peninsula island with a mortised solid walnut foot rail and matte black top, paired with a book-matched walnut back bar concealing Bauhaus color-blocked dovetail drawers.',
-      images: [
-        {
-          src: ASSETS.wetBar.sheet6TambourIsland,
-          sheetNumber: 'SHEET 01',
-          label: 'Island perspective — fluted oak tambour front, walnut foot rail & matte black top',
-          alt: '3D rendering of 84-inch by 36-inch radiused wet bar peninsula island featuring 42-inch-high oversized vertical fluted white oak tambour columns, mortised solid walnut foot rail, and 1.5-inch matte black top',
-          type: 'render',
-        },
-        {
-          src: ASSETS.wetBar.sheet7ColorBlockedDrawers,
-          sheetNumber: 'SHEET 02',
-          label: 'Interior elevation — color-blocked drawer stack in gray, blue & Bauhaus orange',
-          alt: 'Interior elevation of 96-inch walnut back bar credenza showing 36-inch counter height, book-matched walnut doors with routed finger-pull joinery, and Bauhaus color-blocked dovetail drawer stack',
-          type: 'render',
-        },
-        {
-          src: ASSETS.wetBar.sheet5OverheadLayout,
-          sheetNumber: 'SHEET 03',
-          label: 'Overhead spatial layout — back bar credenza & peninsula sink island',
-          alt: 'Overhead architectural plan view showing 96-inch back bar credenza, 42-inch walkway clearance, and 84-inch radiused fluted white oak tambour peninsula island with undermount stainless bar sink',
-          type: 'render',
-        },
-      ],
-      specs: [
-        { label: 'ISLAND FRONT', value: 'Oversized vertical fluted white oak columns with solid walnut base rail' },
-        { label: 'ACCENT DRAWER FRONTS', value: 'Color-blocked in Bauhaus Orange (#EF6922), Fabrication Blue (#27AAE0) & Gray (#CBCBCB)' },
-        { label: 'CASEWORK & DOORS', value: 'Vertical book-matched walnut doors with integrated black finger pulls' },
-        { label: 'COUNTERTOPS', value: 'Matte black radiused countertop with stainless undermount bar sink' },
-      ],
-    },
-    {
-      id: 'kids-kitchen',
-      code: '1070MCG',
-      pillarCode: 'PILLAR 03 / HEIRLOOM PRODUCTS & 2D CAD',
-      pillarBg: 'bg-[#FDCB33]',
-      tolerance: 'FRACTIONAL 2D CAD',
-      title: 'HEIRLOOM PLAY KITCHEN & BUILT-IN WALL — SHOP DRAWINGS',
-      category: 'HEIRLOOM FURNITURE & CAD SUBMITTAL',
-      categoryTag: 'furniture',
-      materials: 'SOLID BLACK WALNUT · STACKED-BALL LATHE LEGS · SCALLOPED APRON',
-      dimensions: '48 1/4" W KITCHENETTE + 72 3/4" W × 101" H BUILT-IN',
-      description:
-        'Dimensioned 2D Rhino CAD elevation and section shop drawings for a solid walnut heirloom play kitchen featuring lathe-turned stacked-ball legs, a continuous scalloped apron, and full-height adjacent storage.',
-      images: [
-        {
-          src: ASSETS.kidsKitchen.elevationA1,
-          sheetNumber: 'ELEVATION A1',
-          label: 'Kids kitchen elevation drawing — full fractional dimensions (48 1/4" width / 101" height)',
-          alt: 'Rhino 2D CAD elevation drawing showing 48.25-inch overall countertop span and stacked-ball lathe legs',
-          type: 'cad',
-        },
-        {
-          src: ASSETS.kidsKitchen.sectionB1,
-          sheetNumber: 'SECTION B1',
-          label: 'Section view through kids kitchen & plumbing clearance detail',
-          alt: 'Rhino 2D CAD section B1 shop drawing detailing 30.5-inch countertop height, 9.75-inch stacked-ball lathe leg tenon joinery, continuous scalloped apron profile, and 72.75-inch by 101-inch built-in storage wall',
-          type: 'cad',
-        },
-      ],
-      specs: [
-        { label: 'ENGINEERING SOFTWARE', value: 'Rhino 3D CAD Modeling & Dimensioned 2D Architectural Shop Drawings' },
-        { label: 'KITCHENETTE WIDTH', value: '48 1/4" Overall Countertop Span × 30 1/2" Counter Height' },
-        { label: 'TURNED & SHAPED DETAILS', value: 'Lathe-turned stacked-ball legs (9 3/4" H) with continuous scalloped apron' },
-        { label: 'ADJACENT MILLWORK', value: '72 3/4" W × 101" H full-height architectural storage cabinetry' },
-      ],
-    },
-  ];
+  const [projects, setProjects] = useState<PortfolioProject[]>(DEFAULT_PORTFOLIO_PROJECTS);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/projects');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled && Array.isArray(data.projects) && data.projects.length > 0) {
+          setProjects(data.projects);
+        }
+      } catch {
+        // Keep seeded default projects if API is momentarily unavailable
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const filteredProjects = projects.filter((p) => {
     if (filter === 'all') return true;
-    if (filter === 'architectural') return p.id === 'family-room' || p.id === 'wet-bar';
-    if (filter === 'furniture') return p.id === 'kids-kitchen';
-    if (filter === 'commercial') return p.id === 'wet-bar';
-    return true;
+    return p.categoryTag === filter;
   });
-
-  const handleInquireAboutProject = (project: ProjectData) => {
-    const mappedType =
-      project.categoryTag === 'architectural'
-        ? 'Architectural Built-In / Cabinetry'
-        : project.categoryTag === 'commercial'
-        ? 'Commercial Millwork'
-        : 'Custom Furniture';
-    const refLine = `Inspired by ${project.code} (${project.title}).`;
-
-    setFormData((prev) => ({
-      ...prev,
-      projectType: mappedType,
-      details: prev.details.includes(project.code)
-        ? prev.details
-        : prev.details.trim()
-        ? `${refLine}\n\n${prev.details.trim()}`
-        : `${refLine} `,
-    }));
-    navigateToPage('inquire');
-  };
 
   const currentLens =
     INSPECTION_LENSES.find((l) => l.id === activeLens) || INSPECTION_LENSES[0];
@@ -663,77 +452,87 @@ Reference Photos / Sketches: ${attachmentNames}${
 Details: ${formData.details || 'Custom woodworking commission'}`;
   };
 
-  const handleSubmit = (e: React.FormEvent, mode: 'sms' | 'email') => {
+  const { getFreshToken } = useAuth();
+
+  const handleSubmit = async (e: React.FormEvent, mode: 'sms' | 'email') => {
     e.preventDefault();
-    if (inquiryFormRef.current && !inquiryFormRef.current.reportValidity()) {
-      return;
-    }
     setSubmitMode(mode);
     const summary = formatSummary();
+
+    const activeConcept =
+      visualizerState.history.find((c) => c.id === visualizerState.activeConceptId) ||
+      visualizerState.history[0] ||
+      null;
+
+    // Persist inquiry to Cloud SQL in the background
+    getFreshToken()
+      .then((token) => {
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (token) {
+          headers.Authorization = `Bearer ${token}`;
+        }
+        return fetch('/api/inquiries', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            name: formData.name || 'Studio Visitor',
+            email: formData.contact || 'Not provided',
+            phone: formData.contact || '',
+            projectType: formData.projectType,
+            timeline: formData.timeline,
+            dimensions: formData.location,
+            description: formData.details || summary,
+            conceptId: activeConcept?.id || '',
+          }),
+        });
+      })
+      .catch(() => {});
 
     if (mode === 'sms') {
       window.location.href = `sms:${OWNER_PHONE}?&body=${encodeURIComponent(summary)}`;
     } else {
-      const subject = `Commission Inquiry: ${formData.projectType}${
-        formData.name.trim() ? ` — ${formData.name.trim()}` : ''
-      }`;
+      const subject = `Commission Inquiry: ${formData.projectType} — ${formData.name}`;
       window.location.href = `mailto:${OWNER_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(summary)}`;
     }
     setSubmitState('modal');
   };
 
-  const handleCopy = async () => {
-    const text = formatSummary();
-    try {
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(text);
-      } else {
-        throw new Error('Clipboard API unavailable');
-      }
-    } catch {
-      const textarea = document.createElement('textarea');
-      textarea.value = text;
-      textarea.style.position = 'fixed';
-      textarea.style.opacity = '0';
-      document.body.appendChild(textarea);
-      textarea.select();
-      try {
-        document.execCommand('copy');
-      } catch {
-        // Ignore if copy is blocked
-      }
-      document.body.removeChild(textarea);
-    }
+  const handleCopy = () => {
+    navigator.clipboard.writeText(formatSummary());
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
   };
 
+  const isCover = activePage === 'cover';
+  const isAnyModalOpen =
+    Boolean(lightboxState.project) || submitState === 'modal' || menuOpen;
+
   return (
     <>
-      {activePage === 'cover' && (
+      {isCover && (
         <MortiseWallCanvas
           controller={wall}
           heroSelector="#hero-center-stack"
           headerSelector="header"
           footerSelector="footer"
-          isModalOpen={Boolean(lightboxState.project) || submitState === 'modal'}
+          isModalOpen={isAnyModalOpen}
         />
       )}
       <div
-        className={`min-h-screen text-black font-nexa antialiased flex flex-col selection:bg-[#EF6922] selection:text-black ${
-          activePage === 'cover' ? 'mortise-page-shell' : 'bg-white'
-        }`}
+        className={`${
+          isCover ? 'mortise-page-shell' : 'bg-white'
+        } min-h-screen text-black font-nexa antialiased flex flex-col selection:bg-[#EF6922] selection:text-black`}
       >
-      {/* =======================================================================
-          TOP BAR CONTRACT: 3-Zone Architectural Header
-          Hidden on the initial minimal front page ('cover'); appears once the
-          visitor enters the studio pages (01–06).
-      ======================================================================= */}
-      {activePage !== 'cover' && (
-        <header
-          ref={headerRef}
-          className="sticky top-0 z-40 bg-white border-b-[1.5px] border-black"
-        >
+        {/* =======================================================================
+            TOP BAR CONTRACT: 3-Zone Architectural Header
+            Hidden on the initial minimal front page ('cover'); appears once the
+            visitor enters the studio pages (01–06).
+        ======================================================================= */}
+        {activePage !== 'cover' && (
+          <header
+            ref={headerRef}
+            className="ui-surface sticky top-0 z-40 bg-white border-b-[1.5px] border-black"
+          >
           <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4">
             <div className="grid grid-cols-1 md:grid-cols-[260px_1fr_260px] lg:grid-cols-[280px_1fr_280px] items-center gap-4">
               {/* Zone 1: Studio Index Dropdown — Reflects Selected Page Color */}
@@ -870,7 +669,7 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
       <main
         className={`flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 ${
           activePage === 'cover'
-            ? 'py-8 sm:py-12 flex flex-col justify-center'
+            ? 'py-4 sm:py-6 flex flex-col justify-center'
             : 'pt-8 pb-16 flex flex-col justify-between'
         }`}
       >
@@ -906,7 +705,7 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
                       OMAHA, NEBRASKA · CUSTOM FURNITURE &amp; ARCHITECTURAL MILLWORK
                     </p>
                     <h1 className="text-[1.35rem] sm:text-[1.65rem] font-normal text-black leading-snug mb-3">
-                      We engineer and handcraft the pieces that have never been built before.
+                      we make the things that have never been made before
                     </h1>
                     <p className="text-[0.94rem] sm:text-[1.0rem] font-light leading-relaxed text-black max-w-[62ch]">
                       Every commission in our Omaha studio starts as a dimensioned 2D &amp; 3D Rhino
@@ -917,18 +716,6 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
 
                   {/* Right 4 Columns: Interactive Three-Pillar Quick Links */}
                   <div className="lg:col-span-4 flex flex-col justify-between gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setHeroView('cad')}
-                      className="flex-1 bg-[#EF6922] text-black border border-black rounded-[9px] px-4 py-3 flex flex-col justify-center text-left hover:opacity-90 transition-opacity cursor-pointer"
-                    >
-                      <span className="text-[0.68rem] tracking-cad uppercase font-medium">
-                        01 / DESIGN &amp; 3D CAD
-                      </span>
-                      <span className="text-[0.88rem] font-normal mt-0.5">
-                        Rhino 3D Proposals &amp; 2D Shop Drawings
-                      </span>
-                    </button>
                     <button
                       type="button"
                       onClick={() => navigateToPage('work')}
@@ -951,6 +738,18 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
                       </span>
                       <span className="text-[0.88rem] font-normal mt-0.5">
                         Hardwoods, Millwork &amp; Joinery
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => navigateToPage('process')}
+                      className="flex-1 bg-[#CBCBCB] text-black border border-black rounded-[9px] px-4 py-3 flex flex-col justify-center text-left hover:opacity-90 transition-opacity cursor-pointer"
+                    >
+                      <span className="text-[0.68rem] tracking-cad uppercase font-medium">
+                        04 / PROCESS &amp; TRADE →
+                      </span>
+                      <span className="text-[0.88rem] font-normal mt-0.5">
+                        6-Step Workflow &amp; Trade Program
                       </span>
                     </button>
                   </div>
@@ -1128,11 +927,9 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
                   </div>
 
                   <div className="border border-black rounded-[9px] p-5 bg-white grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
-                    <button
-                      type="button"
+                    <div
                       onClick={() => navigateToPage('work', currentLens.targetProjectId)}
-                      aria-label={`Inspect ${currentLens.title} in Selected Work`}
-                      className={`lg:col-span-5 h-[220px] w-full rounded-[9px] border-[0.75px] border-black overflow-hidden cursor-pointer flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EF6922] ${
+                      className={`lg:col-span-5 h-[220px] rounded-[9px] border-[0.75px] border-black overflow-hidden cursor-pointer flex items-center justify-center ${
                         currentLens.isCad ? 'cad-grid-bg p-3' : 'bg-white'
                       }`}
                     >
@@ -1144,7 +941,7 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
                         }`}
                         referrerPolicy="no-referrer"
                       />
-                    </button>
+                    </div>
 
                     <div className="lg:col-span-7 flex flex-col justify-between gap-4 text-left">
                       <div>
@@ -1282,7 +1079,7 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
                               const isSheetActive = !isSpecsOpen && currentIdx === idx;
                               return (
                                 <button
-                                  key={img.src}
+                                  key={`${img.sheetNumber}-${idx}`}
                                   type="button"
                                   onClick={() => setSheetIndex(project.id, idx)}
                                   className={`text-[0.70rem] tracking-cad uppercase px-3.5 py-2 rounded-[9px] border border-black transition-colors cursor-pointer ${
@@ -1332,20 +1129,18 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
                         </div>
 
                         {/* Visual Stage or Spec Schedule Table */}
-                        {!isSpecsOpen ? (
+                        {!isSpecsOpen && currentImg ? (
                           <div className="space-y-4">
                             <div
                               className={`relative w-full rounded-[9px] border border-black overflow-hidden flex items-center justify-center ${
                                 currentImg.type === 'cad' ? 'cad-grid-bg p-4 sm:p-8' : 'bg-white'
                               }`}
                             >
-                              <button
-                                type="button"
+                              <div
                                 onClick={() =>
                                   setLightboxState({ project, imageIndex: currentIdx })
                                 }
-                                aria-label={`Zoom ${project.title} ${currentImg.sheetNumber}`}
-                                className="w-full cursor-zoom-in flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EF6922]"
+                                className="w-full cursor-zoom-in flex items-center justify-center"
                               >
                                 <img
                                   src={currentImg.src}
@@ -1355,7 +1150,7 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
                                   className="w-full max-h-[540px] object-contain select-none"
                                   referrerPolicy="no-referrer"
                                 />
-                              </button>
+                              </div>
 
                               {project.images.length > 1 && (
                                 <>
@@ -1401,7 +1196,7 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
                                     const isSelected = currentIdx === idx;
                                     return (
                                       <button
-                                        key={thumb.src}
+                                        key={`${thumb.sheetNumber}-${idx}`}
                                         type="button"
                                         onClick={() => setSheetIndex(project.id, idx)}
                                         className={`relative rounded-[9px] overflow-hidden border-[0.75px] border-black transition-all cursor-pointer shrink-0 ${
@@ -1469,7 +1264,7 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
 
                           <button
                             type="button"
-                            onClick={() => handleInquireAboutProject(project)}
+                            onClick={() => navigateToPage('inquire')}
                             className={`shrink-0 ${project.pillarBg} text-black hover:bg-black hover:text-white text-[0.74rem] tracking-cad uppercase py-3 px-5 rounded-[9px] border-[0.75px] border-black transition-colors cursor-pointer font-medium whitespace-nowrap`}
                           >
                             INQUIRE ABOUT THIS BUILD →
@@ -1693,16 +1488,14 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
                       <span>SAMPLE SUBMITTAL — 1070MCG</span>
                       <span>SECTION B1</span>
                     </div>
-                    <button
-                      type="button"
+                    <div
                       onClick={() =>
                         setLightboxState({
                           project: projects[2],
                           imageIndex: 1,
                         })
                       }
-                      aria-label="Zoom Sample Rhino 2D CAD Section B1 Submittal"
-                      className="cad-grid-bg border-[0.75px] border-black rounded-[9px] p-4 w-full flex items-center justify-center cursor-zoom-in h-[220px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EF6922]"
+                      className="cad-grid-bg border-[0.75px] border-black rounded-[9px] p-4 flex items-center justify-center cursor-zoom-in h-[220px]"
                     >
                       <img
                         src={ASSETS.kidsKitchen.sectionB1}
@@ -1711,7 +1504,7 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
                         className="w-full h-full object-contain select-none"
                         referrerPolicy="no-referrer"
                       />
-                    </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1791,11 +1584,7 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
                   </div>
                 )}
 
-                <form
-                  ref={inquiryFormRef}
-                  onSubmit={(e) => handleSubmit(e, submitMode)}
-                  className="space-y-5"
-                >
+                <form onSubmit={(e) => handleSubmit(e, submitMode)} className="space-y-5">
                   {/* Row 1: Name, Contact, Category */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                     <div className="flex flex-col gap-2 text-left">
@@ -1927,39 +1716,25 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
                       </button>
 
                       {attachments.length > 0 && (
-                        <div className="space-y-1.5 pt-1">
-                          <div className="flex flex-wrap gap-2">
-                            {attachments.map((file, idx) => (
-                              <div
-                                key={`${file.name}-${idx}`}
-                                className="flex items-center gap-2 bg-[#CBCBCB] border-[0.75px] border-black rounded-[9px] px-3 py-1.5 text-[0.76rem] font-medium"
+                        <div className="flex flex-wrap gap-2 pt-1">
+                          {attachments.map((file, idx) => (
+                            <div
+                              key={`${file.name}-${idx}`}
+                              className="flex items-center gap-2 bg-[#CBCBCB] border-[0.75px] border-black rounded-[9px] px-3 py-1.5 text-[0.76rem] font-medium"
+                            >
+                              <FileText className="w-3.5 h-3.5 text-black" />
+                              <span className="max-w-[150px] truncate">{file.name}</span>
+                              <span>({file.size})</span>
+                              <button
+                                type="button"
+                                onClick={() => removeAttachment(idx)}
+                                className="text-black hover:text-[#EF6922] cursor-pointer"
+                                aria-label={`Remove ${file.name}`}
                               >
-                                {file.previewUrl ? (
-                                  <img
-                                    src={file.previewUrl}
-                                    alt={file.name}
-                                    className="w-5 h-5 rounded-[4px] object-cover border border-black/30 bg-white shrink-0"
-                                  />
-                                ) : (
-                                  <FileText className="w-3.5 h-3.5 text-black shrink-0" />
-                                )}
-                                <span className="max-w-[150px] truncate">{file.name}</span>
-                                <span>({file.size})</span>
-                                <button
-                                  type="button"
-                                  onClick={() => removeAttachment(idx)}
-                                  className="text-black hover:text-[#EF6922] cursor-pointer"
-                                  aria-label={`Remove ${file.name}`}
-                                >
-                                  <X className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                          <p className="text-[0.74rem] font-light text-black/70">
-                            Listed in your inquiry summary — remember to attach these files inside
-                            your SMS or email app after clicking send.
-                          </p>
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ))}
                         </div>
                       )}
                     </div>
@@ -2117,8 +1892,8 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
         )}
       </main>
 
-      {/* Architectural Business Card Footer */}
-      <Footer />
+      {/* Architectural Business Card Footer (4-icon strip omitted on landing page for interactive wall room) */}
+      <Footer showBrandIcons={!isCover} compact={isCover} />
 
       {/* High-Resolution CAD & Render Lightbox Modal */}
       <CadModal
@@ -2133,8 +1908,7 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
         <div
           role="dialog"
           aria-modal="true"
-          aria-labelledby="inquiry-modal-title"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fadeIn"
+          className="ui-surface fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm"
           onClick={() => setSubmitState('idle')}
         >
           <div
@@ -2142,14 +1916,10 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
             onClick={(e) => e.stopPropagation()}
           >
             <div className="bg-[#FDCB33] text-black border border-black rounded-[9px] px-4 py-2.5 flex items-center justify-between">
-              <span
-                id="inquiry-modal-title"
-                className="text-[0.76rem] tracking-cad uppercase font-medium"
-              >
+              <span className="text-[0.76rem] tracking-cad uppercase font-medium">
                 COMMISSION INQUIRY READY
               </span>
               <button
-                type="button"
                 onClick={() => setSubmitState('idle')}
                 className="text-[0.72rem] text-black font-medium uppercase tracking-cad cursor-pointer hover:underline"
               >
@@ -2170,7 +1940,6 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
 
             <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
               <button
-                type="button"
                 onClick={handleCopy}
                 className="flex items-center gap-1.5 py-2.5 px-4 rounded-[9px] border-[0.75px] border-black text-[0.72rem] tracking-cad uppercase hover:bg-black hover:text-white transition-colors cursor-pointer font-medium"
               >
@@ -2187,9 +1956,7 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
                 </a>
                 <a
                   href={`mailto:${OWNER_EMAIL}?subject=${encodeURIComponent(
-                    `Commission Inquiry: ${formData.projectType}${
-                      formData.name.trim() ? ` — ${formData.name.trim()}` : ''
-                    }`
+                    `Commission Inquiry: ${formData.projectType}`
                   )}&body=${encodeURIComponent(formatSummary())}`}
                   className="py-2.5 px-4 rounded-[9px] bg-[#27AAE0] text-black border-[0.75px] border-black text-[0.72rem] tracking-cad uppercase font-medium"
                 >
@@ -2200,7 +1967,7 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
           </div>
         </div>
       )}
-      </div>
+    </div>
     </>
   );
 };

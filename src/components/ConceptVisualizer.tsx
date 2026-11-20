@@ -8,18 +8,103 @@ import {
   RefreshCw,
   Check,
   Image as ImageIcon,
-  Layers,
-  Compass,
   MessageSquare,
   Mail,
   FolderOpen,
-  Lock,
 } from 'lucide-react';
 import { ASSETS } from '../assets/index.ts';
 import {
   renderWatermarkedSheet,
   downloadWatermarkedSheet,
 } from '../utils/watermarkSheet.ts';
+import { useAuth } from '../context/AuthContext.tsx';
+
+/**
+ * Loads /assets/aistudio/IMG_4823_b2889f31.JPG, strips out the checkerboard background
+ * pixels, and tightly crops to the isometric 3D wireframe cube so it renders cleanly.
+ */
+const ProcessedCubeIcon: React.FC<{ src: string; className?: string }> = ({
+  src,
+  className = 'w-4 h-4 object-contain shrink-0',
+}) => {
+  const [cleanDataUrl, setCleanDataUrl] = useState<string>(src);
+
+  useEffect(() => {
+    let active = true;
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      try {
+        const w = img.naturalWidth;
+        const h = img.naturalHeight;
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        ctx.drawImage(img, 0, 0);
+        const imgData = ctx.getImageData(0, 0, w, h);
+        const d = imgData.data;
+
+        let minX = w;
+        let minY = h;
+        let maxX = 0;
+        let maxY = 0;
+
+        for (let y = 0; y < h; y++) {
+          for (let x = 0; x < w; x++) {
+            const idx = (y * w + x) * 4;
+            const lum = (d[idx] + d[idx + 1] + d[idx + 2]) / 3;
+            if (lum > 175) {
+              d[idx + 3] = 0;
+            } else {
+              const alpha = Math.min(255, Math.max(0, Math.round(((195 - lum) / 155) * 255)));
+              d[idx] = 0;
+              d[idx + 1] = 0;
+              d[idx + 2] = 0;
+              d[idx + 3] = alpha;
+              if (alpha > 25) {
+                if (x < minX) minX = x;
+                if (y < minY) minY = y;
+                if (x > maxX) maxX = x;
+                if (y > maxY) maxY = y;
+              }
+            }
+          }
+        }
+
+        ctx.putImageData(imgData, 0, 0);
+
+        if (maxX > minX && maxY > minY) {
+          const pad = 6;
+          const cropX = Math.max(0, minX - pad);
+          const cropY = Math.max(0, minY - pad);
+          const cropW = Math.min(w - cropX, maxX - minX + pad * 2);
+          const cropH = Math.min(h - cropY, maxY - minY + pad * 2);
+
+          const outCanvas = document.createElement('canvas');
+          outCanvas.width = cropW;
+          outCanvas.height = cropH;
+          const outCtx = outCanvas.getContext('2d');
+          if (outCtx) {
+            outCtx.drawImage(canvas, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+            if (active) {
+              setCleanDataUrl(outCanvas.toDataURL('image/png'));
+            }
+          }
+        }
+      } catch {
+        // Fallback to raw src if canvas manipulation fails
+      }
+    };
+    img.src = src;
+    return () => {
+      active = false;
+    };
+  }, [src]);
+
+  return <img src={cleanDataUrl} alt="" className={className} />;
+};
 
 export type VisualStyleMode = 'render-3d' | 'cad-2d';
 
@@ -37,8 +122,6 @@ export interface GeneratedConceptItem {
   designStyle: string;
   addedDetails: string;
   summarySpec: string;
-  modelEngine?: string;
-  usedSourceImage?: boolean;
   timestamp: string;
 }
 
@@ -180,18 +263,8 @@ export const ConceptVisualizer: React.FC<ConceptVisualizerProps> = ({
   const [showArchiveModal, setShowArchiveModal] = useState(false);
   const [archiveList, setArchiveList] = useState<ServerLoggedConcept[]>([]);
   const [loadingArchive, setLoadingArchive] = useState(false);
-  const [archivePin, setArchivePin] = useState<string>(() => {
-    try {
-      return sessionStorage.getItem('cg_studio_pin') || '';
-    } catch {
-      return '';
-    }
-  });
-  const [archivePinInput, setArchivePinInput] = useState('');
-  const [archiveUnlocked, setArchiveUnlocked] = useState(false);
-  const [archiveError, setArchiveError] = useState<string | null>(null);
-  const [archiveConfigured, setArchiveConfigured] = useState<boolean>(true);
 
+  const { user, getFreshToken, signInWithGoogle, signOutUser } = useAuth();
   const photoInputRef = useRef<HTMLInputElement | null>(null);
 
   const OWNER_PHONE = '+14027201377';
@@ -218,43 +291,16 @@ export const ConceptVisualizer: React.FC<ConceptVisualizerProps> = ({
       ? state.customDetailsText.trim() || 'Custom Millwork Detail'
       : state.addedDetails;
 
-  const fetchServerArchive = async (pinToUse: string) => {
-    if (!pinToUse.trim()) {
-      setArchiveUnlocked(false);
-      return;
-    }
+  const fetchServerArchive = async () => {
     setLoadingArchive(true);
-    setArchiveError(null);
     try {
-      const res = await fetch('/api/generated-concepts', {
-        headers: { 'x-studio-pin': pinToUse.trim() },
-      });
-      const data = await res.json().catch(() => ({}));
+      const res = await fetch('/api/generated-concepts');
       if (res.ok) {
+        const data = await res.json();
         setArchiveList(Array.isArray(data.concepts) ? data.concepts : []);
-        setArchiveUnlocked(true);
-        setArchiveConfigured(true);
-        setArchivePin(pinToUse.trim());
-        try {
-          sessionStorage.setItem('cg_studio_pin', pinToUse.trim());
-        } catch {
-          // Ignore storage errors
-        }
-      } else if (res.status === 403 && data.configured === false) {
-        setArchiveConfigured(false);
-        setArchiveUnlocked(false);
-        setArchiveError(data.error || 'Studio Concept Log is locked on this server.');
-      } else {
-        setArchiveUnlocked(false);
-        setArchiveError(data.error || 'Invalid Studio PIN. Please try again.');
-        try {
-          sessionStorage.removeItem('cg_studio_pin');
-        } catch {
-          // Ignore
-        }
       }
     } catch {
-      setArchiveError('Unable to reach the studio server. Please try again.');
+      // Ignore background archive fetch errors
     } finally {
       setLoadingArchive(false);
     }
@@ -262,31 +308,9 @@ export const ConceptVisualizer: React.FC<ConceptVisualizerProps> = ({
 
   useEffect(() => {
     if (showArchiveModal) {
-      if (archivePin) {
-        fetchServerArchive(archivePin);
-      } else {
-        setArchiveUnlocked(false);
-        setArchiveError(null);
-      }
+      fetchServerArchive();
     }
   }, [showArchiveModal]);
-
-  useEffect(() => {
-    if (!showArchiveModal && !fullscreenConcept) return;
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        if (fullscreenConcept) setFullscreenConcept(null);
-        else if (showArchiveModal) setShowArchiveModal(false);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.body.style.overflow = prevOverflow;
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [showArchiveModal, fullscreenConcept]);
 
   const parseDataUrl = (dataUrl: string): { mimeType: string; base64Data: string } => {
     const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
@@ -302,76 +326,19 @@ export const ConceptVisualizer: React.FC<ConceptVisualizerProps> = ({
 
     const reader = new FileReader();
     reader.onload = () => {
-      const rawDataUrl = typeof reader.result === 'string' ? reader.result : '';
-      if (!rawDataUrl) return;
-
-      // Downscale very large photos (>1600px) so room-photo uploads stay crisp & fast for Gemini
-      const img = new Image();
-      img.onload = () => {
-        const MAX_DIM = 1600;
-        let targetW = img.naturalWidth || 1200;
-        let targetH = img.naturalHeight || 900;
-
-        if (targetW > MAX_DIM || targetH > MAX_DIM) {
-          const ratio = Math.min(MAX_DIM / targetW, MAX_DIM / targetH);
-          targetW = Math.round(targetW * ratio);
-          targetH = Math.round(targetH * ratio);
-        }
-
-        const canvas = document.createElement('canvas');
-        canvas.width = targetW;
-        canvas.height = targetH;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.drawImage(img, 0, 0, targetW, targetH);
-          const outputMime = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
-          const compressedUrl =
-            outputMime === 'image/png'
-              ? canvas.toDataURL('image/png')
-              : canvas.toDataURL('image/jpeg', 0.88);
-          const { mimeType, base64Data } = parseDataUrl(compressedUrl);
-          if (base64Data) {
-            onChangeState((prev) => ({
-              ...prev,
-              uploadedPhoto: {
-                name: file.name,
-                mimeType,
-                dataUrl: compressedUrl,
-                base64Data,
-              },
-            }));
-            return;
-          }
-        }
-
-        const { mimeType, base64Data } = parseDataUrl(rawDataUrl);
-        if (base64Data) {
-          onChangeState((prev) => ({
-            ...prev,
-            uploadedPhoto: {
-              name: file.name,
-              mimeType: mimeType || file.type || 'image/jpeg',
-              dataUrl: rawDataUrl,
-              base64Data,
-            },
-          }));
-        }
-      };
-      img.onerror = () => {
-        const { mimeType, base64Data } = parseDataUrl(rawDataUrl);
-        if (base64Data) {
-          onChangeState((prev) => ({
-            ...prev,
-            uploadedPhoto: {
-              name: file.name,
-              mimeType: mimeType || file.type || 'image/jpeg',
-              dataUrl: rawDataUrl,
-              base64Data,
-            },
-          }));
-        }
-      };
-      img.src = rawDataUrl;
+      const dataUrl = typeof reader.result === 'string' ? reader.result : '';
+      const { mimeType, base64Data } = parseDataUrl(dataUrl);
+      if (base64Data) {
+        onChangeState((prev) => ({
+          ...prev,
+          uploadedPhoto: {
+            name: file.name,
+            mimeType: mimeType || file.type || 'image/jpeg',
+            dataUrl,
+            base64Data,
+          },
+        }));
+      }
     };
     reader.readAsDataURL(file);
     e.target.value = '';
@@ -434,9 +401,15 @@ export const ConceptVisualizer: React.FC<ConceptVisualizerProps> = ({
         sourceImageMode = 'room-photo';
       }
 
+      const token = await getFreshToken();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+
       const response = await fetch('/api/visualize-concept', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           ideaPrompt: promptToUse || activeConcept?.ideaPrompt || 'Custom wood project',
           visualStyle: targetStyle,
@@ -476,13 +449,11 @@ export const ConceptVisualizer: React.FC<ConceptVisualizerProps> = ({
         designStyle: resolvedDesignStyle,
         addedDetails: resolvedAddedDetails,
         summarySpec: data.summarySpec,
-        modelEngine: data.modelEngine,
-        usedSourceImage: Boolean(data.usedSourceImage),
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
 
       // Automatically render the watermarked Casegoods sheet and save it back to the server file
-      if (data.id && data.uploadToken) {
+      if (data.filename) {
         renderWatermarkedSheet({
           imageSrc: data.imageUrl,
           projectHeader: `${conceptId.toUpperCase()} — ${resolvedWoodSpecies}`,
@@ -494,33 +465,15 @@ export const ConceptVisualizer: React.FC<ConceptVisualizerProps> = ({
           rightBoxFill: targetStyle === 'cad-2d' ? '#FDCB33' : '#27AAE0',
           rightBoxText: '#000000',
         })
-          .then(({ dataUrl: watermarkedDataUrl }) =>
+          .then(({ dataUrl: watermarkedDataUrl }) => {
             fetch('/api/save-watermarked-concept', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                conceptId: data.id,
-                uploadToken: data.uploadToken,
+                filename: data.filename,
                 watermarkedDataUrl,
               }),
-            })
-          )
-          .then((r) => (r.ok ? r.json() : null))
-          .then((saved) => {
-            if (!saved?.publicPath) return;
-            onChangeState((prev) => ({
-              ...prev,
-              history: prev.history.map((item) =>
-                item.id === conceptId
-                  ? {
-                      ...item,
-                      filename: saved.filename || item.filename,
-                      publicPath: saved.publicPath || item.publicPath,
-                      fullImageUrl: saved.fullImageUrl || item.fullImageUrl,
-                    }
-                  : item
-              ),
-            }));
+            }).catch(() => {});
           })
           .catch(() => {});
       }
@@ -626,10 +579,29 @@ Concept Image Link: ${imageLink}`;
         <span className="text-[0.80rem] sm:text-[0.86rem] tracking-cad uppercase font-medium">
           06 / CUSTOM CONCEPT VISUALIZER — TEST YOUR CUSTOM BUILD IDEA IN 3D RENDER OR 2D CAD
         </span>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <span className="hidden sm:inline text-[0.70rem] tracking-cad uppercase font-medium">
             DWG-CG-006
           </span>
+          {user ? (
+            <button
+              type="button"
+              onClick={() => signOutUser()}
+              className="bg-black text-white hover:bg-white hover:text-black border border-black rounded-[9px] px-3 py-1 text-[0.66rem] tracking-cad uppercase font-medium transition-colors cursor-pointer"
+              title="Sign out of your account"
+            >
+              {user.displayName || user.email || 'SIGNED IN'} · SIGN OUT
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => signInWithGoogle()}
+              className="bg-[#FDCB33] hover:bg-black text-black hover:text-white border border-black rounded-[9px] px-3 py-1 text-[0.66rem] tracking-cad uppercase font-medium transition-colors cursor-pointer"
+              title="Sign in with Google to link your saved concepts to your account"
+            >
+              GOOGLE SIGN IN
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setShowArchiveModal(true)}
@@ -644,13 +616,13 @@ Concept Image Link: ${imageLink}`;
 
       {/* Main Framed Concept Studio Container */}
       <div className="w-full bg-white border-[1.5px] border-black rounded-[9px] p-5 sm:p-7 space-y-6">
-        {/* Top Row: Lead Instructions + Output Style Switcher (3D Hardwood Render vs 2D CAD Sketch) */}
+        {/* Top Row: Lead Instructions + Output Style Switcher (3D Realistic Rendering vs 2D Elevation Sketch) */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-black pb-5">
           <div className="text-left space-y-1">
             <p className="text-[0.72rem] tracking-cad uppercase font-medium text-black">
               DESCRIBE A PIECE OR UPLOAD A ROOM PHOTO / HAND SKETCH
             </p>
-            <p className="text-[0.90rem] font-light text-black max-w-[64ch]">
+            <p className="text-[0.90rem] font-light text-black max-w-[68ch]">
               Choose a basic starter idea or write your own, pick your primary timber, design
               style, and added cabinetry details, and generate a visual concept that is shared with Josh.
             </p>
@@ -667,14 +639,17 @@ Concept Image Link: ${imageLink}`;
               onClick={() =>
                 onChangeState((prev) => ({ ...prev, visualStyle: 'render-3d' }))
               }
-              className={`py-2.5 px-4 rounded-[9px] border border-black text-[0.72rem] tracking-cad uppercase transition-colors cursor-pointer flex items-center justify-center gap-2 whitespace-nowrap ${
+              className={`py-2.5 px-4 rounded-[9px] border border-black text-[0.72rem] tracking-cad uppercase transition-colors cursor-pointer flex items-center justify-center gap-2.5 whitespace-nowrap ${
                 state.visualStyle === 'render-3d'
                   ? 'bg-[#EF6922] text-black font-medium'
                   : 'bg-white text-black hover:bg-[#CBCBCB] font-normal'
               }`}
             >
-              <Layers className="w-3.5 h-3.5 shrink-0" />
-              <span>3D HARDWOOD RENDER</span>
+              <ProcessedCubeIcon
+                src="/assets/aistudio/IMG_4823_b2889f31.JPG"
+                className="w-4 h-4 object-contain shrink-0"
+              />
+              <span>3D REALISTIC RENDERING</span>
             </button>
 
             <button
@@ -682,146 +657,147 @@ Concept Image Link: ${imageLink}`;
               onClick={() =>
                 onChangeState((prev) => ({ ...prev, visualStyle: 'cad-2d' }))
               }
-              className={`py-2.5 px-4 rounded-[9px] border border-black text-[0.72rem] tracking-cad uppercase transition-colors cursor-pointer flex items-center justify-center gap-2 whitespace-nowrap ${
+              className={`py-2.5 px-4 rounded-[9px] border border-black text-[0.72rem] tracking-cad uppercase transition-colors cursor-pointer flex items-center justify-center gap-2.5 whitespace-nowrap ${
                 state.visualStyle === 'cad-2d'
                   ? 'bg-[#FDCB33] text-black font-medium'
                   : 'bg-white text-black hover:bg-[#CBCBCB] font-normal'
               }`}
             >
-              <Compass className="w-3.5 h-3.5 shrink-0" />
-              <span>2D CAD ELEVATION SKETCH</span>
+              <img
+                src="/assets/aistudio/Asset-1_70446043.png"
+                alt=""
+                className="w-4 h-4 object-contain shrink-0"
+              />
+              <span>2D ELEVATION SKETCH</span>
             </button>
           </div>
         </div>
 
-        {/* 2-Column Interactive Drafting Workbench */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          {/* Left 6 Columns: Prompt Input, 4 Basic Templates, Timber, Design Style & Added Details */}
-          <div className="lg:col-span-6 space-y-4 text-left">
-            {/* 4 Very Different, Basic Quick Concept Templates */}
-            <div className="space-y-2">
-              <span className="block text-[0.68rem] tracking-cad uppercase font-medium text-black">
-                QUICK CONCEPT TEMPLATES (4 BASIC STARTING IDEAS):
-              </span>
-              <div className="grid grid-cols-2 gap-2">
-                {QUICK_IDEA_PRESETS.map((preset) => (
-                  <button
-                    key={preset.label}
-                    type="button"
-                    onClick={() =>
-                      onChangeState((prev) => ({
-                        ...prev,
-                        ideaPrompt: preset.prompt,
-                        woodSpecies: preset.wood,
-                        designStyle: preset.style,
-                        addedDetails: preset.details,
-                      }))
-                    }
-                    className="py-2 px-3 rounded-[9px] border border-black bg-white hover:bg-[#EF6922] text-black text-[0.68rem] tracking-cad uppercase font-medium text-left transition-colors cursor-pointer truncate"
-                  >
-                    {preset.label}
-                  </button>
-                ))}
-              </div>
+        {/* Full-Width Customization Workbench + Full-Width Concept Preview Stage Below */}
+        <div className="w-full space-y-5 text-left">
+          {/* Row 1: 4 Basic Quick Concept Templates (Full-Width 4-Column Strip) */}
+          <div className="space-y-2">
+            <span className="block text-[0.68rem] tracking-cad uppercase font-medium text-black">
+              QUICK CONCEPT TEMPLATES (4 BASIC STARTING IDEAS):
+            </span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {QUICK_IDEA_PRESETS.map((preset) => (
+                <button
+                  key={preset.label}
+                  type="button"
+                  onClick={() =>
+                    onChangeState((prev) => ({
+                      ...prev,
+                      ideaPrompt: preset.prompt,
+                      woodSpecies: preset.wood,
+                      designStyle: preset.style,
+                      addedDetails: preset.details,
+                    }))
+                  }
+                  className="py-2.5 px-3.5 rounded-[9px] border border-black bg-white hover:bg-[#EF6922] text-black text-[0.70rem] tracking-cad uppercase font-medium text-left transition-colors cursor-pointer truncate"
+                >
+                  {preset.label}
+                </button>
+              ))}
             </div>
+          </div>
 
-            {/* 01 / Custom Idea Prompt Input */}
+          {/* Row 2: 01 / Custom Idea Prompt Input (Full Width) */}
+          <div className="space-y-2">
+            <label
+              htmlFor={`visualizer-prompt-${placement}`}
+              className="block bg-[#CBCBCB] text-black border border-black rounded-[9px] py-2 px-3.5 text-[0.70rem] tracking-cad uppercase font-medium cursor-pointer"
+            >
+              01 / DESCRIBE YOUR CUSTOM PIECE, BUILT-IN OR DIMENSIONS *
+            </label>
+            <textarea
+              id={`visualizer-prompt-${placement}`}
+              rows={3}
+              value={state.ideaPrompt}
+              onChange={(e) =>
+                onChangeState((prev) => ({ ...prev, ideaPrompt: e.target.value }))
+              }
+              placeholder="Describe what you want to build (e.g., a dining table, built-in bookcase, media console, desk, or custom bar)..."
+              className="w-full bg-white text-black text-[0.90rem] p-3.5 rounded-[9px] border border-black font-light focus:outline-none focus:bg-[#FDCB33]/10 placeholder:text-black/45 leading-relaxed resize-y"
+            />
+          </div>
+
+          {/* Row 3: Full-Width 3-Column Bauhaus Selectors (02 Primary Timber · 03 Design Style · 04 Added Details) */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* 02 / PRIMARY TIMBER */}
             <div className="space-y-2">
               <label
-                htmlFor={`visualizer-prompt-${placement}`}
-                className="block bg-[#CBCBCB] text-black border border-black rounded-[9px] py-2 px-3.5 text-[0.70rem] tracking-cad uppercase font-medium cursor-pointer"
+                htmlFor={`visualizer-wood-${placement}`}
+                className="block bg-[#27AAE0] text-black border border-black rounded-[9px] py-2 px-3.5 text-[0.70rem] tracking-cad uppercase font-medium cursor-pointer"
               >
-                01 / DESCRIBE YOUR CUSTOM PIECE, BUILT-IN OR DIMENSIONS *
+                02 / PRIMARY TIMBER
               </label>
-              <textarea
-                id={`visualizer-prompt-${placement}`}
-                rows={3}
-                value={state.ideaPrompt}
+              <select
+                id={`visualizer-wood-${placement}`}
+                value={state.woodSpecies}
                 onChange={(e) =>
-                  onChangeState((prev) => ({ ...prev, ideaPrompt: e.target.value }))
+                  onChangeState((prev) => ({ ...prev, woodSpecies: e.target.value }))
                 }
-                placeholder="Describe what you want to build (e.g., a dining table, built-in bookcase, media console, desk, or custom bar)..."
-                className="w-full bg-white text-black text-[0.90rem] p-3.5 rounded-[9px] border border-black font-light focus:outline-none focus:bg-[#FDCB33]/10 placeholder:text-black/45 leading-relaxed resize-y"
-              />
+                className="w-full h-[44px] bg-white text-black text-[0.86rem] px-3 rounded-[9px] border border-black font-normal focus:outline-none cursor-pointer"
+              >
+                {WOOD_OPTIONS.map((wood) => (
+                  <option key={wood} value={wood}>
+                    {wood === 'Something Exotic'
+                      ? 'Something Exotic (Enter Own Text)'
+                      : wood}
+                  </option>
+                ))}
+              </select>
+
+              {state.woodSpecies === 'Something Exotic' && (
+                <input
+                  type="text"
+                  value={state.customWoodText}
+                  onChange={(e) =>
+                    onChangeState((prev) => ({ ...prev, customWoodText: e.target.value }))
+                  }
+                  placeholder="Enter exotic wood or custom material..."
+                  className="w-full h-[42px] bg-white text-black text-[0.86rem] px-3.5 rounded-[9px] border-[0.75px] border-black font-light focus:outline-none focus:bg-[#27AAE0]/10 placeholder:text-black/45"
+                />
+              )}
             </div>
 
-            {/* 02 / Primary Timber & 03 / Design Style Selectors */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* 02 / PRIMARY TIMBER */}
-              <div className="space-y-2">
-                <label
-                  htmlFor={`visualizer-wood-${placement}`}
-                  className="block bg-[#27AAE0] text-black border border-black rounded-[9px] py-2 px-3.5 text-[0.70rem] tracking-cad uppercase font-medium cursor-pointer"
-                >
-                  02 / PRIMARY TIMBER
-                </label>
-                <select
-                  id={`visualizer-wood-${placement}`}
-                  value={state.woodSpecies}
+            {/* 03 / DESIGN STYLE */}
+            <div className="space-y-2">
+              <label
+                htmlFor={`visualizer-style-${placement}`}
+                className="block bg-[#FDCB33] text-black border border-black rounded-[9px] py-2 px-3.5 text-[0.70rem] tracking-cad uppercase font-medium cursor-pointer"
+              >
+                03 / DESIGN STYLE
+              </label>
+              <select
+                id={`visualizer-style-${placement}`}
+                value={state.designStyle}
+                onChange={(e) =>
+                  onChangeState((prev) => ({ ...prev, designStyle: e.target.value }))
+                }
+                className="w-full h-[44px] bg-white text-black text-[0.86rem] px-3 rounded-[9px] border border-black font-normal focus:outline-none cursor-pointer"
+              >
+                {DESIGN_STYLE_OPTIONS.map((styleOpt) => (
+                  <option key={styleOpt} value={styleOpt}>
+                    {styleOpt === 'Custom Style'
+                      ? 'Custom Style (Enter Own Text)'
+                      : styleOpt}
+                  </option>
+                ))}
+              </select>
+
+              {state.designStyle === 'Custom Style' && (
+                <input
+                  type="text"
+                  value={state.customStyleText}
                   onChange={(e) =>
-                    onChangeState((prev) => ({ ...prev, woodSpecies: e.target.value }))
+                    onChangeState((prev) => ({ ...prev, customStyleText: e.target.value }))
                   }
-                  className="w-full h-[44px] bg-white text-black text-[0.86rem] px-3 rounded-[9px] border border-black font-normal focus:outline-none cursor-pointer"
-                >
-                  {WOOD_OPTIONS.map((wood) => (
-                    <option key={wood} value={wood}>
-                      {wood === 'Something Exotic'
-                        ? 'Something Exotic (Enter Own Text)'
-                        : wood}
-                    </option>
-                  ))}
-                </select>
-
-                {state.woodSpecies === 'Something Exotic' && (
-                  <input
-                    type="text"
-                    value={state.customWoodText}
-                    onChange={(e) =>
-                      onChangeState((prev) => ({ ...prev, customWoodText: e.target.value }))
-                    }
-                    placeholder="Enter exotic wood or custom material..."
-                    className="w-full h-[42px] bg-white text-black text-[0.86rem] px-3.5 rounded-[9px] border-[0.75px] border-black font-light focus:outline-none focus:bg-[#27AAE0]/10 placeholder:text-black/45"
-                  />
-                )}
-              </div>
-
-              {/* 03 / DESIGN STYLE */}
-              <div className="space-y-2">
-                <label
-                  htmlFor={`visualizer-style-${placement}`}
-                  className="block bg-[#FDCB33] text-black border border-black rounded-[9px] py-2 px-3.5 text-[0.70rem] tracking-cad uppercase font-medium cursor-pointer"
-                >
-                  03 / DESIGN STYLE
-                </label>
-                <select
-                  id={`visualizer-style-${placement}`}
-                  value={state.designStyle}
-                  onChange={(e) =>
-                    onChangeState((prev) => ({ ...prev, designStyle: e.target.value }))
-                  }
-                  className="w-full h-[44px] bg-white text-black text-[0.86rem] px-3 rounded-[9px] border border-black font-normal focus:outline-none cursor-pointer"
-                >
-                  {DESIGN_STYLE_OPTIONS.map((styleOpt) => (
-                    <option key={styleOpt} value={styleOpt}>
-                      {styleOpt === 'Custom Style'
-                        ? 'Custom Style (Enter Own Text)'
-                        : styleOpt}
-                    </option>
-                  ))}
-                </select>
-
-                {state.designStyle === 'Custom Style' && (
-                  <input
-                    type="text"
-                    value={state.customStyleText}
-                    onChange={(e) =>
-                      onChangeState((prev) => ({ ...prev, customStyleText: e.target.value }))
-                    }
-                    placeholder="Describe your preferred design style..."
-                    className="w-full h-[42px] bg-white text-black text-[0.86rem] px-3.5 rounded-[9px] border-[0.75px] border-black font-light focus:outline-none focus:bg-[#FDCB33]/10 placeholder:text-black/45"
-                  />
-                )}
-              </div>
+                  placeholder="Describe your preferred design style..."
+                  className="w-full h-[42px] bg-white text-black text-[0.86rem] px-3.5 rounded-[9px] border-[0.75px] border-black font-light focus:outline-none focus:bg-[#FDCB33]/10 placeholder:text-black/45"
+                />
+              )}
             </div>
 
             {/* 04 / ADDED DETAILS */}
@@ -861,338 +837,330 @@ Concept Image Link: ${imageLink}`;
                 />
               )}
             </div>
+          </div>
 
-            {/* 05 / Room Photo or Sketch Upload (Optional Context) */}
-            <div className="space-y-2">
-              <label
-                htmlFor={`visualizer-photo-${placement}`}
-                className="block bg-[#CBCBCB] text-black border border-black rounded-[9px] py-2 px-3.5 text-[0.70rem] tracking-cad uppercase font-medium cursor-pointer"
+          {/* Row 4: 05 / Room Photo or Sketch Upload (Full Width) */}
+          <div className="space-y-2">
+            <label
+              htmlFor={`visualizer-photo-${placement}`}
+              className="block bg-[#CBCBCB] text-black border border-black rounded-[9px] py-2 px-3.5 text-[0.70rem] tracking-cad uppercase font-medium cursor-pointer"
+            >
+              05 / UPLOAD ROOM PHOTO OR HAND SKETCH (OPTIONAL)
+            </label>
+            <input
+              id={`visualizer-photo-${placement}`}
+              ref={photoInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handlePhotoUpload}
+              className="hidden"
+            />
+
+            {!state.uploadedPhoto ? (
+              <button
+                type="button"
+                onClick={() => photoInputRef.current?.click()}
+                className="w-full py-2.5 px-4 rounded-[9px] border border-black bg-white hover:bg-[#CBCBCB] text-[0.82rem] text-black flex items-center justify-center gap-2 transition-colors cursor-pointer font-normal"
               >
-                05 / UPLOAD ROOM PHOTO OR HAND SKETCH (OPTIONAL)
-              </label>
-              <input
-                id={`visualizer-photo-${placement}`}
-                ref={photoInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handlePhotoUpload}
-                className="hidden"
-              />
-
-              {!state.uploadedPhoto ? (
+                <Upload className="w-4 h-4 text-black shrink-0" />
+                <span>Upload a photo of your wall/alcove or a rough sketch</span>
+              </button>
+            ) : (
+              <div className="flex items-center justify-between gap-3 p-2.5 rounded-[9px] border border-black bg-[#FDCB33]/20">
+                <div className="flex items-center gap-3 min-w-0">
+                  <img
+                    src={state.uploadedPhoto.dataUrl}
+                    alt={state.uploadedPhoto.name}
+                    className="w-12 h-12 rounded-[6px] border-[0.75px] border-black object-cover shrink-0 bg-white"
+                  />
+                  <div className="min-w-0">
+                    <p className="text-[0.72rem] tracking-cad uppercase font-medium text-black truncate">
+                      {state.uploadedPhoto.name}
+                    </p>
+                    <p className="text-[0.76rem] font-light text-black">
+                      Will visualize piece inside this photo / sketch
+                    </p>
+                  </div>
+                </div>
                 <button
                   type="button"
-                  onClick={() => photoInputRef.current?.click()}
-                  className="w-full py-2.5 px-4 rounded-[9px] border border-black bg-white hover:bg-[#CBCBCB] text-[0.82rem] text-black flex items-center justify-center gap-2 transition-colors cursor-pointer font-normal"
+                  onClick={handleClearPhoto}
+                  className="p-2 rounded-[9px] border-[0.75px] border-black bg-white hover:bg-[#EF6922] text-black transition-colors cursor-pointer shrink-0"
+                  aria-label="Remove uploaded room photo"
                 >
-                  <Upload className="w-4 h-4 text-black shrink-0" />
-                  <span>Upload a photo of your wall/alcove or a rough sketch</span>
+                  <X className="w-4 h-4" />
                 </button>
-              ) : (
-                <div className="flex items-center justify-between gap-3 p-2.5 rounded-[9px] border border-black bg-[#FDCB33]/20">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <img
-                      src={state.uploadedPhoto.dataUrl}
-                      alt={state.uploadedPhoto.name}
-                      className="w-12 h-12 rounded-[6px] border-[0.75px] border-black object-cover shrink-0 bg-white"
-                    />
-                    <div className="min-w-0">
-                      <p className="text-[0.72rem] tracking-cad uppercase font-medium text-black truncate">
-                        {state.uploadedPhoto.name}
-                      </p>
-                      <p className="text-[0.76rem] font-light text-black">
-                        Will visualize piece inside this photo / sketch
-                      </p>
-                    </div>
+              </div>
+            )}
+          </div>
+
+          {errorMsg && (
+            <div className="p-3.5 rounded-[9px] border border-black bg-[#EF6922] text-black text-[0.82rem] font-medium">
+              {errorMsg}
+            </div>
+          )}
+
+          {/* Row 5: Full-Width GENERATE CUSTOM CONCEPT Button */}
+          <button
+            type="button"
+            disabled={isGenerating}
+            onClick={() => runGeneration('new')}
+            className={`w-full py-4 px-6 rounded-[9px] border border-black text-[0.80rem] tracking-cad uppercase font-medium transition-colors cursor-pointer flex items-center justify-center gap-2 ${
+              isGenerating
+                ? 'bg-[#CBCBCB] text-black cursor-wait'
+                : 'bg-[#EF6922] text-black hover:bg-black hover:text-white'
+            }`}
+          >
+            {isGenerating ? (
+              <>
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                <span>GENERATING CUSTOM CONCEPT...</span>
+              </>
+            ) : (
+              <span>GENERATE CUSTOM CONCEPT</span>
+            )}
+          </button>
+
+          {/* Row 6: Full-Width Concept Preview Stage (Placed Below the Generator Button) */}
+          <div className="w-full border border-black rounded-[9px] bg-white p-4 sm:p-5 space-y-4">
+            {/* Viewport Header Strip */}
+            <div
+              className={`w-full ${
+                activeConcept?.visualStyle === 'cad-2d'
+                  ? 'bg-[#FDCB33] text-black'
+                  : 'bg-[#27AAE0] text-black'
+              } border-[0.75px] border-black rounded-[9px] px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 text-[0.70rem] tracking-cad uppercase font-medium`}
+            >
+              <span>
+                {activeConcept
+                  ? activeConcept.visualStyle === 'cad-2d'
+                    ? 'GENERATED SHEET · 2D ELEVATION SKETCH'
+                    : 'GENERATED SHEET · 3D REALISTIC RENDERING'
+                  : 'CONCEPT PREVIEW STAGE · 16:9 SHEET'}
+              </span>
+              <span>
+                {activeConcept
+                  ? `SAVED & SENT TO STUDIO (${activeConcept.timestamp})`
+                  : 'READY TO GENERATE'}
+              </span>
+            </div>
+
+            {/* Full-Width Visual Canvas */}
+            <div className="w-full cad-grid-bg border-[0.75px] border-black rounded-[9px] overflow-hidden min-h-[320px] sm:min-h-[440px] flex items-center justify-center relative">
+              {isGenerating ? (
+                <div className="p-8 text-center space-y-3">
+                  <div className="w-12 h-12 mx-auto rounded-[9px] border-[0.75px] border-black bg-[#EF6922] flex items-center justify-center animate-pulse">
+                    <RefreshCw className="w-5 h-5 text-black animate-spin" />
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleClearPhoto}
-                    className="p-2 rounded-[9px] border-[0.75px] border-black bg-white hover:bg-[#EF6922] text-black transition-colors cursor-pointer shrink-0"
-                    aria-label="Remove uploaded room photo"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
+                  <p className="text-[0.76rem] tracking-cad uppercase font-medium text-black">
+                    ENGINEERING CUSTOM CONCEPT SHEET...
+                  </p>
+                  <p className="text-[0.84rem] font-light text-black max-w-md mx-auto">
+                    Applying {resolvedWoodSpecies}, {resolvedDesignStyle} &amp;{' '}
+                    {resolvedAddedDetails} in{' '}
+                    {state.visualStyle === 'cad-2d'
+                      ? '2D elevation sketch format'
+                      : '3D realistic rendering format'}
+                    .
+                  </p>
+                </div>
+              ) : activeConcept ? (
+                <div className="w-full h-full relative group p-2 sm:p-4">
+                  <img
+                    src={activeConcept.imageUrl}
+                    alt={activeConcept.summarySpec}
+                    onClick={() => setFullscreenConcept(activeConcept)}
+                    className="w-full max-h-[540px] object-contain cursor-zoom-in select-none mx-auto"
+                  />
+                  <div className="absolute bottom-4 right-4 flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleDownloadConcept(activeConcept)}
+                      className="bg-white hover:bg-[#FDCB33] text-black border-[0.75px] border-black rounded-[9px] py-1.5 px-3.5 text-[0.68rem] tracking-cad uppercase font-medium flex items-center gap-1.5 cursor-pointer shadow-sm"
+                      title="Download Concept PNG"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>SAVE PNG</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFullscreenConcept(activeConcept)}
+                      className="bg-black hover:bg-[#EF6922] text-white hover:text-black border-[0.75px] border-black rounded-[9px] py-1.5 px-3.5 text-[0.68rem] tracking-cad uppercase font-medium flex items-center gap-1.5 cursor-pointer shadow-sm"
+                      title="Zoom Fullscreen"
+                    >
+                      <Maximize2 className="w-3.5 h-3.5" />
+                      <span>ZOOM</span>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-8 sm:p-12 text-center space-y-3">
+                  <div className="w-11 h-11 mx-auto rounded-[9px] border-[0.75px] border-black bg-white flex items-center justify-center">
+                    <ImageIcon className="w-5 h-5 text-black" />
+                  </div>
+                  <p className="text-[0.76rem] tracking-cad uppercase font-medium text-black">
+                    YOUR GENERATED 3D REALISTIC RENDERING OR 2D ELEVATION SKETCH WILL APPEAR HERE
+                  </p>
+                  <p className="text-[0.84rem] font-light text-black max-w-md mx-auto">
+                    Click any of the 4 basic starter ideas above or describe your custom
+                    piece and click GENERATE CUSTOM CONCEPT.
+                  </p>
                 </div>
               )}
             </div>
 
-            {errorMsg && (
-              <div className="p-3.5 rounded-[9px] border border-black bg-[#EF6922] text-black text-[0.82rem] font-medium">
-                {errorMsg}
-              </div>
-            )}
-
-            {/* Bottom Button: GENERATE CUSTOM CONCEPT */}
-            <button
-              type="button"
-              disabled={isGenerating}
-              onClick={() => runGeneration('new')}
-              className={`w-full py-3.5 px-5 rounded-[9px] border border-black text-[0.78rem] tracking-cad uppercase font-medium transition-colors cursor-pointer flex items-center justify-center gap-2 ${
-                isGenerating
-                  ? 'bg-[#CBCBCB] text-black cursor-wait'
-                  : 'bg-[#EF6922] text-black hover:bg-black hover:text-white'
-              }`}
-            >
-              {isGenerating ? (
-                <>
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                  <span>GENERATING CUSTOM CONCEPT...</span>
-                </>
-              ) : (
-                <span>GENERATE CUSTOM CONCEPT</span>
-              )}
-            </button>
-          </div>
-
-          {/* Right 6 Columns: Live Concept Sheet Stage, Iterative Edit Bar & Direct Send to Josh */}
-          <div className="lg:col-span-6 flex flex-col justify-between gap-4">
-            <div className="border border-black rounded-[9px] bg-white p-4 space-y-3.5">
-              {/* Viewport Header Strip */}
-              <div
-                className={`w-full ${
-                  activeConcept?.visualStyle === 'cad-2d'
-                    ? 'bg-[#FDCB33] text-black'
-                    : 'bg-[#27AAE0] text-black'
-                } border-[0.75px] border-black rounded-[9px] px-4 py-2 flex flex-wrap items-center justify-between gap-2 text-[0.70rem] tracking-cad uppercase font-medium`}
-              >
-                <span>
-                  {activeConcept
-                    ? activeConcept.visualStyle === 'cad-2d'
-                      ? 'GENERATED SHEET · 2D RHINO CAD SKETCH'
-                      : 'GENERATED SHEET · 3D HARDWOOD PROPOSAL'
-                    : 'CONCEPT PREVIEW STAGE · 16:9 SHEET'}
-                </span>
-                <span>
-                  {activeConcept
-                    ? `SAVED & SENT TO STUDIO (${activeConcept.timestamp})`
-                    : 'READY TO GENERATE'}
-                </span>
-              </div>
-
-              {/* Visual Canvas */}
-              <div className="cad-grid-bg border-[0.75px] border-black rounded-[9px] overflow-hidden min-h-[270px] sm:min-h-[310px] flex items-center justify-center relative">
-                {isGenerating ? (
-                  <div className="p-8 text-center space-y-3">
-                    <div className="w-12 h-12 mx-auto rounded-[9px] border-[0.75px] border-black bg-[#EF6922] flex items-center justify-center animate-pulse">
-                      <RefreshCw className="w-5 h-5 text-black animate-spin" />
-                    </div>
-                    <p className="text-[0.76rem] tracking-cad uppercase font-medium text-black">
-                      ENGINEERING CUSTOM CONCEPT SHEET...
-                    </p>
-                    <p className="text-[0.84rem] font-light text-black max-w-sm mx-auto">
-                      Applying {resolvedWoodSpecies}, {resolvedDesignStyle} &amp;{' '}
-                      {resolvedAddedDetails} in{' '}
-                      {state.visualStyle === 'cad-2d'
-                        ? '2D Rhino CAD elevation format'
-                        : 'photorealistic 3D studio format'}
-                      .
-                    </p>
+            {/* Active Concept Controls: Automatic Dispatch Notice, Direct SMS/Email to Josh, Refine & Convert */}
+            {activeConcept && (
+              <div className="space-y-3 pt-1 text-left">
+                <div className="bg-[#CBCBCB]/40 border-[0.75px] border-black rounded-[9px] px-3.5 py-2.5 space-y-1">
+                  <div className="flex items-center justify-between gap-2 text-[0.68rem] tracking-cad uppercase font-medium text-black">
+                    <span>✓ LOGGED &amp; DISPATCHED TO JOSH ({OWNER_EMAIL})</span>
+                    {activeConcept.publicPath && (
+                      <a
+                        href={activeConcept.publicPath}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="underline hover:text-[#EF6922]"
+                      >
+                        DIRECT IMAGE LINK ↗
+                      </a>
+                    )}
                   </div>
-                ) : activeConcept ? (
-                  <div className="w-full h-full relative group">
-                    <img
-                      src={activeConcept.imageUrl}
-                      alt={activeConcept.summarySpec}
-                      onClick={() => setFullscreenConcept(activeConcept)}
-                      className="w-full max-h-[340px] object-contain cursor-zoom-in select-none mx-auto"
-                    />
-                    <div className="absolute bottom-3 right-3 flex items-center gap-2">
+                  <p className="text-[0.82rem] font-light text-black">
+                    {activeConcept.summarySpec}
+                  </p>
+                </div>
+
+                {/* Direct Send Concept Link & Specs to Josh via SMS or Email */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => handleDirectSendToJosh(activeConcept, 'sms')}
+                    className="bg-[#FDCB33] hover:bg-black text-black hover:text-white text-[0.68rem] tracking-cad uppercase py-2.5 px-3 rounded-[9px] border-[0.75px] border-black font-medium transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                  >
+                    <MessageSquare className="w-3.5 h-3.5 shrink-0" />
+                    <span>TEXT IMAGE LINK TO JOSH ({OWNER_PHONE_DISPLAY})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDirectSendToJosh(activeConcept, 'email')}
+                    className="bg-black hover:bg-[#EF6922] text-white hover:text-black text-[0.68rem] tracking-cad uppercase py-2.5 px-3 rounded-[9px] border-[0.75px] border-black font-medium transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                  >
+                    <Mail className="w-3.5 h-3.5 shrink-0" />
+                    <span>EMAIL IMAGE LINK TO JOSH</span>
+                  </button>
+                </div>
+
+                {/* Iterative Refinement Input Bar */}
+                <div className="flex flex-col sm:flex-row gap-2.5">
+                  <input
+                    type="text"
+                    value={refinementText}
+                    onChange={(e) => setRefinementText(e.target.value)}
+                    placeholder="Refine this concept (e.g., 'Add fluted doors' or 'Make it wider')..."
+                    className="flex-1 h-[42px] bg-white text-black text-[0.84rem] px-3.5 rounded-[9px] border-[0.75px] border-black font-light focus:outline-none placeholder:text-black/45"
+                  />
+                  <button
+                    type="button"
+                    disabled={isGenerating || !refinementText.trim()}
+                    onClick={() => runGeneration('refine')}
+                    className="shrink-0 bg-[#27AAE0] text-black disabled:opacity-50 hover:bg-black hover:text-white text-[0.70rem] tracking-cad uppercase px-5 py-2.5 rounded-[9px] border-[0.75px] border-black font-medium transition-colors cursor-pointer whitespace-nowrap"
+                  >
+                    REFINE IMAGE
+                  </button>
+                </div>
+
+                {/* One-Click Style Conversion + Send to Inquiry */}
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                  <button
+                    type="button"
+                    disabled={isGenerating}
+                    onClick={() =>
+                      runGeneration(
+                        'refine',
+                        activeConcept.visualStyle === 'cad-2d' ? 'render-3d' : 'cad-2d'
+                      )
+                    }
+                    className="bg-white hover:bg-[#CBCBCB] text-black text-[0.68rem] tracking-cad uppercase py-2 px-3.5 rounded-[9px] border-[0.75px] border-black font-medium transition-colors cursor-pointer"
+                  >
+                    {activeConcept.visualStyle === 'cad-2d'
+                      ? 'CONVERT THIS TO 3D REALISTIC RENDERING →'
+                      : 'CONVERT THIS TO 2D ELEVATION SKETCH →'}
+                  </button>
+
+                  {(placement === 'visualizer' || placement === 'methodology') &&
+                    onSendToInquiry && (
                       <button
                         type="button"
-                        onClick={() => handleDownloadConcept(activeConcept)}
-                        className="bg-white hover:bg-[#FDCB33] text-black border-[0.75px] border-black rounded-[9px] py-1.5 px-3 text-[0.68rem] tracking-cad uppercase font-medium flex items-center gap-1.5 cursor-pointer shadow-sm"
-                        title="Download Concept PNG"
+                        onClick={() => onSendToInquiry(activeConcept)}
+                        className="bg-[#EF6922] hover:bg-black text-black hover:text-white text-[0.70rem] tracking-cad uppercase py-2.5 px-4 rounded-[9px] border-[0.75px] border-black font-medium transition-colors cursor-pointer inline-flex items-center gap-1.5"
                       >
-                        <Download className="w-3.5 h-3.5" />
-                        <span>SAVE PNG</span>
+                        <span>OPEN IN PAGE 05 COMMISSION INQUIRY</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => setFullscreenConcept(activeConcept)}
-                        className="bg-black hover:bg-[#EF6922] text-white hover:text-black border-[0.75px] border-black rounded-[9px] py-1.5 px-3 text-[0.68rem] tracking-cad uppercase font-medium flex items-center gap-1.5 cursor-pointer shadow-sm"
-                        title="Zoom Fullscreen"
-                      >
-                        <Maximize2 className="w-3.5 h-3.5" />
-                        <span>ZOOM</span>
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="p-6 sm:p-8 text-center space-y-3">
-                    <div className="w-11 h-11 mx-auto rounded-[9px] border-[0.75px] border-black bg-white flex items-center justify-center">
-                      <ImageIcon className="w-5 h-5 text-black" />
-                    </div>
-                    <p className="text-[0.76rem] tracking-cad uppercase font-medium text-black">
-                      YOUR GENERATED 3D RENDER OR 2D CAD SKETCH WILL APPEAR HERE
-                    </p>
-                    <p className="text-[0.84rem] font-light text-black max-w-md mx-auto">
-                      Click any of the 4 basic starter ideas on the left or describe your custom
-                      piece and click GENERATE CUSTOM CONCEPT.
-                    </p>
+                    )}
+
+                  {placement === 'inquire' && onApplyToInquiryForm && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onApplyToInquiryForm(activeConcept);
+                        setSyncedNotice(true);
+                        setTimeout(() => setSyncedNotice(false), 2500);
+                      }}
+                      className="bg-[#FDCB33] hover:bg-black text-black hover:text-white text-[0.70rem] tracking-cad uppercase py-2 px-3.5 rounded-[9px] border-[0.75px] border-black font-medium transition-colors cursor-pointer inline-flex items-center gap-1.5"
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                      <span>
+                        {syncedNotice
+                          ? 'CONCEPT SPECS COPIED TO INQUIRY FORM'
+                          : 'INSERT SPECS INTO INQUIRY FORM BELOW'}
+                      </span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Concept History Strip if multiple variations generated */}
+                {state.history.length > 1 && (
+                  <div className="pt-2 border-t border-black/20 flex items-center gap-2.5 overflow-x-auto">
+                    <span className="text-[0.66rem] tracking-cad uppercase font-medium text-black shrink-0">
+                      VARIATIONS ({state.history.length}):
+                    </span>
+                    {state.history.map((item) => {
+                      const isSelected = item.id === activeConcept.id;
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() =>
+                            onChangeState((prev) => ({ ...prev, activeConceptId: item.id }))
+                          }
+                          className={`relative rounded-[6px] overflow-hidden border-[0.75px] border-black shrink-0 cursor-pointer transition-all ${
+                            isSelected ? 'ring-2 ring-[#EF6922] opacity-100' : 'opacity-60 hover:opacity-100'
+                          }`}
+                        >
+                          <img
+                            src={item.imageUrl}
+                            alt={item.summarySpec}
+                            className="w-16 h-10 object-cover bg-white"
+                          />
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
               </div>
-
-              {/* Active Concept Controls: Automatic Dispatch Notice, Direct SMS/Email to Josh, Refine & Convert */}
-              {activeConcept && (
-                <div className="space-y-3 pt-1 text-left">
-                  <div className="bg-[#CBCBCB]/40 border-[0.75px] border-black rounded-[9px] px-3.5 py-2.5 space-y-1">
-                    <div className="flex items-center justify-between gap-2 text-[0.68rem] tracking-cad uppercase font-medium text-black">
-                      <span>✓ LOGGED &amp; DISPATCHED TO JOSH ({OWNER_EMAIL})</span>
-                      {activeConcept.publicPath && (
-                        <a
-                          href={activeConcept.publicPath}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="underline hover:text-[#EF6922]"
-                        >
-                          DIRECT IMAGE LINK ↗
-                        </a>
-                      )}
-                    </div>
-                    <p className="text-[0.82rem] font-light text-black">
-                      {activeConcept.summarySpec}
-                    </p>
-                    {activeConcept.modelEngine && (
-                      <p className="text-[0.66rem] tracking-cad uppercase text-black/65 font-medium pt-0.5">
-                        ENGINE: {activeConcept.modelEngine}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Direct Send Concept Link & Specs to Josh via SMS or Email */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleDirectSendToJosh(activeConcept, 'sms')}
-                      className="bg-[#FDCB33] hover:bg-black text-black hover:text-white text-[0.68rem] tracking-cad uppercase py-2.5 px-3 rounded-[9px] border-[0.75px] border-black font-medium transition-colors cursor-pointer flex items-center justify-center gap-1.5"
-                    >
-                      <MessageSquare className="w-3.5 h-3.5 shrink-0" />
-                      <span>TEXT IMAGE LINK TO JOSH ({OWNER_PHONE_DISPLAY})</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDirectSendToJosh(activeConcept, 'email')}
-                      className="bg-black hover:bg-[#EF6922] text-white hover:text-black text-[0.68rem] tracking-cad uppercase py-2.5 px-3 rounded-[9px] border-[0.75px] border-black font-medium transition-colors cursor-pointer flex items-center justify-center gap-1.5"
-                    >
-                      <Mail className="w-3.5 h-3.5 shrink-0" />
-                      <span>EMAIL IMAGE LINK TO JOSH</span>
-                    </button>
-                  </div>
-
-                  {/* Iterative Refinement Input Bar */}
-                  <div className="flex flex-col sm:flex-row gap-2">
-                    <input
-                      type="text"
-                      value={refinementText}
-                      onChange={(e) => setRefinementText(e.target.value)}
-                      placeholder="Refine this concept (e.g., 'Add fluted doors' or 'Make it wider')..."
-                      className="flex-1 h-[42px] bg-white text-black text-[0.84rem] px-3.5 rounded-[9px] border-[0.75px] border-black font-light focus:outline-none placeholder:text-black/45"
-                    />
-                    <button
-                      type="button"
-                      disabled={isGenerating || !refinementText.trim()}
-                      onClick={() => runGeneration('refine')}
-                      className="shrink-0 bg-[#27AAE0] text-black disabled:opacity-50 hover:bg-black hover:text-white text-[0.70rem] tracking-cad uppercase px-4 py-2.5 rounded-[9px] border-[0.75px] border-black font-medium transition-colors cursor-pointer whitespace-nowrap"
-                    >
-                      REFINE IMAGE
-                    </button>
-                  </div>
-
-                  {/* One-Click Style Conversion + Send to Inquiry */}
-                  <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-                    <button
-                      type="button"
-                      disabled={isGenerating}
-                      onClick={() =>
-                        runGeneration(
-                          'refine',
-                          activeConcept.visualStyle === 'cad-2d' ? 'render-3d' : 'cad-2d'
-                        )
-                      }
-                      className="bg-white hover:bg-[#CBCBCB] text-black text-[0.68rem] tracking-cad uppercase py-2 px-3.5 rounded-[9px] border-[0.75px] border-black font-medium transition-colors cursor-pointer"
-                    >
-                      {activeConcept.visualStyle === 'cad-2d'
-                        ? 'CONVERT THIS TO 3D HARDWOOD RENDER →'
-                        : 'CONVERT THIS TO 2D CAD SKETCH →'}
-                    </button>
-
-                    {(placement === 'visualizer' || placement === 'methodology') &&
-                      onSendToInquiry && (
-                        <button
-                          type="button"
-                          onClick={() => onSendToInquiry(activeConcept)}
-                          className="bg-[#EF6922] hover:bg-black text-black hover:text-white text-[0.70rem] tracking-cad uppercase py-2.5 px-4 rounded-[9px] border-[0.75px] border-black font-medium transition-colors cursor-pointer inline-flex items-center gap-1.5"
-                        >
-                          <span>OPEN IN PAGE 05 COMMISSION INQUIRY</span>
-                          <ArrowRight className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-
-                    {placement === 'inquire' && onApplyToInquiryForm && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          onApplyToInquiryForm(activeConcept);
-                          setSyncedNotice(true);
-                          setTimeout(() => setSyncedNotice(false), 2500);
-                        }}
-                        className="bg-[#FDCB33] hover:bg-black text-black hover:text-white text-[0.70rem] tracking-cad uppercase py-2 px-3.5 rounded-[9px] border-[0.75px] border-black font-medium transition-colors cursor-pointer inline-flex items-center gap-1.5"
-                      >
-                        <Check className="w-3.5 h-3.5" />
-                        <span>
-                          {syncedNotice
-                            ? 'CONCEPT SPECS COPIED TO INQUIRY FORM'
-                            : 'INSERT SPECS INTO INQUIRY FORM BELOW'}
-                        </span>
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Concept History Strip if multiple variations generated */}
-                  {state.history.length > 1 && (
-                    <div className="pt-2 border-t border-black/20 flex items-center gap-2.5 overflow-x-auto">
-                      <span className="text-[0.66rem] tracking-cad uppercase font-medium text-black shrink-0">
-                        VARIATIONS ({state.history.length}):
-                      </span>
-                      {state.history.map((item) => {
-                        const isSelected = item.id === activeConcept.id;
-                        return (
-                          <button
-                            key={item.id}
-                            type="button"
-                            onClick={() =>
-                              onChangeState((prev) => ({ ...prev, activeConceptId: item.id }))
-                            }
-                            className={`relative rounded-[6px] overflow-hidden border-[0.75px] border-black shrink-0 cursor-pointer transition-all ${
-                              isSelected ? 'ring-2 ring-[#EF6922] opacity-100' : 'opacity-60 hover:opacity-100'
-                            }`}
-                          >
-                            <img
-                              src={item.imageUrl}
-                              alt={item.summarySpec}
-                              className="w-16 h-10 object-cover bg-white"
-                            />
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Studio Concept Archive Modal (PIN-protected so only Josh can view all customer-generated images) */}
+      {/* Studio Concept Archive Modal (Allows Josh to view & download all customer-generated images) */}
       {showArchiveModal && (
         <div
           role="dialog"
           aria-modal="true"
-          aria-labelledby="studio-archive-modal-title"
-          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn"
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
           onClick={() => setShowArchiveModal(false)}
         >
           <div
@@ -1200,153 +1168,83 @@ Concept Image Link: ${imageLink}`;
             onClick={(e) => e.stopPropagation()}
           >
             <div className="bg-[#EF6922] text-black border border-black rounded-[9px] px-4 py-2.5 flex items-center justify-between gap-2 shrink-0">
-              <span
-                id="studio-archive-modal-title"
-                className="text-[0.76rem] tracking-cad uppercase font-medium flex items-center gap-2"
-              >
-                <Lock className="w-3.5 h-3.5 shrink-0" />
-                <span>STUDIO CONCEPT LOG — OWNER ACCESS</span>
+              <span className="text-[0.76rem] tracking-cad uppercase font-medium">
+                STUDIO CONCEPT LOG — ALL GENERATED CUSTOMER VISUALIZATIONS
               </span>
-              <div className="flex items-center gap-2">
-                {archiveUnlocked && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setArchiveUnlocked(false);
-                      setArchivePin('');
-                      setArchivePinInput('');
-                      setArchiveList([]);
-                      try {
-                        sessionStorage.removeItem('cg_studio_pin');
-                      } catch {
-                        // Ignore
-                      }
-                    }}
-                    className="bg-black text-white border-[0.75px] border-black rounded-[6px] px-3 py-1 text-[0.66rem] tracking-cad uppercase font-medium cursor-pointer"
-                  >
-                    LOCK
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setShowArchiveModal(false)}
-                  className="bg-white text-black border-[0.75px] border-black rounded-[6px] px-3 py-1 text-[0.68rem] tracking-cad uppercase font-medium cursor-pointer"
-                >
-                  CLOSE [X]
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => setShowArchiveModal(false)}
+                className="bg-white text-black border-[0.75px] border-black rounded-[6px] px-3 py-1 text-[0.68rem] tracking-cad uppercase font-medium cursor-pointer"
+              >
+                CLOSE [X]
+              </button>
             </div>
 
-            {!archiveUnlocked ? (
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  fetchServerArchive(archivePinInput);
-                }}
-                className="border border-black rounded-[9px] p-5 sm:p-6 bg-white space-y-4"
-              >
-                <p className="text-[0.88rem] font-light text-black leading-relaxed">
-                  To protect customer privacy, the Studio Concept Log is restricted to studio
-                  owners. Enter your <strong className="font-medium">Studio Admin PIN</strong> to
-                  view saved concepts.
-                </p>
+            <p className="text-[0.86rem] font-light text-black shrink-0">
+              Every image generated through the Custom Concept Visualizer is automatically saved to
+              the studio server and dispatched to <strong className="font-medium">{OWNER_EMAIL}</strong>.
+            </p>
 
-                {archiveConfigured && (
-                  <div className="flex flex-col sm:flex-row gap-2.5">
-                    <input
-                      type="password"
-                      value={archivePinInput}
-                      onChange={(e) => setArchivePinInput(e.target.value)}
-                      placeholder="Enter Studio Admin PIN..."
-                      autoFocus
-                      className="flex-1 h-[44px] bg-white text-black text-[0.90rem] px-3.5 rounded-[9px] border border-black font-light focus:outline-none focus:bg-[#FDCB33]/10 placeholder:text-black/45"
-                    />
-                    <button
-                      type="submit"
-                      disabled={loadingArchive || !archivePinInput.trim()}
-                      className="bg-black hover:bg-[#EF6922] text-white hover:text-black disabled:opacity-50 border border-black rounded-[9px] px-5 py-2.5 text-[0.72rem] tracking-cad uppercase font-medium transition-colors cursor-pointer whitespace-nowrap"
+            <div className="flex-1 overflow-y-auto space-y-3 pr-1">
+              {loadingArchive ? (
+                <div className="p-8 text-center text-[0.78rem] tracking-cad uppercase font-medium">
+                  LOADING SAVED CUSTOMER CONCEPTS...
+                </div>
+              ) : archiveList.length === 0 ? (
+                <div className="p-8 border border-black rounded-[9px] text-center text-[0.84rem] font-light text-black">
+                  No customer concepts have been generated yet in this session.
+                </div>
+              ) : (
+                archiveList.map((entry) => (
+                  <div
+                    key={entry.id}
+                    className="border border-black rounded-[9px] p-3.5 bg-white grid grid-cols-1 sm:grid-cols-12 gap-4 items-center"
+                  >
+                    <a
+                      href={entry.publicPath}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="sm:col-span-4 h-[110px] border-[0.75px] border-black rounded-[6px] overflow-hidden bg-white flex items-center justify-center"
                     >
-                      {loadingArchive ? 'VERIFYING...' : 'UNLOCK LOG'}
-                    </button>
-                  </div>
-                )}
-
-                {archiveError && (
-                  <div className="p-3 rounded-[9px] border border-black bg-[#FDCB33]/35 text-black text-[0.80rem] font-medium">
-                    {archiveError}
-                  </div>
-                )}
-              </form>
-            ) : (
-              <>
-                <p className="text-[0.86rem] font-light text-black shrink-0">
-                  Every image generated through the Custom Concept Visualizer is automatically saved
-                  to the studio server and dispatched to{' '}
-                  <strong className="font-medium">{OWNER_EMAIL}</strong>.
-                </p>
-
-                <div className="flex-1 overflow-y-auto space-y-3 pr-1">
-                  {loadingArchive ? (
-                    <div className="p-8 text-center text-[0.78rem] tracking-cad uppercase font-medium">
-                      LOADING SAVED CUSTOMER CONCEPTS...
-                    </div>
-                  ) : archiveList.length === 0 ? (
-                    <div className="p-8 border border-black rounded-[9px] text-center text-[0.84rem] font-light text-black">
-                      No customer concepts have been generated yet in this session.
-                    </div>
-                  ) : (
-                    archiveList.map((entry) => (
-                      <div
-                        key={entry.id}
-                        className="border border-black rounded-[9px] p-3.5 bg-white grid grid-cols-1 sm:grid-cols-12 gap-4 items-center"
-                      >
+                      <img
+                        src={entry.publicPath}
+                        alt={entry.summarySpec}
+                        className="w-full h-full object-cover"
+                      />
+                    </a>
+                    <div className="sm:col-span-8 space-y-1.5">
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-[0.68rem] tracking-cad uppercase font-medium text-black">
+                        <span>
+                          {entry.woodSpecies} · {entry.designStyle}
+                          {entry.addedDetails ? ` · ${entry.addedDetails}` : ''}
+                        </span>
+                        <span>{entry.createdAt}</span>
+                      </div>
+                      <p className="text-[0.86rem] font-normal text-black">
+                        &ldquo;{entry.ideaPrompt}&rdquo;
+                      </p>
+                      <div className="flex flex-wrap items-center gap-2 pt-1">
+                        <a
+                          href={`/api/download-concept/${encodeURIComponent(entry.filename)}`}
+                          download={`casegoods-${entry.filename}`}
+                          className="bg-[#FDCB33] text-black border-[0.75px] border-black rounded-[6px] px-3 py-1 text-[0.66rem] tracking-cad uppercase font-medium"
+                        >
+                          DOWNLOAD IMAGE
+                        </a>
                         <a
                           href={entry.publicPath}
                           target="_blank"
                           rel="noreferrer"
-                          className="sm:col-span-4 h-[110px] border-[0.75px] border-black rounded-[6px] overflow-hidden bg-white flex items-center justify-center"
+                          className="bg-white text-black border-[0.75px] border-black rounded-[6px] px-3 py-1 text-[0.66rem] tracking-cad uppercase font-medium"
                         >
-                          <img
-                            src={entry.publicPath}
-                            alt={entry.summarySpec}
-                            className="w-full h-full object-cover"
-                          />
+                          OPEN FULL IMAGE ↗
                         </a>
-                        <div className="sm:col-span-8 space-y-1.5">
-                          <div className="flex flex-wrap items-center justify-between gap-2 text-[0.68rem] tracking-cad uppercase font-medium text-black">
-                            <span>
-                              {entry.woodSpecies} · {entry.designStyle}
-                              {entry.addedDetails ? ` · ${entry.addedDetails}` : ''}
-                            </span>
-                            <span>{entry.createdAt}</span>
-                          </div>
-                          <p className="text-[0.86rem] font-normal text-black">
-                            &ldquo;{entry.ideaPrompt}&rdquo;
-                          </p>
-                          <div className="flex flex-wrap items-center gap-2 pt-1">
-                            <a
-                              href={`/api/download-concept/${encodeURIComponent(entry.filename)}`}
-                              download={`casegoods-${entry.filename}`}
-                              className="bg-[#FDCB33] text-black border-[0.75px] border-black rounded-[6px] px-3 py-1 text-[0.66rem] tracking-cad uppercase font-medium"
-                            >
-                              DOWNLOAD IMAGE
-                            </a>
-                            <a
-                              href={entry.publicPath}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="bg-white text-black border-[0.75px] border-black rounded-[6px] px-3 py-1 text-[0.66rem] tracking-cad uppercase font-medium"
-                            >
-                              OPEN FULL IMAGE ↗
-                            </a>
-                          </div>
-                        </div>
                       </div>
-                    ))
-                  )}
-                </div>
-              </>
-            )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -1356,8 +1254,7 @@ Concept Image Link: ${imageLink}`;
         <div
           role="dialog"
           aria-modal="true"
-          aria-labelledby="visualizer-fullscreen-title"
-          className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-2 sm:p-6 animate-fadeIn"
+          className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-2 sm:p-6"
           onClick={() => setFullscreenConcept(null)}
         >
           <div
@@ -1369,10 +1266,7 @@ Concept Image Link: ${imageLink}`;
             <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] items-center gap-3 select-none">
               {/* Left Box: Project Name or Number */}
               <div className="bg-[#EF6922] text-black border border-black rounded-[9px] px-4 py-2.5 flex items-center justify-start text-left overflow-hidden">
-                <span
-                  id="visualizer-fullscreen-title"
-                  className="text-[0.74rem] tracking-cad uppercase font-medium truncate"
-                >
+                <span className="text-[0.74rem] tracking-cad uppercase font-medium truncate">
                   {fullscreenConcept.id.toUpperCase()} — {fullscreenConcept.woodSpecies}
                 </span>
               </div>
