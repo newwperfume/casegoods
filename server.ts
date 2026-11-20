@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
+import { GoogleGenAI } from '@google/genai';
 import { requireAuth, optionalAuth, type AuthRequest } from './src/middleware/auth.ts';
 import {
   getOrCreateUser,
@@ -205,6 +206,206 @@ function buildStyleConstraint(designStyle: string): string {
     return 'Refined modern Shaker architectural proportions with crisp flat recessed center panels, narrow 2-1/4-inch stiles and rails, and timeless symmetry.';
   }
   return `${designStyle} architectural proportions with disciplined geometric alignment and bespoke cabinetmaker detailing.`;
+}
+
+interface SourceImagePayload {
+  data: string;
+  mimeType: string;
+}
+
+const ALLOWED_INPUT_MIMES = new Set([
+  'image/png',
+  'image/jpeg',
+  'image/webp',
+  'image/heic',
+  'image/heif',
+]);
+const MAX_SOURCE_IMAGE_BASE64_LEN = 12 * 1024 * 1024; // ~9 MB raw image
+
+function getGeminiApiKey(): string {
+  const key = (process.env.GEMINI_API_KEY || '').trim();
+  if (!key || key === 'MY_GEMINI_API_KEY') return '';
+  return key;
+}
+
+/**
+ * Primary Multimodal Image Engine: Google Gemini (Nano Banana 2.1 / 3.1 Flash Image / 2.5 Flash Image)
+ * Supports true image-to-image room-photo compositing, hand-sketch translation, iterative refinement,
+ * and 3D <-> 2D CAD conversion via @google/genai.
+ */
+async function generateWithGeminiImage(params: {
+  prompt: string;
+  sourceImage: SourceImagePayload | null;
+  sourceImageMode: 'room-photo' | 'refine-concept';
+}): Promise<{
+  base64: string;
+  mimeType: string;
+  engine: string;
+} | null> {
+  const apiKey = getGeminiApiKey();
+  if (!apiKey) return null;
+
+  const ai = new GoogleGenAI({ apiKey });
+  const configuredModel = (process.env.GEMINI_IMAGE_MODEL || '').trim();
+  const candidateModels = Array.from(
+    new Set(
+      [
+        configuredModel,
+        'gemini-nano-banana-2.1',
+        'gemini-3.1-flash-image',
+        'gemini-2.5-flash-image',
+      ].filter(Boolean)
+    )
+  );
+
+  const contents = params.sourceImage
+    ? [
+        {
+          inlineData: {
+            mimeType: params.sourceImage.mimeType,
+            data: params.sourceImage.data,
+          },
+        },
+        params.prompt,
+      ]
+    : params.prompt;
+
+  for (const model of candidateModels) {
+    try {
+      const supportsImageSize = model !== 'gemini-2.5-flash-image';
+      const response = await ai.models.generateContent({
+        model,
+        contents,
+        config: {
+          responseModalities: ['IMAGE'],
+          imageConfig: supportsImageSize
+            ? { aspectRatio: '16:9', imageSize: '1K' }
+            : { aspectRatio: '16:9' },
+        },
+      });
+
+      const parts = response.candidates?.[0]?.content?.parts || [];
+      for (const part of parts) {
+        if (part.inlineData?.data && part.inlineData?.mimeType?.startsWith('image/')) {
+          const modeTag = params.sourceImage
+            ? params.sourceImageMode === 'room-photo'
+              ? 'Room/Sketch Edit'
+              : 'Iterative Refinement'
+            : 'Studio Render';
+          return {
+            base64: part.inlineData.data,
+            mimeType: part.inlineData.mimeType,
+            engine: `Gemini ${model} (${modeTag})`,
+          };
+        }
+      }
+      console.warn(`Gemini model ${model} returned no image part; trying next fallback.`);
+    } catch (err) {
+      console.warn(`Gemini model ${model} error:`, err instanceof Error ? err.message : err);
+    }
+  }
+
+  return null;
+}
+
+function buildVisualizationPrompt(opts: {
+  visualStyle: 'render-3d' | 'cad-2d';
+  ideaPrompt: string;
+  timberSpec: string;
+  joinerySpec: string;
+  styleSpec: string;
+  refinementClause: string;
+  hasSourceImage: boolean;
+  sourceImageMode: 'room-photo' | 'refine-concept';
+}): string {
+  const {
+    visualStyle,
+    ideaPrompt,
+    timberSpec,
+    joinerySpec,
+    styleSpec,
+    refinementClause,
+    hasSourceImage,
+    sourceImageMode,
+  } = opts;
+
+  if (hasSourceImage && sourceImageMode === 'room-photo') {
+    if (visualStyle === 'cad-2d') {
+      return [
+        'Use the attached room photo or hand sketch strictly as the spatial layout and architectural reference.',
+        'Translate the requested custom woodwork commission into a pure 2D orthographic front elevation architectural CAD shop drawing drafted in crisp black technical ink (#000000) on stark pure white drafting paper (#FFFFFF).',
+        `Custom Millwork / Furniture Piece: ${ideaPrompt}.`,
+        `Joinery & Elevation Linework Details: ${joinerySpec}`,
+        `Architectural Proportions: ${styleSpec}`,
+        refinementClause,
+        'Match the width, height, alcove proportions, and bay layout suggested by the reference image. Include cabinet door divisions, stile-and-rail profiles, cross-section callouts, and fractional inch dimension lines. Strictly flat 2D technical vector linework: NO 3D perspective, NO photo background, NO photorealistic shading.',
+      ]
+        .filter(Boolean)
+        .join(' ');
+    }
+
+    return [
+      'Use the attached image as the direct architectural reference. If it is a photograph of a room, wall, or alcove, preserve the exact existing room architecture, walls, flooring, windows, camera angle, perspective, and natural daylight while seamlessly building and installing the custom hardwood furniture or millwork piece directly into the space at realistic physical scale with accurate contact shadows. If the attached image is a hand-drawn sketch, faithfully preserve its exact layout, compartments, and proportions and render it as a finished handcrafted studio photograph.',
+      `Custom Commission to Build: ${ideaPrompt}.`,
+      `Timber & Finish Specification: ${timberSpec}`,
+      `Joinery & Construction Specification: ${joinerySpec}`,
+      `Architectural Style & Proportions: ${styleSpec}`,
+      refinementClause,
+      'Photorealistic architectural photography, crisp natural lighting, realistic wood grain continuity, +/- 1/32-inch cabinetmaker reveals, no text watermarks or labels.',
+    ]
+      .filter(Boolean)
+      .join(' ');
+  }
+
+  if (hasSourceImage && sourceImageMode === 'refine-concept') {
+    if (visualStyle === 'cad-2d') {
+      return [
+        'Edit and translate the exact custom furniture or millwork design shown in the attached image into a pure 2D orthographic front elevation architectural CAD shop drawing in crisp black technical ink (#000000) on stark pure white drafting paper (#FFFFFF).',
+        `Original Commission Context: ${ideaPrompt}.`,
+        `Joinery & Elevation Linework Details: ${joinerySpec}`,
+        `Architectural Proportions: ${styleSpec}`,
+        refinementClause,
+        'Preserve the exact bay layout, door count, drawer configuration, and overall silhouette from the attached image while applying any requested revision. Show exact cabinet divisions, stile-and-rail profiles, and fractional inch dimension lines. Strictly flat 2D CAD linework with NO perspective, NO shading, NO room background.',
+      ]
+        .filter(Boolean)
+        .join(' ');
+    }
+
+    return [
+      'Edit the custom furniture or architectural millwork design shown in the attached image while preserving its core structure, silhouette, camera framing, and clean studio setting (or room setting if already placed in a room).',
+      `Commission Context: ${ideaPrompt}.`,
+      `Timber & Finish Specification: ${timberSpec}`,
+      `Joinery & Construction Specification: ${joinerySpec}`,
+      `Architectural Style & Proportions: ${styleSpec}`,
+      refinementClause,
+      'Apply the requested refinement accurately with photorealistic studio architectural lighting, continuous hardwood grain, crisp +/- 1/32-inch joinery reveals, and zero text watermarks.',
+    ]
+      .filter(Boolean)
+      .join(' ');
+  }
+
+  return visualStyle === 'cad-2d'
+    ? [
+        'Pure 2D orthographic front elevation architectural CAD shop drawing drafted in crisp black technical ink (#000000) on stark pure white drafting paper (#FFFFFF).',
+        `Custom Millwork / Furniture Piece: ${ideaPrompt}.`,
+        `Joinery & Elevation Linework Details: ${joinerySpec}`,
+        `Architectural Proportions: ${styleSpec}`,
+        refinementClause,
+        'Show exact cabinet door divisions, stile-and-rail profiles, cross-section callout lines, and fractional inch dimension ticks. Strictly flat 2D technical vector linework: NO 3D perspective, NO room background, NO photorealistic wood shading, NO grey gradients.',
+      ]
+        .filter(Boolean)
+        .join(' ')
+    : [
+        'Architectural studio photography of a single bespoke handcrafted furniture or architectural millwork commission, shot on a 50mm tilt-shift lens at eye level, straight-on front elevation or gentle 3/4 view with strictly vertical plumb lines and zero wide-angle distortion.',
+        `Hero Piece: ${ideaPrompt}.`,
+        `Timber & Finish Specification: ${timberSpec}`,
+        `Joinery & Construction Specification: ${joinerySpec}`,
+        `Architectural Style & Proportions: ${styleSpec}`,
+        refinementClause,
+        'Environment & Framing Constraint: The custom woodwork piece fills the center of the frame against a clean, quiet smooth white architectural gallery wall and neutral floor with soft natural side daylight. Strictly NO room clutter, NO houseplants, NO throw pillows, NO rugs, NO decorative knick-knacks, NO people.',
+      ]
+        .filter(Boolean)
+        .join(' ');
 }
 
 /**
@@ -611,7 +812,7 @@ async function startServer() {
     res.json({ concepts: records });
   });
 
-  // POST /api/visualize-concept — Render a 3D Hardwood Proposal or 2D CAD Sketch using Cloud Open-Source FLUX.1
+  // POST /api/visualize-concept — True Multimodal Gemini Image-to-Image + Text-to-Image (with FLUX fallback)
   app.post('/api/visualize-concept', optionalAuth, async (req: AuthRequest, res) => {
     try {
       const {
@@ -621,61 +822,114 @@ async function startServer() {
         designStyle = 'Mid-Century Modern',
         addedDetails = 'Full Overlay Doors',
         refinementPrompt = '',
+        sourceImage = null,
+        sourceImageMode = 'room-photo',
       } = req.body || {};
 
-      if (!ideaPrompt.trim() && !refinementPrompt.trim()) {
+      const cleanIdeaPrompt = typeof ideaPrompt === 'string' ? ideaPrompt.trim() : '';
+      const cleanRefinement = typeof refinementPrompt === 'string' ? refinementPrompt.trim() : '';
+      const safeVisualStyle: 'render-3d' | 'cad-2d' =
+        visualStyle === 'cad-2d' ? 'cad-2d' : 'render-3d';
+      const safeSourceMode: 'room-photo' | 'refine-concept' =
+        sourceImageMode === 'refine-concept' ? 'refine-concept' : 'room-photo';
+
+      if (!cleanIdeaPrompt && !cleanRefinement) {
         res.status(400).json({
           error: 'Please enter a description of your custom furniture or millwork idea.',
         });
         return;
       }
 
-      const timberSpec = buildTimberConstraint(woodSpecies);
-      const joinerySpec = buildJoineryDetailConstraint(addedDetails);
-      const styleSpec = buildStyleConstraint(designStyle);
-
-      const refinementClause = refinementPrompt.trim()
-        ? `Mandatory design revision: ${refinementPrompt.trim()}.`
-        : '';
-
-      const fullOpenSourcePrompt =
-        visualStyle === 'cad-2d'
-          ? [
-              'Pure 2D orthographic front elevation architectural CAD shop drawing drafted in crisp black technical ink (#000000) on stark pure white drafting paper (#FFFFFF).',
-              `Custom Millwork / Furniture Piece: ${ideaPrompt.trim()}.`,
-              `Joinery & Elevation Linework Details: ${joinerySpec}`,
-              `Architectural Proportions: ${styleSpec}`,
-              refinementClause,
-              'Show exact cabinet door divisions, stile-and-rail profiles, cross-section callout lines, and fractional inch dimension ticks. Strictly flat 2D technical vector linework: NO 3D perspective, NO room background, NO photorealistic wood shading, NO grey gradients.',
-            ]
-              .filter(Boolean)
-              .join(' ')
-          : [
-              'Architectural studio photography of a single bespoke handcrafted furniture or architectural millwork commission, shot on a 50mm tilt-shift lens at eye level, straight-on front elevation or gentle 3/4 view with strictly vertical plumb lines and zero wide-angle distortion.',
-              `Hero Piece: ${ideaPrompt.trim()}.`,
-              `Timber & Finish Specification: ${timberSpec}`,
-              `Joinery & Construction Specification: ${joinerySpec}`,
-              `Architectural Style & Proportions: ${styleSpec}`,
-              refinementClause,
-              'Environment & Framing Constraint: The custom woodwork piece fills the center of the frame against a clean, quiet smooth white architectural gallery wall and neutral floor with soft natural side daylight. Strictly NO room clutter, NO houseplants, NO throw pillows, NO rugs, NO decorative knick-knacks, NO people.',
-            ]
-              .filter(Boolean)
-              .join(' ');
-
-      // 1. Try Primary Cloud Open-Source Engine: Black Forest Labs FLUX.1-schnell (8-Step HD)
-      let generatedResult = await generateWithOpenSourceFluxSpace(fullOpenSourcePrompt);
-
-      // 2. Fallback to Secondary Cloud Open-Source Engine: Pollinations FLUX (enhance=false)
-      if (!generatedResult) {
-        generatedResult = await generateWithPollinationsFlux(fullOpenSourcePrompt);
+      // Validate optional sourceImage (room photo / sketch / existing concept for refinement)
+      let validatedSourceImage: SourceImagePayload | null = null;
+      if (sourceImage && typeof sourceImage === 'object') {
+        const rawData = typeof sourceImage.data === 'string' ? sourceImage.data.trim() : '';
+        const rawMime =
+          typeof sourceImage.mimeType === 'string' ? sourceImage.mimeType.trim().toLowerCase() : '';
+        if (rawData) {
+          if (!ALLOWED_INPUT_MIMES.has(rawMime)) {
+            res.status(400).json({
+              error: 'Unsupported image format. Please upload a PNG, JPEG, or WebP photo.',
+            });
+            return;
+          }
+          if (rawData.length > MAX_SOURCE_IMAGE_BASE64_LEN) {
+            res.status(400).json({
+              error: 'Uploaded photo is too large. Please use an image under 8 MB.',
+            });
+            return;
+          }
+          validatedSourceImage = { data: rawData, mimeType: rawMime };
+        }
       }
 
-      if (!generatedResult) {
-        res.status(503).json({
-          error:
-            'The cloud open-source FLUX.1 render queue is momentarily busy. Please click GENERATE CUSTOM CONCEPT again in a few seconds.',
+      const timberSpec = buildTimberConstraint(String(woodSpecies));
+      const joinerySpec = buildJoineryDetailConstraint(String(addedDetails));
+      const styleSpec = buildStyleConstraint(String(designStyle));
+      const refinementClause = cleanRefinement
+        ? `Mandatory design revision: ${cleanRefinement}.`
+        : '';
+
+      const prompt = buildVisualizationPrompt({
+        visualStyle: safeVisualStyle,
+        ideaPrompt: cleanIdeaPrompt || 'Custom handcrafted hardwood furniture commission',
+        timberSpec,
+        joinerySpec,
+        styleSpec,
+        refinementClause,
+        hasSourceImage: Boolean(validatedSourceImage),
+        sourceImageMode: safeSourceMode,
+      });
+
+      let generatedResult: { base64: string; mimeType: string; engine: string } | null = null;
+
+      if (validatedSourceImage) {
+        // True image-to-image requires Gemini multimodal API
+        if (!getGeminiApiKey()) {
+          res.status(503).json({
+            error:
+              'Room photo visualization and image refinement require GEMINI_API_KEY to be configured on the server.',
+          });
+          return;
+        }
+        generatedResult = await generateWithGeminiImage({
+          prompt,
+          sourceImage: validatedSourceImage,
+          sourceImageMode: safeSourceMode,
         });
-        return;
+
+        if (!generatedResult) {
+          res.status(503).json({
+            error:
+              'Gemini image editing is momentarily busy or could not process this photo. Please try again in a few seconds.',
+          });
+          return;
+        }
+      } else {
+        // 1. Primary: Gemini Image Generation (if GEMINI_API_KEY is configured)
+        generatedResult = await generateWithGeminiImage({
+          prompt,
+          sourceImage: null,
+          sourceImageMode: 'room-photo',
+        });
+
+        // 2. Fallback to Cloud Open-Source Engine: Black Forest Labs FLUX.1-schnell (8-Step HD)
+        if (!generatedResult) {
+          generatedResult = await generateWithOpenSourceFluxSpace(prompt);
+        }
+
+        // 3. Fallback to Secondary Cloud Open-Source Engine: Pollinations FLUX (enhance=false)
+        if (!generatedResult) {
+          generatedResult = await generateWithPollinationsFlux(prompt);
+        }
+
+        if (!generatedResult) {
+          res.status(503).json({
+            error:
+              'The image render queue is momentarily busy. Please click GENERATE CUSTOM CONCEPT again in a few seconds.',
+          });
+          return;
+        }
       }
 
       const { base64: generatedBase64, mimeType: generatedMime, engine: modelEngine } =

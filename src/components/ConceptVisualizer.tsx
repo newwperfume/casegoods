@@ -326,19 +326,55 @@ export const ConceptVisualizer: React.FC<ConceptVisualizerProps> = ({
 
     const reader = new FileReader();
     reader.onload = () => {
-      const dataUrl = typeof reader.result === 'string' ? reader.result : '';
-      const { mimeType, base64Data } = parseDataUrl(dataUrl);
-      if (base64Data) {
-        onChangeState((prev) => ({
-          ...prev,
-          uploadedPhoto: {
-            name: file.name,
-            mimeType: mimeType || file.type || 'image/jpeg',
-            dataUrl,
-            base64Data,
-          },
-        }));
-      }
+      const rawDataUrl = typeof reader.result === 'string' ? reader.result : '';
+      if (!rawDataUrl) return;
+
+      const applyPhoto = (dataUrl: string, fallbackMime: string) => {
+        const { mimeType, base64Data } = parseDataUrl(dataUrl);
+        if (base64Data) {
+          onChangeState((prev) => ({
+            ...prev,
+            uploadedPhoto: {
+              name: file.name,
+              mimeType: mimeType || fallbackMime,
+              dataUrl,
+              base64Data,
+            },
+          }));
+        }
+      };
+
+      // Downscale very large phone photos (>1600px) so room-photo uploads stay fast & under Gemini's inline limit
+      const img = new Image();
+      img.onload = () => {
+        const MAX_DIM = 1600;
+        let targetW = img.naturalWidth || 1200;
+        let targetH = img.naturalHeight || 900;
+
+        if (targetW > MAX_DIM || targetH > MAX_DIM) {
+          const ratio = Math.min(MAX_DIM / targetW, MAX_DIM / targetH);
+          targetW = Math.round(targetW * ratio);
+          targetH = Math.round(targetH * ratio);
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = targetW;
+        canvas.height = targetH;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, targetW, targetH);
+          const outputMime = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+          const compressedUrl =
+            outputMime === 'image/png'
+              ? canvas.toDataURL('image/png')
+              : canvas.toDataURL('image/jpeg', 0.88);
+          applyPhoto(compressedUrl, outputMime);
+          return;
+        }
+        applyPhoto(rawDataUrl, file.type || 'image/jpeg');
+      };
+      img.onerror = () => applyPhoto(rawDataUrl, file.type || 'image/jpeg');
+      img.src = rawDataUrl;
     };
     reader.readAsDataURL(file);
     e.target.value = '';
