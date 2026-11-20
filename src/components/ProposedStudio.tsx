@@ -16,14 +16,18 @@ import {
   ArrowLeft,
 } from 'lucide-react';
 import { ASSETS } from '../assets/index.ts';
-import { ProjectData, CadModal } from './CadModal.tsx';
+import { type ProjectData, CadModal } from './CadModal.tsx';
 import { Footer } from './Footer.tsx';
 import {
   ConceptVisualizer,
-  ConceptVisualizerState,
-  GeneratedConceptItem,
+  type ConceptVisualizerState,
+  type GeneratedConceptItem,
 } from './ConceptVisualizer.tsx';
 import { FrontCoverOptions } from './FrontCoverOptions.tsx';
+import {
+  MortiseWallCanvas,
+  useMortiseWallController,
+} from './MortiseWallSystem.tsx';
 
 type HeroViewMode = 'split' | 'cad' | 'render';
 type TeaserLensId = 'joint' | 'grain' | 'line' | 'color';
@@ -226,6 +230,7 @@ function getPageFromHash(): ProposedPageId {
 
 export const ProposedStudio: React.FC = () => {
   const [activePage, setActivePage] = useState<ProposedPageId>(() => getPageFromHash());
+  const wall = useMortiseWallController('01');
   const [menuOpen, setMenuOpen] = useState(false);
   const [heroView, setHeroView] = useState<HeroViewMode>('split');
   const [activeLens, setActiveLens] = useState<TeaserLensId>('joint');
@@ -704,7 +709,21 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
   };
 
   return (
-    <div className="min-h-screen bg-white text-black font-nexa antialiased flex flex-col selection:bg-[#EF6922] selection:text-black">
+    <>
+      {activePage === 'cover' && (
+        <MortiseWallCanvas
+          controller={wall}
+          heroSelector="#hero-center-stack"
+          headerSelector="header"
+          footerSelector="footer"
+          isModalOpen={Boolean(lightboxState.project) || submitState === 'modal'}
+        />
+      )}
+      <div
+        className={`min-h-screen text-black font-nexa antialiased flex flex-col selection:bg-[#EF6922] selection:text-black ${
+          activePage === 'cover' ? 'mortise-page-shell' : 'bg-white'
+        }`}
+      >
       {/* =======================================================================
           TOP BAR CONTRACT: 3-Zone Architectural Header
           Hidden on the initial minimal front page ('cover'); appears once the
@@ -860,7 +879,7 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
               MINIMAL FRONT PAGE (5 Options Switcher — Not Listed in Studio Index)
           =================================================================== */}
           {activePage === 'cover' && (
-            <FrontCoverOptions onNavigate={navigateToPage} />
+            <FrontCoverOptions onNavigate={navigateToPage} wall={wall} />
           )}
 
           {/* ===================================================================
@@ -2181,6 +2200,7 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 };

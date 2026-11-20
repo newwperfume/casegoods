@@ -1,11 +1,11 @@
 import React from 'react';
 import { ArrowRight } from 'lucide-react';
 import { ASSETS } from '../assets/index.ts';
-import { ProposedPageId } from './ProposedStudio.tsx';
+import type { ProposedPageId } from './ProposedStudio.tsx';
 import {
-  MortiseWallController,
+  type MortiseWallController,
   MortiseWallToolbar,
-  PillarColorKey,
+  type PillarColorKey,
 } from './MortiseWallSystem.tsx';
 
 interface FrontCoverOptionsProps {

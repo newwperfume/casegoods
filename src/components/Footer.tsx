@@ -3,7 +3,7 @@ import { ASSETS } from '../assets/index.ts';
 
 export const Footer: React.FC = () => {
   return (
-    <footer className="mt-14 pb-16 flex flex-col items-center justify-center gap-6 text-center px-4">
+    <footer className="ui-surface mt-14 pb-16 flex flex-col items-center justify-center gap-6 text-center px-4">
       {/* Centered 4-Icon Brand Strip (Chair, Cabinet, Tree Ring, Lightning Bolt) */}
       <div className="w-full max-w-[360px] flex items-center justify-center select-none">
         <img
