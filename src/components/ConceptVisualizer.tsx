@@ -13,6 +13,7 @@ import {
   MessageSquare,
   Mail,
   FolderOpen,
+  Lock,
 } from 'lucide-react';
 import { ASSETS } from '../assets/index.ts';
 import {
@@ -36,6 +37,8 @@ export interface GeneratedConceptItem {
   designStyle: string;
   addedDetails: string;
   summarySpec: string;
+  modelEngine?: string;
+  usedSourceImage?: boolean;
   timestamp: string;
 }
 
@@ -177,6 +180,17 @@ export const ConceptVisualizer: React.FC<ConceptVisualizerProps> = ({
   const [showArchiveModal, setShowArchiveModal] = useState(false);
   const [archiveList, setArchiveList] = useState<ServerLoggedConcept[]>([]);
   const [loadingArchive, setLoadingArchive] = useState(false);
+  const [archivePin, setArchivePin] = useState<string>(() => {
+    try {
+      return sessionStorage.getItem('cg_studio_pin') || '';
+    } catch {
+      return '';
+    }
+  });
+  const [archivePinInput, setArchivePinInput] = useState('');
+  const [archiveUnlocked, setArchiveUnlocked] = useState(false);
+  const [archiveError, setArchiveError] = useState<string | null>(null);
+  const [archiveConfigured, setArchiveConfigured] = useState<boolean>(true);
 
   const photoInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -204,16 +218,43 @@ export const ConceptVisualizer: React.FC<ConceptVisualizerProps> = ({
       ? state.customDetailsText.trim() || 'Custom Millwork Detail'
       : state.addedDetails;
 
-  const fetchServerArchive = async () => {
+  const fetchServerArchive = async (pinToUse: string) => {
+    if (!pinToUse.trim()) {
+      setArchiveUnlocked(false);
+      return;
+    }
     setLoadingArchive(true);
+    setArchiveError(null);
     try {
-      const res = await fetch('/api/generated-concepts');
+      const res = await fetch('/api/generated-concepts', {
+        headers: { 'x-studio-pin': pinToUse.trim() },
+      });
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
-        const data = await res.json();
         setArchiveList(Array.isArray(data.concepts) ? data.concepts : []);
+        setArchiveUnlocked(true);
+        setArchiveConfigured(true);
+        setArchivePin(pinToUse.trim());
+        try {
+          sessionStorage.setItem('cg_studio_pin', pinToUse.trim());
+        } catch {
+          // Ignore storage errors
+        }
+      } else if (res.status === 403 && data.configured === false) {
+        setArchiveConfigured(false);
+        setArchiveUnlocked(false);
+        setArchiveError(data.error || 'Studio Concept Log is locked on this server.');
+      } else {
+        setArchiveUnlocked(false);
+        setArchiveError(data.error || 'Invalid Studio PIN. Please try again.');
+        try {
+          sessionStorage.removeItem('cg_studio_pin');
+        } catch {
+          // Ignore
+        }
       }
     } catch {
-      // Ignore background archive fetch errors
+      setArchiveError('Unable to reach the studio server. Please try again.');
     } finally {
       setLoadingArchive(false);
     }
@@ -221,9 +262,31 @@ export const ConceptVisualizer: React.FC<ConceptVisualizerProps> = ({
 
   useEffect(() => {
     if (showArchiveModal) {
-      fetchServerArchive();
+      if (archivePin) {
+        fetchServerArchive(archivePin);
+      } else {
+        setArchiveUnlocked(false);
+        setArchiveError(null);
+      }
     }
   }, [showArchiveModal]);
+
+  useEffect(() => {
+    if (!showArchiveModal && !fullscreenConcept) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (fullscreenConcept) setFullscreenConcept(null);
+        else if (showArchiveModal) setShowArchiveModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showArchiveModal, fullscreenConcept]);
 
   const parseDataUrl = (dataUrl: string): { mimeType: string; base64Data: string } => {
     const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
@@ -239,19 +302,76 @@ export const ConceptVisualizer: React.FC<ConceptVisualizerProps> = ({
 
     const reader = new FileReader();
     reader.onload = () => {
-      const dataUrl = typeof reader.result === 'string' ? reader.result : '';
-      const { mimeType, base64Data } = parseDataUrl(dataUrl);
-      if (base64Data) {
-        onChangeState((prev) => ({
-          ...prev,
-          uploadedPhoto: {
-            name: file.name,
-            mimeType: mimeType || file.type || 'image/jpeg',
-            dataUrl,
-            base64Data,
-          },
-        }));
-      }
+      const rawDataUrl = typeof reader.result === 'string' ? reader.result : '';
+      if (!rawDataUrl) return;
+
+      // Downscale very large photos (>1600px) so room-photo uploads stay crisp & fast for Gemini
+      const img = new Image();
+      img.onload = () => {
+        const MAX_DIM = 1600;
+        let targetW = img.naturalWidth || 1200;
+        let targetH = img.naturalHeight || 900;
+
+        if (targetW > MAX_DIM || targetH > MAX_DIM) {
+          const ratio = Math.min(MAX_DIM / targetW, MAX_DIM / targetH);
+          targetW = Math.round(targetW * ratio);
+          targetH = Math.round(targetH * ratio);
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = targetW;
+        canvas.height = targetH;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, targetW, targetH);
+          const outputMime = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+          const compressedUrl =
+            outputMime === 'image/png'
+              ? canvas.toDataURL('image/png')
+              : canvas.toDataURL('image/jpeg', 0.88);
+          const { mimeType, base64Data } = parseDataUrl(compressedUrl);
+          if (base64Data) {
+            onChangeState((prev) => ({
+              ...prev,
+              uploadedPhoto: {
+                name: file.name,
+                mimeType,
+                dataUrl: compressedUrl,
+                base64Data,
+              },
+            }));
+            return;
+          }
+        }
+
+        const { mimeType, base64Data } = parseDataUrl(rawDataUrl);
+        if (base64Data) {
+          onChangeState((prev) => ({
+            ...prev,
+            uploadedPhoto: {
+              name: file.name,
+              mimeType: mimeType || file.type || 'image/jpeg',
+              dataUrl: rawDataUrl,
+              base64Data,
+            },
+          }));
+        }
+      };
+      img.onerror = () => {
+        const { mimeType, base64Data } = parseDataUrl(rawDataUrl);
+        if (base64Data) {
+          onChangeState((prev) => ({
+            ...prev,
+            uploadedPhoto: {
+              name: file.name,
+              mimeType: mimeType || file.type || 'image/jpeg',
+              dataUrl: rawDataUrl,
+              base64Data,
+            },
+          }));
+        }
+      };
+      img.src = rawDataUrl;
     };
     reader.readAsDataURL(file);
     e.target.value = '';
@@ -356,11 +476,13 @@ export const ConceptVisualizer: React.FC<ConceptVisualizerProps> = ({
         designStyle: resolvedDesignStyle,
         addedDetails: resolvedAddedDetails,
         summarySpec: data.summarySpec,
+        modelEngine: data.modelEngine,
+        usedSourceImage: Boolean(data.usedSourceImage),
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
 
       // Automatically render the watermarked Casegoods sheet and save it back to the server file
-      if (data.filename) {
+      if (data.id && data.uploadToken) {
         renderWatermarkedSheet({
           imageSrc: data.imageUrl,
           projectHeader: `${conceptId.toUpperCase()} — ${resolvedWoodSpecies}`,
@@ -372,15 +494,33 @@ export const ConceptVisualizer: React.FC<ConceptVisualizerProps> = ({
           rightBoxFill: targetStyle === 'cad-2d' ? '#FDCB33' : '#27AAE0',
           rightBoxText: '#000000',
         })
-          .then(({ dataUrl: watermarkedDataUrl }) => {
+          .then(({ dataUrl: watermarkedDataUrl }) =>
             fetch('/api/save-watermarked-concept', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                filename: data.filename,
+                conceptId: data.id,
+                uploadToken: data.uploadToken,
                 watermarkedDataUrl,
               }),
-            }).catch(() => {});
+            })
+          )
+          .then((r) => (r.ok ? r.json() : null))
+          .then((saved) => {
+            if (!saved?.publicPath) return;
+            onChangeState((prev) => ({
+              ...prev,
+              history: prev.history.map((item) =>
+                item.id === conceptId
+                  ? {
+                      ...item,
+                      filename: saved.filename || item.filename,
+                      publicPath: saved.publicPath || item.publicPath,
+                      fullImageUrl: saved.fullImageUrl || item.fullImageUrl,
+                    }
+                  : item
+              ),
+            }));
           })
           .catch(() => {});
       }
@@ -914,6 +1054,11 @@ Concept Image Link: ${imageLink}`;
                     <p className="text-[0.82rem] font-light text-black">
                       {activeConcept.summarySpec}
                     </p>
+                    {activeConcept.modelEngine && (
+                      <p className="text-[0.66rem] tracking-cad uppercase text-black/65 font-medium pt-0.5">
+                        ENGINE: {activeConcept.modelEngine}
+                      </p>
+                    )}
                   </div>
 
                   {/* Direct Send Concept Link & Specs to Josh via SMS or Email */}
@@ -1041,12 +1186,13 @@ Concept Image Link: ${imageLink}`;
         </div>
       </div>
 
-      {/* Studio Concept Archive Modal (Allows Josh to view & download all customer-generated images) */}
+      {/* Studio Concept Archive Modal (PIN-protected so only Josh can view all customer-generated images) */}
       {showArchiveModal && (
         <div
           role="dialog"
           aria-modal="true"
-          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+          aria-labelledby="studio-archive-modal-title"
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn"
           onClick={() => setShowArchiveModal(false)}
         >
           <div
@@ -1054,83 +1200,153 @@ Concept Image Link: ${imageLink}`;
             onClick={(e) => e.stopPropagation()}
           >
             <div className="bg-[#EF6922] text-black border border-black rounded-[9px] px-4 py-2.5 flex items-center justify-between gap-2 shrink-0">
-              <span className="text-[0.76rem] tracking-cad uppercase font-medium">
-                STUDIO CONCEPT LOG — ALL GENERATED CUSTOMER VISUALIZATIONS
-              </span>
-              <button
-                type="button"
-                onClick={() => setShowArchiveModal(false)}
-                className="bg-white text-black border-[0.75px] border-black rounded-[6px] px-3 py-1 text-[0.68rem] tracking-cad uppercase font-medium cursor-pointer"
+              <span
+                id="studio-archive-modal-title"
+                className="text-[0.76rem] tracking-cad uppercase font-medium flex items-center gap-2"
               >
-                CLOSE [X]
-              </button>
+                <Lock className="w-3.5 h-3.5 shrink-0" />
+                <span>STUDIO CONCEPT LOG — OWNER ACCESS</span>
+              </span>
+              <div className="flex items-center gap-2">
+                {archiveUnlocked && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setArchiveUnlocked(false);
+                      setArchivePin('');
+                      setArchivePinInput('');
+                      setArchiveList([]);
+                      try {
+                        sessionStorage.removeItem('cg_studio_pin');
+                      } catch {
+                        // Ignore
+                      }
+                    }}
+                    className="bg-black text-white border-[0.75px] border-black rounded-[6px] px-3 py-1 text-[0.66rem] tracking-cad uppercase font-medium cursor-pointer"
+                  >
+                    LOCK
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setShowArchiveModal(false)}
+                  className="bg-white text-black border-[0.75px] border-black rounded-[6px] px-3 py-1 text-[0.68rem] tracking-cad uppercase font-medium cursor-pointer"
+                >
+                  CLOSE [X]
+                </button>
+              </div>
             </div>
 
-            <p className="text-[0.86rem] font-light text-black shrink-0">
-              Every image generated through the Custom Concept Visualizer is automatically saved to
-              the studio server and dispatched to <strong className="font-medium">{OWNER_EMAIL}</strong>.
-            </p>
+            {!archiveUnlocked ? (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  fetchServerArchive(archivePinInput);
+                }}
+                className="border border-black rounded-[9px] p-5 sm:p-6 bg-white space-y-4"
+              >
+                <p className="text-[0.88rem] font-light text-black leading-relaxed">
+                  To protect customer privacy, the Studio Concept Log is restricted to studio
+                  owners. Enter your <strong className="font-medium">Studio Admin PIN</strong> to
+                  view saved concepts.
+                </p>
 
-            <div className="flex-1 overflow-y-auto space-y-3 pr-1">
-              {loadingArchive ? (
-                <div className="p-8 text-center text-[0.78rem] tracking-cad uppercase font-medium">
-                  LOADING SAVED CUSTOMER CONCEPTS...
-                </div>
-              ) : archiveList.length === 0 ? (
-                <div className="p-8 border border-black rounded-[9px] text-center text-[0.84rem] font-light text-black">
-                  No customer concepts have been generated yet in this session.
-                </div>
-              ) : (
-                archiveList.map((entry) => (
-                  <div
-                    key={entry.id}
-                    className="border border-black rounded-[9px] p-3.5 bg-white grid grid-cols-1 sm:grid-cols-12 gap-4 items-center"
-                  >
-                    <a
-                      href={entry.publicPath}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="sm:col-span-4 h-[110px] border-[0.75px] border-black rounded-[6px] overflow-hidden bg-white flex items-center justify-center"
+                {archiveConfigured && (
+                  <div className="flex flex-col sm:flex-row gap-2.5">
+                    <input
+                      type="password"
+                      value={archivePinInput}
+                      onChange={(e) => setArchivePinInput(e.target.value)}
+                      placeholder="Enter Studio Admin PIN..."
+                      autoFocus
+                      className="flex-1 h-[44px] bg-white text-black text-[0.90rem] px-3.5 rounded-[9px] border border-black font-light focus:outline-none focus:bg-[#FDCB33]/10 placeholder:text-black/45"
+                    />
+                    <button
+                      type="submit"
+                      disabled={loadingArchive || !archivePinInput.trim()}
+                      className="bg-black hover:bg-[#EF6922] text-white hover:text-black disabled:opacity-50 border border-black rounded-[9px] px-5 py-2.5 text-[0.72rem] tracking-cad uppercase font-medium transition-colors cursor-pointer whitespace-nowrap"
                     >
-                      <img
-                        src={entry.publicPath}
-                        alt={entry.summarySpec}
-                        className="w-full h-full object-cover"
-                      />
-                    </a>
-                    <div className="sm:col-span-8 space-y-1.5">
-                      <div className="flex flex-wrap items-center justify-between gap-2 text-[0.68rem] tracking-cad uppercase font-medium text-black">
-                        <span>
-                          {entry.woodSpecies} · {entry.designStyle}
-                          {entry.addedDetails ? ` · ${entry.addedDetails}` : ''}
-                        </span>
-                        <span>{entry.createdAt}</span>
-                      </div>
-                      <p className="text-[0.86rem] font-normal text-black">
-                        &ldquo;{entry.ideaPrompt}&rdquo;
-                      </p>
-                      <div className="flex flex-wrap items-center gap-2 pt-1">
-                        <a
-                          href={`/api/download-concept/${encodeURIComponent(entry.filename)}`}
-                          download={`casegoods-${entry.filename}`}
-                          className="bg-[#FDCB33] text-black border-[0.75px] border-black rounded-[6px] px-3 py-1 text-[0.66rem] tracking-cad uppercase font-medium"
-                        >
-                          DOWNLOAD IMAGE
-                        </a>
+                      {loadingArchive ? 'VERIFYING...' : 'UNLOCK LOG'}
+                    </button>
+                  </div>
+                )}
+
+                {archiveError && (
+                  <div className="p-3 rounded-[9px] border border-black bg-[#FDCB33]/35 text-black text-[0.80rem] font-medium">
+                    {archiveError}
+                  </div>
+                )}
+              </form>
+            ) : (
+              <>
+                <p className="text-[0.86rem] font-light text-black shrink-0">
+                  Every image generated through the Custom Concept Visualizer is automatically saved
+                  to the studio server and dispatched to{' '}
+                  <strong className="font-medium">{OWNER_EMAIL}</strong>.
+                </p>
+
+                <div className="flex-1 overflow-y-auto space-y-3 pr-1">
+                  {loadingArchive ? (
+                    <div className="p-8 text-center text-[0.78rem] tracking-cad uppercase font-medium">
+                      LOADING SAVED CUSTOMER CONCEPTS...
+                    </div>
+                  ) : archiveList.length === 0 ? (
+                    <div className="p-8 border border-black rounded-[9px] text-center text-[0.84rem] font-light text-black">
+                      No customer concepts have been generated yet in this session.
+                    </div>
+                  ) : (
+                    archiveList.map((entry) => (
+                      <div
+                        key={entry.id}
+                        className="border border-black rounded-[9px] p-3.5 bg-white grid grid-cols-1 sm:grid-cols-12 gap-4 items-center"
+                      >
                         <a
                           href={entry.publicPath}
                           target="_blank"
                           rel="noreferrer"
-                          className="bg-white text-black border-[0.75px] border-black rounded-[6px] px-3 py-1 text-[0.66rem] tracking-cad uppercase font-medium"
+                          className="sm:col-span-4 h-[110px] border-[0.75px] border-black rounded-[6px] overflow-hidden bg-white flex items-center justify-center"
                         >
-                          OPEN FULL IMAGE ↗
+                          <img
+                            src={entry.publicPath}
+                            alt={entry.summarySpec}
+                            className="w-full h-full object-cover"
+                          />
                         </a>
+                        <div className="sm:col-span-8 space-y-1.5">
+                          <div className="flex flex-wrap items-center justify-between gap-2 text-[0.68rem] tracking-cad uppercase font-medium text-black">
+                            <span>
+                              {entry.woodSpecies} · {entry.designStyle}
+                              {entry.addedDetails ? ` · ${entry.addedDetails}` : ''}
+                            </span>
+                            <span>{entry.createdAt}</span>
+                          </div>
+                          <p className="text-[0.86rem] font-normal text-black">
+                            &ldquo;{entry.ideaPrompt}&rdquo;
+                          </p>
+                          <div className="flex flex-wrap items-center gap-2 pt-1">
+                            <a
+                              href={`/api/download-concept/${encodeURIComponent(entry.filename)}`}
+                              download={`casegoods-${entry.filename}`}
+                              className="bg-[#FDCB33] text-black border-[0.75px] border-black rounded-[6px] px-3 py-1 text-[0.66rem] tracking-cad uppercase font-medium"
+                            >
+                              DOWNLOAD IMAGE
+                            </a>
+                            <a
+                              href={entry.publicPath}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="bg-white text-black border-[0.75px] border-black rounded-[6px] px-3 py-1 text-[0.66rem] tracking-cad uppercase font-medium"
+                            >
+                              OPEN FULL IMAGE ↗
+                            </a>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
+                    ))
+                  )}
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -1140,7 +1356,8 @@ Concept Image Link: ${imageLink}`;
         <div
           role="dialog"
           aria-modal="true"
-          className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-2 sm:p-6"
+          aria-labelledby="visualizer-fullscreen-title"
+          className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-2 sm:p-6 animate-fadeIn"
           onClick={() => setFullscreenConcept(null)}
         >
           <div
@@ -1152,7 +1369,10 @@ Concept Image Link: ${imageLink}`;
             <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] items-center gap-3 select-none">
               {/* Left Box: Project Name or Number */}
               <div className="bg-[#EF6922] text-black border border-black rounded-[9px] px-4 py-2.5 flex items-center justify-start text-left overflow-hidden">
-                <span className="text-[0.74rem] tracking-cad uppercase font-medium truncate">
+                <span
+                  id="visualizer-fullscreen-title"
+                  className="text-[0.74rem] tracking-cad uppercase font-medium truncate"
+                >
                   {fullscreenConcept.id.toUpperCase()} — {fullscreenConcept.woodSpecies}
                 </span>
               </div>

@@ -93,12 +93,29 @@ export const CadModal: React.FC<CadModalProps> = ({
   }, [project, initialImageIndex, initialShowSpecs]);
 
   useEffect(() => {
+    if (!project) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') {
+        onClose();
+      } else if (e.key === 'ArrowLeft' && !isSpecsOpen && project.images.length > 1) {
+        e.preventDefault();
+        setZoomLevel(1);
+        setCurrentIndex((prev) => (prev === 0 ? project.images.length - 1 : prev - 1));
+      } else if (e.key === 'ArrowRight' && !isSpecsOpen && project.images.length > 1) {
+        e.preventDefault();
+        setZoomLevel(1);
+        setCurrentIndex((prev) => (prev === project.images.length - 1 ? 0 : prev + 1));
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [project, isSpecsOpen, onClose]);
 
   if (!project) return null;
 
@@ -153,6 +170,7 @@ export const CadModal: React.FC<CadModalProps> = ({
     <div
       role="dialog"
       aria-modal="true"
+      aria-labelledby="cad-modal-title"
       className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-6 bg-black/85 backdrop-blur-sm animate-fadeIn"
       onClick={onClose}
     >
@@ -167,7 +185,7 @@ export const CadModal: React.FC<CadModalProps> = ({
           <div
             className={`${activeTheme.barBg} ${activeTheme.barText} border border-black rounded-[9px] px-4 py-2.5 flex items-center justify-start text-left overflow-hidden`}
           >
-            <span className="text-[0.74rem] tracking-cad uppercase font-medium truncate">
+            <span id="cad-modal-title" className="text-[0.74rem] tracking-cad uppercase font-medium truncate">
               {project.code} — {project.title}
             </span>
           </div>

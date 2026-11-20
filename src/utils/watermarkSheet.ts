@@ -99,6 +99,12 @@ export async function renderWatermarkedSheet(
     rightBoxText = '#000000',
   } = options;
 
+  const BRAND_FONT = '"Nexa Light", "Montserrat", "Questrial", -apple-system, BlinkMacSystemFont, sans-serif';
+
+  if (typeof document !== 'undefined' && document.fonts?.ready) {
+    await document.fonts.ready.catch(() => {});
+  }
+
   const [mainImg, logoImg] = await Promise.all([
     loadImage(imageSrc),
     loadImage(ASSETS.brand.logoFull).catch(() => null),
@@ -178,7 +184,7 @@ export async function renderWatermarkedSheet(
   );
 
   ctx.fillStyle = leftBoxText;
-  ctx.font = '500 17px "Plus Jakarta Sans", "Outfit", sans-serif';
+  ctx.font = `500 17px ${BRAND_FONT}`;
   ctx.textBaseline = 'middle';
   ctx.textAlign = 'left';
   const leftText = truncateTextToWidth(
@@ -203,7 +209,7 @@ export async function renderWatermarkedSheet(
     ctx.drawImage(logoImg, drawLogoX, drawLogoY, drawLogoW, drawLogoH);
   } else {
     ctx.fillStyle = '#000000';
-    ctx.font = '300 32px "Plus Jakarta Sans", sans-serif';
+    ctx.font = `300 32px ${BRAND_FONT}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('casegoods', sheetWidth / 2, headerTopY + headerHeight / 2);
@@ -224,7 +230,7 @@ export async function renderWatermarkedSheet(
   );
 
   ctx.fillStyle = rightBoxText;
-  ctx.font = '500 17px "Plus Jakarta Sans", "Outfit", sans-serif';
+  ctx.font = `500 17px ${BRAND_FONT}`;
   ctx.textBaseline = 'middle';
   ctx.textAlign = 'center';
   const rightText = truncateTextToWidth(
@@ -262,14 +268,14 @@ export async function renderWatermarkedSheet(
   if (bottomSpecLine) {
     const specY = artY + artHeight + Math.round((footerStripHeight + stageInternalPadding) / 2) - 4;
     ctx.fillStyle = '#000000';
-    ctx.font = '400 14px "Plus Jakarta Sans", sans-serif';
+    ctx.font = `400 14px ${BRAND_FONT}`;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
     const cleanSpec = truncateTextToWidth(ctx, bottomSpecLine, stageWidth - 360);
     ctx.fillText(cleanSpec, artX, specY);
 
     ctx.textAlign = 'right';
-    ctx.font = '500 13px "Plus Jakarta Sans", sans-serif';
+    ctx.font = `500 13px ${BRAND_FONT}`;
     ctx.fillText(
       'CASEGOODS · HANDCRAFTED IN OMAHA · 402-720-1377',
       artX + artWidth,

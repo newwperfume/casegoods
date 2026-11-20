@@ -3,7 +3,7 @@ import { ASSETS } from '../assets/index.ts';
 
 export const Footer: React.FC = () => {
   return (
-    <footer className="mt-14 pb-16 flex flex-col items-center justify-center gap-6 text-center select-none px-4">
+    <footer className="mt-14 pb-16 flex flex-col items-center justify-center gap-6 text-center px-4">
       {/* Centered 4-Icon Brand Strip (Chair, Cabinet, Tree Ring, Lightning Bolt) */}
       <div className="w-full max-w-[360px] flex items-center justify-center select-none">
         <img
@@ -15,8 +15,26 @@ export const Footer: React.FC = () => {
       </div>
 
       {/* Studio Location & Attribution */}
-      <div className="space-y-1 text-black/75 text-[0.72rem] tracking-cad uppercase font-light">
-        <div>casegoods • josh heinke • 402-720-1377 • casegoodsne@gmail.com</div>
+      <div className="space-y-1 text-black/80 text-[0.72rem] tracking-cad uppercase font-light">
+        <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
+          <span>casegoods</span>
+          <span aria-hidden="true">•</span>
+          <span>josh heinke</span>
+          <span aria-hidden="true">•</span>
+          <a
+            href="tel:+14027201377"
+            className="hover:text-[#EF6922] underline-offset-4 hover:underline transition-colors"
+          >
+            402-720-1377
+          </a>
+          <span aria-hidden="true">•</span>
+          <a
+            href="mailto:casegoodsne@gmail.com"
+            className="hover:text-[#EF6922] underline-offset-4 hover:underline transition-colors"
+          >
+            casegoodsne@gmail.com
+          </a>
+        </div>
         <div className="text-[0.68rem] text-black/75">
           handcrafted in omaha, nebraska • architectural built-ins &amp; custom furniture
         </div>

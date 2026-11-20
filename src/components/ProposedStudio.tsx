@@ -208,8 +208,24 @@ interface AttachedFile {
   previewUrl?: string;
 }
 
+const VALID_PAGE_IDS: ProposedPageId[] = [
+  'cover',
+  'methodology',
+  'work',
+  'capabilities',
+  'process',
+  'inquire',
+  'visualizer',
+];
+
+function getPageFromHash(): ProposedPageId {
+  if (typeof window === 'undefined') return 'cover';
+  const raw = window.location.hash.replace(/^#/, '').toLowerCase() as ProposedPageId;
+  return VALID_PAGE_IDS.includes(raw) ? raw : 'cover';
+}
+
 export const ProposedStudio: React.FC = () => {
-  const [activePage, setActivePage] = useState<ProposedPageId>('cover');
+  const [activePage, setActivePage] = useState<ProposedPageId>(() => getPageFromHash());
   const [menuOpen, setMenuOpen] = useState(false);
   const [heroView, setHeroView] = useState<HeroViewMode>('split');
   const [activeLens, setActiveLens] = useState<TeaserLensId>('joint');
@@ -280,6 +296,20 @@ export const ProposedStudio: React.FC = () => {
 
   const headerRef = useRef<HTMLElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const inquiryFormRef = useRef<HTMLFormElement | null>(null);
+  const attachmentsRef = useRef<AttachedFile[]>([]);
+
+  useEffect(() => {
+    attachmentsRef.current = attachments;
+  }, [attachments]);
+
+  useEffect(() => {
+    return () => {
+      attachmentsRef.current.forEach((item) => {
+        if (item.previewUrl) URL.revokeObjectURL(item.previewUrl);
+      });
+    };
+  }, []);
 
   const OWNER_PHONE = '+14027201377';
   const OWNER_PHONE_DISPLAY = '402-720-1377';
@@ -292,15 +322,48 @@ export const ProposedStudio: React.FC = () => {
   const nextPageMeta =
     currentPageIdx < STUDIO_INDEX_PAGES.length - 1 ? STUDIO_INDEX_PAGES[currentPageIdx + 1] : null;
 
+  // Sync browser Back/Forward navigation with activePage
+  useEffect(() => {
+    const syncFromUrl = () => {
+      setActivePage(getPageFromHash());
+      setMenuOpen(false);
+    };
+    window.addEventListener('hashchange', syncFromUrl);
+    window.addEventListener('popstate', syncFromUrl);
+    return () => {
+      window.removeEventListener('hashchange', syncFromUrl);
+      window.removeEventListener('popstate', syncFromUrl);
+    };
+  }, []);
+
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (headerRef.current && !headerRef.current.contains(e.target as Node)) {
         setMenuOpen(false);
       }
     };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (menuOpen) setMenuOpen(false);
+        if (submitState === 'modal') setSubmitState('idle');
+      }
+    };
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [menuOpen, submitState]);
+
+  useEffect(() => {
+    if (submitState !== 'modal') return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [submitState]);
 
   const pendingTargetRef = useRef<string | undefined>(undefined);
 
@@ -344,6 +407,14 @@ export const ProposedStudio: React.FC = () => {
     pendingTargetRef.current = targetElementId;
     setActivePage(pageId);
 
+    const targetHash = pageId === 'cover' ? '' : `#${pageId}`;
+    if (typeof window !== 'undefined' && window.location.hash !== targetHash) {
+      const nextUrl = targetHash
+        ? `${window.location.pathname}${window.location.search}${targetHash}`
+        : `${window.location.pathname}${window.location.search}`;
+      window.history.pushState(null, '', nextUrl);
+    }
+
     if (!targetElementId) {
       scrollToTopImmediate();
       requestAnimationFrame(() => {
@@ -370,7 +441,6 @@ export const ProposedStudio: React.FC = () => {
       pillarBg: 'bg-[#EF6922]',
       tolerance: '± 1/32" RHINO 3D',
       title: 'FAMILY ROOM CABINETS & WINDOW BENCH',
-      recipient: 'HOLLYE HEMPEL',
       category: 'ARCHITECTURAL BUILT-IN',
       categoryTag: 'architectural',
       materials: 'FLUTED BLACK WALNUT · FINGER-JOINTED WHITE OAK · TURNED PULLS',
@@ -421,7 +491,6 @@ export const ProposedStudio: React.FC = () => {
       pillarBg: 'bg-[#27AAE0]',
       tolerance: '± 1/32" RHINO 3D',
       title: 'WET BAR CREDENZA & FLUTED TAMBOUR ISLAND',
-      recipient: 'HOLLYE HEMPEL',
       category: 'WET BAR & SPECIALTY CABINETRY',
       categoryTag: 'commercial',
       materials: 'BAUHAUS COLOR-BLOCKED DRAWERS · FLUTED OAK TAMBOUR · WALNUT RAIL',
@@ -465,7 +534,6 @@ export const ProposedStudio: React.FC = () => {
       pillarBg: 'bg-[#FDCB33]',
       tolerance: 'FRACTIONAL 2D CAD',
       title: 'HEIRLOOM PLAY KITCHEN & BUILT-IN WALL — SHOP DRAWINGS',
-      recipient: 'LAUREN & JOE MCGILL',
       category: 'HEIRLOOM FURNITURE & CAD SUBMITTAL',
       categoryTag: 'furniture',
       materials: 'SOLID BLACK WALNUT · STACKED-BALL LATHE LEGS · SCALLOPED APRON',
@@ -501,9 +569,30 @@ export const ProposedStudio: React.FC = () => {
     if (filter === 'all') return true;
     if (filter === 'architectural') return p.id === 'family-room' || p.id === 'wet-bar';
     if (filter === 'furniture') return p.id === 'kids-kitchen';
-    if (filter === 'commercial') return p.id === 'wet-bar' || p.id === 'kids-kitchen';
+    if (filter === 'commercial') return p.id === 'wet-bar';
     return true;
   });
+
+  const handleInquireAboutProject = (project: ProjectData) => {
+    const mappedType =
+      project.categoryTag === 'architectural'
+        ? 'Architectural Built-In / Cabinetry'
+        : project.categoryTag === 'commercial'
+        ? 'Commercial Millwork'
+        : 'Custom Furniture';
+    const refLine = `Inspired by ${project.code} (${project.title}).`;
+
+    setFormData((prev) => ({
+      ...prev,
+      projectType: mappedType,
+      details: prev.details.includes(project.code)
+        ? prev.details
+        : prev.details.trim()
+        ? `${refLine}\n\n${prev.details.trim()}`
+        : `${refLine} `,
+    }));
+    navigateToPage('inquire');
+  };
 
   const currentLens =
     INSPECTION_LENSES.find((l) => l.id === activeLens) || INSPECTION_LENSES[0];
@@ -571,20 +660,45 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
 
   const handleSubmit = (e: React.FormEvent, mode: 'sms' | 'email') => {
     e.preventDefault();
+    if (inquiryFormRef.current && !inquiryFormRef.current.reportValidity()) {
+      return;
+    }
     setSubmitMode(mode);
     const summary = formatSummary();
 
     if (mode === 'sms') {
       window.location.href = `sms:${OWNER_PHONE}?&body=${encodeURIComponent(summary)}`;
     } else {
-      const subject = `Commission Inquiry: ${formData.projectType} — ${formData.name}`;
+      const subject = `Commission Inquiry: ${formData.projectType}${
+        formData.name.trim() ? ` — ${formData.name.trim()}` : ''
+      }`;
       window.location.href = `mailto:${OWNER_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(summary)}`;
     }
     setSubmitState('modal');
   };
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(formatSummary());
+  const handleCopy = async () => {
+    const text = formatSummary();
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        throw new Error('Clipboard API unavailable');
+      }
+    } catch {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      try {
+        document.execCommand('copy');
+      } catch {
+        // Ignore if copy is blocked
+      }
+      document.body.removeChild(textarea);
+    }
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
   };
@@ -995,9 +1109,11 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
                   </div>
 
                   <div className="border border-black rounded-[9px] p-5 bg-white grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
-                    <div
+                    <button
+                      type="button"
                       onClick={() => navigateToPage('work', currentLens.targetProjectId)}
-                      className={`lg:col-span-5 h-[220px] rounded-[9px] border-[0.75px] border-black overflow-hidden cursor-pointer flex items-center justify-center ${
+                      aria-label={`Inspect ${currentLens.title} in Selected Work`}
+                      className={`lg:col-span-5 h-[220px] w-full rounded-[9px] border-[0.75px] border-black overflow-hidden cursor-pointer flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EF6922] ${
                         currentLens.isCad ? 'cad-grid-bg p-3' : 'bg-white'
                       }`}
                     >
@@ -1009,7 +1125,7 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
                         }`}
                         referrerPolicy="no-referrer"
                       />
-                    </div>
+                    </button>
 
                     <div className="lg:col-span-7 flex flex-col justify-between gap-4 text-left">
                       <div>
@@ -1204,11 +1320,13 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
                                 currentImg.type === 'cad' ? 'cad-grid-bg p-4 sm:p-8' : 'bg-white'
                               }`}
                             >
-                              <div
+                              <button
+                                type="button"
                                 onClick={() =>
                                   setLightboxState({ project, imageIndex: currentIdx })
                                 }
-                                className="w-full cursor-zoom-in flex items-center justify-center"
+                                aria-label={`Zoom ${project.title} ${currentImg.sheetNumber}`}
+                                className="w-full cursor-zoom-in flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EF6922]"
                               >
                                 <img
                                   src={currentImg.src}
@@ -1218,7 +1336,7 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
                                   className="w-full max-h-[540px] object-contain select-none"
                                   referrerPolicy="no-referrer"
                                 />
-                              </div>
+                              </button>
 
                               {project.images.length > 1 && (
                                 <>
@@ -1332,7 +1450,7 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
 
                           <button
                             type="button"
-                            onClick={() => navigateToPage('inquire')}
+                            onClick={() => handleInquireAboutProject(project)}
                             className={`shrink-0 ${project.pillarBg} text-black hover:bg-black hover:text-white text-[0.74rem] tracking-cad uppercase py-3 px-5 rounded-[9px] border-[0.75px] border-black transition-colors cursor-pointer font-medium whitespace-nowrap`}
                           >
                             INQUIRE ABOUT THIS BUILD →
@@ -1556,14 +1674,16 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
                       <span>SAMPLE SUBMITTAL — 1070MCG</span>
                       <span>SECTION B1</span>
                     </div>
-                    <div
+                    <button
+                      type="button"
                       onClick={() =>
                         setLightboxState({
                           project: projects[2],
                           imageIndex: 1,
                         })
                       }
-                      className="cad-grid-bg border-[0.75px] border-black rounded-[9px] p-4 flex items-center justify-center cursor-zoom-in h-[220px]"
+                      aria-label="Zoom Sample Rhino 2D CAD Section B1 Submittal"
+                      className="cad-grid-bg border-[0.75px] border-black rounded-[9px] p-4 w-full flex items-center justify-center cursor-zoom-in h-[220px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EF6922]"
                     >
                       <img
                         src={ASSETS.kidsKitchen.sectionB1}
@@ -1572,7 +1692,7 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
                         className="w-full h-full object-contain select-none"
                         referrerPolicy="no-referrer"
                       />
-                    </div>
+                    </button>
                   </div>
                 </div>
               </div>
@@ -1652,7 +1772,11 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
                   </div>
                 )}
 
-                <form onSubmit={(e) => handleSubmit(e, submitMode)} className="space-y-5">
+                <form
+                  ref={inquiryFormRef}
+                  onSubmit={(e) => handleSubmit(e, submitMode)}
+                  className="space-y-5"
+                >
                   {/* Row 1: Name, Contact, Category */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                     <div className="flex flex-col gap-2 text-left">
@@ -1784,25 +1908,39 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
                       </button>
 
                       {attachments.length > 0 && (
-                        <div className="flex flex-wrap gap-2 pt-1">
-                          {attachments.map((file, idx) => (
-                            <div
-                              key={`${file.name}-${idx}`}
-                              className="flex items-center gap-2 bg-[#CBCBCB] border-[0.75px] border-black rounded-[9px] px-3 py-1.5 text-[0.76rem] font-medium"
-                            >
-                              <FileText className="w-3.5 h-3.5 text-black" />
-                              <span className="max-w-[150px] truncate">{file.name}</span>
-                              <span>({file.size})</span>
-                              <button
-                                type="button"
-                                onClick={() => removeAttachment(idx)}
-                                className="text-black hover:text-[#EF6922] cursor-pointer"
-                                aria-label={`Remove ${file.name}`}
+                        <div className="space-y-1.5 pt-1">
+                          <div className="flex flex-wrap gap-2">
+                            {attachments.map((file, idx) => (
+                              <div
+                                key={`${file.name}-${idx}`}
+                                className="flex items-center gap-2 bg-[#CBCBCB] border-[0.75px] border-black rounded-[9px] px-3 py-1.5 text-[0.76rem] font-medium"
                               >
-                                <X className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          ))}
+                                {file.previewUrl ? (
+                                  <img
+                                    src={file.previewUrl}
+                                    alt={file.name}
+                                    className="w-5 h-5 rounded-[4px] object-cover border border-black/30 bg-white shrink-0"
+                                  />
+                                ) : (
+                                  <FileText className="w-3.5 h-3.5 text-black shrink-0" />
+                                )}
+                                <span className="max-w-[150px] truncate">{file.name}</span>
+                                <span>({file.size})</span>
+                                <button
+                                  type="button"
+                                  onClick={() => removeAttachment(idx)}
+                                  className="text-black hover:text-[#EF6922] cursor-pointer"
+                                  aria-label={`Remove ${file.name}`}
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                          <p className="text-[0.74rem] font-light text-black/70">
+                            Listed in your inquiry summary — remember to attach these files inside
+                            your SMS or email app after clicking send.
+                          </p>
                         </div>
                       )}
                     </div>
@@ -1976,7 +2114,8 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
         <div
           role="dialog"
           aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm"
+          aria-labelledby="inquiry-modal-title"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fadeIn"
           onClick={() => setSubmitState('idle')}
         >
           <div
@@ -1984,10 +2123,14 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
             onClick={(e) => e.stopPropagation()}
           >
             <div className="bg-[#FDCB33] text-black border border-black rounded-[9px] px-4 py-2.5 flex items-center justify-between">
-              <span className="text-[0.76rem] tracking-cad uppercase font-medium">
+              <span
+                id="inquiry-modal-title"
+                className="text-[0.76rem] tracking-cad uppercase font-medium"
+              >
                 COMMISSION INQUIRY READY
               </span>
               <button
+                type="button"
                 onClick={() => setSubmitState('idle')}
                 className="text-[0.72rem] text-black font-medium uppercase tracking-cad cursor-pointer hover:underline"
               >
@@ -2008,6 +2151,7 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
 
             <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
               <button
+                type="button"
                 onClick={handleCopy}
                 className="flex items-center gap-1.5 py-2.5 px-4 rounded-[9px] border-[0.75px] border-black text-[0.72rem] tracking-cad uppercase hover:bg-black hover:text-white transition-colors cursor-pointer font-medium"
               >
@@ -2024,7 +2168,9 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
                 </a>
                 <a
                   href={`mailto:${OWNER_EMAIL}?subject=${encodeURIComponent(
-                    `Commission Inquiry: ${formData.projectType}`
+                    `Commission Inquiry: ${formData.projectType}${
+                      formData.name.trim() ? ` — ${formData.name.trim()}` : ''
+                    }`
                   )}&body=${encodeURIComponent(formatSummary())}`}
                   className="py-2.5 px-4 rounded-[9px] bg-[#27AAE0] text-black border-[0.75px] border-black text-[0.72rem] tracking-cad uppercase font-medium"
                 >
