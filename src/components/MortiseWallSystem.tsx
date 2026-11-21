@@ -2473,9 +2473,10 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
   return <canvas ref={canvasRef} className="mortise-wall-canvas" aria-hidden="true" />;
 };
 
-export const MortiseWallToolbar: React.FC<{ controller: MortiseWallController }> = ({
-  controller,
-}) => {
+export const MortiseWallToolbar: React.FC<{
+  controller: MortiseWallController;
+  variant?: 'default' | 'compact';
+}> = ({ controller, variant = 'default' }) => {
   const isDesktopInteractive = useDesktopInteractiveWall();
   const { activeTool, setActiveTool, toolSizes, adjustToolSize, rearrange, clearWall } =
     controller;
@@ -2487,7 +2488,10 @@ export const MortiseWallToolbar: React.FC<{ controller: MortiseWallController }>
   if (!isDesktopInteractive) return null;
 
   return (
-    <div className="wall-toolbar ui-surface" aria-label="Interactive modular wall controls">
+    <div
+      className={`wall-toolbar ui-surface${variant === 'compact' ? ' wall-toolbar--compact' : ''}`}
+      aria-label="Interactive modular wall controls"
+    >
       <div className="wall-tool-group" role="group" aria-label="Select modular piece to place">
         <button
           type="button"

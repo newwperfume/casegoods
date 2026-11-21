@@ -311,4 +311,71 @@ body.wall-dragging * {
   border-bottom-color: var(--cg-black);
 }
 
+/* Compact 430px Variant — Flush with Business Card Email & Website Buttons */
+.wall-toolbar--compact {
+  width: 100%;
+  padding: 8px 10px;
+  gap: 8px 10px;
+}
+
+.wall-toolbar--compact .wall-tool-group {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  width: 100%;
+  gap: 6px;
+}
+
+.wall-toolbar--compact .wall-tool-btn {
+  width: 100%;
+  justify-content: center;
+  height: 30px;
+  padding: 0 6px;
+  gap: 4px;
+  font-size: 0.60rem;
+  letter-spacing: 0.05em;
+}
+
+.wall-toolbar--compact .wall-tool-icon {
+  width: 13px;
+  height: 13px;
+}
+
+.wall-toolbar--compact .wall-tool-size {
+  font-size: 0.56rem;
+  margin-left: 0;
+}
+
+.wall-toolbar--compact .wall-size-controls {
+  gap: 5px;
+}
+
+.wall-toolbar--compact .wall-size-stepper {
+  height: 28px;
+}
+
+.wall-toolbar--compact .wall-size-axis {
+  padding: 0 6px;
+  font-size: 0.58rem;
+}
+
+.wall-toolbar--compact .wall-size-step-btn {
+  width: 21px;
+  font-size: 0.78rem;
+}
+
+.wall-toolbar--compact .wall-size-val {
+  min-width: 16px;
+  font-size: 0.64rem;
+}
+
+.wall-toolbar--compact .mortise-actions {
+  gap: 10px;
+  margin-left: auto;
+}
+
+.wall-toolbar--compact .text-action-link {
+  font-size: 0.64rem;
+  letter-spacing: 0.08em;
+}
+
 

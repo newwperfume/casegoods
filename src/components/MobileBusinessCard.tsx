@@ -22,6 +22,7 @@ import {
 } from '../utils/casegoodsQr.ts';
 import {
   MortiseWallCanvas,
+  MortiseWallToolbar,
   PillarColorKey,
   useMortiseWallController,
 } from './MortiseWallSystem.tsx';
@@ -152,7 +153,6 @@ export const MobileBusinessCard: React.FC = () => {
         heroSelector="#card-main-stack"
         headerSelector=""
         footerSelector="#card-footer"
-        interactive={false}
       />
       <div className="mortise-page-shell min-h-screen text-black font-nexa antialiased flex flex-col p-4 sm:p-6">
         <div className="flex-1 flex flex-col justify-center py-6">
@@ -379,6 +379,9 @@ export const MobileBusinessCard: React.FC = () => {
               </div>
             </div>
           )}
+
+            {/* Compact Outlined Mortise Wall Controls — Flush with Email & Website Buttons */}
+            <MortiseWallToolbar controller={wall} variant="compact" />
           </div>
         </div>
 
