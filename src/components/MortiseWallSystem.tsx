@@ -33,9 +33,40 @@ const SVG_SLOT_R = 18;
 const SVG_PITCH_X = 306;
 const SVG_PITCH_Y = 387;
 
-// Both Shelf + Rod and Sliding-Door Cabinet span 4 mortise slots (gx2 - gx1 === 3)
-const MIN_SHELF_SPAN = 3;
-const MIN_CABINET_SPAN = 3;
+// Default & adjustable cell size limits (width in cols, height in rows) for each modular object
+export interface PieceSize {
+  cols: number;
+  rows: number;
+}
+
+export const TOOL_SIZE_LIMITS: Record<
+  WallTool,
+  { minCols: number; maxCols: number; minRows: number; maxRows: number; defaultSize: PieceSize }
+> = {
+  hook: {
+    minCols: 1,
+    maxCols: 3,
+    minRows: 1,
+    maxRows: 1,
+    defaultSize: { cols: 1, rows: 1 },
+  },
+  shelf: {
+    minCols: 4,
+    maxCols: 6,
+    minRows: 2,
+    maxRows: 2,
+    defaultSize: { cols: 4, rows: 2 },
+  },
+  cabinet: {
+    minCols: 4,
+    maxCols: 6,
+    minRows: 2,
+    maxRows: 4,
+    defaultSize: { cols: 4, rows: 2 },
+  },
+};
+
+const INITIAL_RANDOM_COUNT = 7;
 
 interface SlotNode {
   gx: number;
@@ -49,16 +80,18 @@ interface SlotNode {
   vy: number;
   rot: number;
   vrot: number;
-  lift: number;
   hoverHeat: number;
 }
 
-interface SpanPlacement {
+interface PlacedItem {
+  id: number;
+  type: WallTool;
   gx1: number;
   gx2: number;
-  gy: number;
-  colorKey: PillarColorKey;
+  gy1: number;
+  gy2: number;
   lift: number;
+  seed: number;
 }
 
 interface GridMeta {
@@ -78,6 +111,8 @@ interface GridMeta {
 export interface MortiseWallController {
   activeTool: WallTool;
   setActiveTool: (tool: WallTool) => void;
+  toolSizes: Record<WallTool, PieceSize>;
+  adjustToolSize: (tool: WallTool, axis: 'cols' | 'rows', delta: -1 | 1) => void;
   activePillar: PillarColorKey;
   setActivePillar: (pillar: PillarColorKey, rippleOrigin?: { x: number; y: number }) => void;
   motionOn: boolean;
@@ -103,6 +138,11 @@ export function useMortiseWallController(
     window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   const [activeTool, setActiveTool] = useState<WallTool>('hook');
+  const [toolSizes, setToolSizes] = useState<Record<WallTool, PieceSize>>({
+    hook: { ...TOOL_SIZE_LIMITS.hook.defaultSize },
+    shelf: { ...TOOL_SIZE_LIMITS.shelf.defaultSize },
+    cabinet: { ...TOOL_SIZE_LIMITS.cabinet.defaultSize },
+  });
   const [activePillar, setActivePillarState] = useState<PillarColorKey>(initialPillar);
   const [motionOn, setMotionOn] = useState<boolean>(!prefersReduced);
 
@@ -119,6 +159,28 @@ export function useMortiseWallController(
   useEffect(() => {
     document.documentElement.style.setProperty('--pillar-active', PILLAR_COLORS[activePillar]);
   }, [activePillar]);
+
+  const adjustToolSize = useCallback(
+    (tool: WallTool, axis: 'cols' | 'rows', delta: -1 | 1) => {
+      setToolSizes((prev) => {
+        const limits = TOOL_SIZE_LIMITS[tool];
+        const current = prev[tool];
+        const nextVal =
+          axis === 'cols'
+            ? Math.max(limits.minCols, Math.min(limits.maxCols, current.cols + delta))
+            : Math.max(limits.minRows, Math.min(limits.maxRows, current.rows + delta));
+        if (nextVal === current[axis]) return prev;
+        return {
+          ...prev,
+          [tool]: {
+            ...current,
+            [axis]: nextVal,
+          },
+        };
+      });
+    },
+    []
+  );
 
   const setActivePillar = useCallback(
     (pillar: PillarColorKey, rippleOrigin?: { x: number; y: number }) => {
@@ -142,6 +204,8 @@ export function useMortiseWallController(
   return {
     activeTool,
     setActiveTool,
+    toolSizes,
+    adjustToolSize,
     activePillar,
     setActivePillar,
     motionOn,
@@ -150,6 +214,38 @@ export function useMortiseWallController(
     clearWall,
     registerActions,
   };
+}
+
+/**
+ * Returns true for desktop web browsers (macOS, Windows, Linux with fine pointer and wide viewport)
+ * and false for iOS (iPhone/iPad), Android, mobile UAs, or narrow mobile-width viewports.
+ */
+export function isDesktopInteractiveWall(): boolean {
+  if (typeof window === 'undefined') return true;
+  const ua = navigator.userAgent || '';
+  const isIOSDevice =
+    /iPhone|iPad|iPod/i.test(ua) ||
+    (/Macintosh/i.test(ua) && (navigator.maxTouchPoints || 0) > 1);
+  const isMobileUA = /Android|webOS|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(ua);
+  const hasFinePointer =
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(any-hover: hover) and (any-pointer: fine)').matches;
+  const isWideViewport = window.innerWidth >= 900;
+
+  return !isIOSDevice && !isMobileUA && hasFinePointer && isWideViewport;
+}
+
+export function useDesktopInteractiveWall(): boolean {
+  const [enabled, setEnabled] = useState<boolean>(() => isDesktopInteractiveWall());
+
+  useEffect(() => {
+    const update = () => setEnabled(isDesktopInteractiveWall());
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
+
+  return enabled;
 }
 
 interface MortiseWallCanvasProps {
@@ -162,6 +258,8 @@ interface MortiseWallCanvasProps {
   footerSelector?: string;
   /** Set true while a modal or drawer is open to pause background clicks/hover */
   isModalOpen?: boolean;
+  /** Override whether click-to-add and drag-to-move are enabled (defaults to desktop browsers only) */
+  interactive?: boolean;
 }
 
 export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
@@ -170,21 +268,29 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
   headerSelector = 'header',
   footerSelector = 'footer',
   isModalOpen = false,
+  interactive,
 }) => {
+  const desktopInteractive = useDesktopInteractiveWall();
+  const canInteract = interactive ?? desktopInteractive;
+
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const syncLoopRef = useRef<() => void>(() => {});
   const stateRef = useRef({
     activeTool: controller.activeTool,
+    toolSizes: controller.toolSizes,
     activePillar: controller.activePillar,
     motionOn: controller.motionOn,
     isModalOpen,
+    canInteract,
   });
 
   stateRef.current = {
     activeTool: controller.activeTool,
+    toolSizes: controller.toolSizes,
     activePillar: controller.activePillar,
     motionOn: controller.motionOn,
     isModalOpen,
+    canInteract,
   };
 
   useEffect(() => {
@@ -199,12 +305,12 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
     let cssW = window.innerWidth;
     let cssH = window.innerHeight;
     let dpr = 1;
-    let presetIdx = 0;
     let hasUserEdited = false;
+    let hasInitializedRandom = false;
+    let nextItemId = 1;
 
-    const hooksMap = new Map<string, PillarColorKey>();
-    let shelvesList: SpanPlacement[] = [];
-    let cabinetsList: SpanPlacement[] = [];
+    // Unlimited additive list of placed items — nothing is removed until Clear (or Reload/Rearrange)
+    let placedItems: PlacedItem[] = [];
     let slots: SlotNode[] = [];
 
     let gridMeta: GridMeta = {
@@ -229,10 +335,26 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
     let pointerY = -9999;
     let pointerOverUI = false;
     let hoveredIdx = -1;
-    let hoveredShelfCandidate: { gx1: number; gx2: number; gy: number } | null = null;
-    let hoveredCabinetCandidate: { gx1: number; gx2: number; gy: number } | null = null;
-    let hoveredExistingShelfIdx = -1;
-    let hoveredExistingCabinetIdx = -1;
+    let hoveredItemId: number | null = null;
+    let hoveredPlacementCandidate: {
+      gx1: number;
+      gx2: number;
+      gy1: number;
+      gy2: number;
+    } | null = null;
+    let dragSession: {
+      itemId: number;
+      pointerId: number;
+      startX: number;
+      startY: number;
+      grabOffsetX: number;
+      grabOffsetY: number;
+      cols: number;
+      rows: number;
+      active: boolean;
+      snapRect: { gx1: number; gx2: number; gy1: number; gy2: number };
+    } | null = null;
+    let suppressNextClick = false;
     let rippleTime = -9999;
     let rippleX = 0.5;
     let rippleY = 0.5;
@@ -309,174 +431,202 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       );
     };
 
-    const isSpanVisible = (span: SpanPlacement) => {
-      for (let gx = span.gx1; gx <= span.gx2; gx++) {
-        const u = slotByCoord(gx, span.gy);
-        const l = slotByCoord(gx, span.gy + 1);
-        if (!u || u.blocked || !l || l.blocked) return false;
-      }
-      return true;
-    };
-
-    const isSlotOccupiedByList = (list: SpanPlacement[], gx: number, gy: number) => {
-      for (let i = 0; i < list.length; i++) {
-        const item = list[i];
-        if (!isSpanVisible(item)) continue;
-        if ((gy === item.gy || gy === item.gy + 1) && gx >= item.gx1 && gx <= item.gx2) {
-          return true;
+    const isItemVisible = (item: { gx1: number; gx2: number; gy1: number; gy2: number }) => {
+      for (let gy = item.gy1; gy <= item.gy2; gy++) {
+        for (let gx = item.gx1; gx <= item.gx2; gx++) {
+          const s = slotByCoord(gx, gy);
+          if (!s || s.blocked) return false;
         }
       }
-      return false;
+      return true;
     };
 
-    const canPlaceSpan = (gx1: number, gx2: number, gy: number) => {
-      for (let gx = gx1; gx <= gx2; gx++) {
-        const u = slotByCoord(gx, gy);
-        const l = slotByCoord(gx, gy + 1);
-        if (!u || u.blocked || !l || l.blocked) return false;
-        if (u.cx < 18 || u.cx > cssW - 18) return false;
+    const canPlaceRect = (gx1: number, gx2: number, gy1: number, gy2: number) => {
+      for (let gy = gy1; gy <= gy2; gy++) {
+        for (let gx = gx1; gx <= gx2; gx++) {
+          const s = slotByCoord(gx, gy);
+          if (!s || s.blocked) return false;
+          if (s.cx < 14 || s.cx > cssW - 14) return false;
+        }
       }
       return true;
     };
 
-    const findShelfAtPoint = (px: number, py: number) => {
-      const m = gridMeta;
-      const t = m.slotW * 0.857;
-      for (let i = shelvesList.length - 1; i >= 0; i--) {
-        const sh = shelvesList[i];
-        if (!isSpanVisible(sh)) continue;
-        const leftX = m.centerX + sh.gx1 * m.pitchX - t * 0.65;
-        const rightX = m.centerX + sh.gx2 * m.pitchX + t * 0.65;
-        const topY = m.centerY + sh.gy * m.pitchY;
-        const botY = m.centerY + (sh.gy + 1) * m.pitchY + m.slotH * 0.2;
-        if (px >= leftX && px <= rightX && py >= topY && py <= botY) return i;
+    /**
+     * Finds the best valid (cols x rows) grid rectangle anchored on or around the hovered/clicked slot.
+     * Supports any width/height cell variance for Hooks, Shelves + Rods, and Cabinets.
+     */
+    const getCandidateForSlot = (
+      s: SlotNode | null,
+      cols: number,
+      rows: number
+    ): { gx1: number; gx2: number; gy1: number; gy2: number } | null => {
+      if (!s || s.blocked) return null;
+      const dxOrder: number[] = [];
+      const centerShiftX = Math.floor((cols - 1) / 2);
+      dxOrder.push(-centerShiftX);
+      for (let step = 1; step < cols; step++) {
+        const leftShift = -centerShiftX - step;
+        const rightShift = -centerShiftX + step;
+        if (leftShift >= -(cols - 1) && leftShift <= 0) dxOrder.push(leftShift);
+        if (rightShift >= -(cols - 1) && rightShift <= 0) dxOrder.push(rightShift);
       }
-      return -1;
-    };
 
-    const findCabinetAtPoint = (px: number, py: number) => {
-      const m = gridMeta;
-      const t = Math.max(7.5, m.slotW * 0.52);
-      for (let i = cabinetsList.length - 1; i >= 0; i--) {
-        const cab = cabinetsList[i];
-        if (!isSpanVisible(cab)) continue;
-        const leftX = m.centerX + cab.gx1 * m.pitchX - t * 0.55;
-        const rightX = m.centerX + cab.gx2 * m.pitchX + t * 0.55;
-        const topY = m.centerY + cab.gy * m.pitchY - m.slotH * 0.62;
-        const botY = m.centerY + (cab.gy + 1) * m.pitchY + m.slotH * 0.62;
-        if (px >= leftX && px <= rightX && py >= topY && py <= botY) return i;
+      const dyOrder: number[] = [];
+      for (let dy = 0; dy >= -(rows - 1); dy--) {
+        dyOrder.push(dy);
       }
-      return -1;
-    };
 
-    const findHookAtPoint = (px: number, py: number) => {
-      const m = gridMeta;
-      const hookW = m.slotW * 0.857;
-      const totalH = m.slotH * (0.768 + 1.382);
-      for (let i = 0; i < slots.length; i++) {
-        const s = slots[i];
-        if (s.blocked || !hooksMap.has(keyOf(s.gx, s.gy))) continue;
-        if (
-          px >= s.cx - hookW * 0.68 &&
-          px <= s.cx + hookW * 0.68 &&
-          py >= s.cy - m.slotH * 0.1 &&
-          py <= s.cy + m.slotH * 0.04 + totalH + 4
-        ) {
-          return s;
+      for (const dy of dyOrder) {
+        for (const dx of dxOrder) {
+          const gx1 = s.gx + dx;
+          const gx2 = gx1 + cols - 1;
+          const gy1 = s.gy + dy;
+          const gy2 = gy1 + rows - 1;
+          if (canPlaceRect(gx1, gx2, gy1, gy2)) {
+            return { gx1, gx2, gy1, gy2 };
+          }
         }
       }
       return null;
     };
 
-    const getFourSlotCandidateForSlot = (s: SlotNode | null) => {
-      if (!s || s.blocked) return null;
-      // Exactly 4 mortise slots wide (gx2 - gx1 === 3)
-      const cands = [
-        { gx1: s.gx - 1, gx2: s.gx + 2, gy: s.gy },
-        { gx1: s.gx - 2, gx2: s.gx + 1, gy: s.gy },
-        { gx1: s.gx, gx2: s.gx + 3, gy: s.gy },
-        { gx1: s.gx - 3, gx2: s.gx, gy: s.gy },
-        { gx1: s.gx - 1, gx2: s.gx + 2, gy: s.gy - 1 },
-        { gx1: s.gx - 2, gx2: s.gx + 1, gy: s.gy - 1 },
-        { gx1: s.gx, gx2: s.gx + 3, gy: s.gy - 1 },
-        { gx1: s.gx - 3, gx2: s.gx, gy: s.gy - 1 },
-      ];
-      return cands.find((c) => canPlaceSpan(c.gx1, c.gx2, c.gy)) || null;
-    };
-
-    const getShelfCandidateForSlot = (s: SlotNode | null) =>
-      getFourSlotCandidateForSlot(s);
-
-    const getCabinetCandidateForSlot = (s: SlotNode | null) =>
-      getFourSlotCandidateForSlot(s);
-
-    const addOrMergeShelf = (
+    /**
+     * Appends a new piece to the mortise wall without removing or overwriting any previously placed items.
+     */
+    const addPlacedItem = (
+      type: WallTool,
       gx1: number,
       gx2: number,
-      gy: number,
-      colorKey: PillarColorKey,
+      gy1: number,
+      gy2: number,
       withAnim: boolean
     ) => {
-      if (gx2 - gx1 < MIN_SHELF_SPAN) return;
-      for (let gx = gx1; gx <= gx2; gx++) {
-        hooksMap.delete(keyOf(gx, gy));
-        hooksMap.delete(keyOf(gx, gy + 1));
-      }
-      cabinetsList = cabinetsList.filter(
-        (cab) => !(Math.abs(cab.gy - gy) <= 1 && cab.gx1 <= gx2 && cab.gx2 >= gx1)
-      );
+      const id = nextItemId++;
+      placedItems.push({
+        id,
+        type,
+        gx1,
+        gx2,
+        gy1,
+        gy2,
+        lift: withAnim ? 0.08 : 1,
+        seed: id * 17 + gx1 * 7 + gx2 * 11 + gy1 * 13 + gy2 * 19,
+      });
+    };
 
-      let mergedGx1 = gx1;
-      let mergedGx2 = gx2;
-      const remaining: SpanPlacement[] = [];
-      for (let i = 0; i < shelvesList.length; i++) {
-        const sh = shelvesList[i];
-        const sameRow = sh.gy === gy;
-        const overlapsVert = Math.abs(sh.gy - gy) <= 1;
-        const overlapsHoriz = sh.gx1 <= mergedGx2 && sh.gx2 >= mergedGx1;
-        const touchesAdjacent =
-          sameRow &&
-          sh.gx1 <= mergedGx2 + 1 &&
-          sh.gx2 >= mergedGx1 - 1;
+    /**
+     * Hit-tests placed hardware top-most first so users can grab and drag any piece to move it.
+     */
+    const findItemAtPoint = (px: number, py: number): PlacedItem | null => {
+      const m = gridMeta;
+      for (let i = placedItems.length - 1; i >= 0; i--) {
+        const item = placedItems[i];
+        if (!isItemVisible(item)) continue;
 
-        if (touchesAdjacent) {
-          mergedGx1 = Math.min(mergedGx1, sh.gx1);
-          mergedGx2 = Math.max(mergedGx2, sh.gx2);
-        } else if (overlapsVert && overlapsHoriz) {
-          continue;
+        const leftCx = m.centerX + item.gx1 * m.pitchX;
+        const rightCx = m.centerX + item.gx2 * m.pitchX;
+        const upperCy = m.centerY + item.gy1 * m.pitchY;
+        const lowerCy = m.centerY + item.gy2 * m.pitchY;
+
+        if (item.type === 'hook') {
+          const cols = Math.max(1, item.gx2 - item.gx1 + 1);
+          const rows = Math.max(1, item.gy2 - item.gy1 + 1);
+          const hookW = m.slotW * 0.857;
+          const upperH = m.slotH * 0.768;
+          const lowerH = m.slotH * 1.382;
+          const extraH = Math.max(0, rows - 1) * m.pitchY;
+          const totalH = upperH + extraH + lowerH;
+          const hy = upperCy + m.slotH * 0.04;
+
+          if (cols > 1) {
+            const railX = leftCx - hookW * 0.5;
+            const railW = rightCx - leftCx + hookW;
+            const railH = upperH + extraH * 0.38;
+            if (
+              px >= railX - 5 &&
+              px <= railX + railW + 5 &&
+              py >= hy - 5 &&
+              py <= hy + railH + 5
+            ) {
+              return item;
+            }
+          }
+
+          for (let gx = item.gx1; gx <= item.gx2; gx++) {
+            const cx = m.centerX + gx * m.pitchX;
+            const hx = cx - hookW * 0.5;
+            if (
+              px >= hx - 7 &&
+              px <= hx + hookW + 7 &&
+              py >= hy - 5 &&
+              py <= hy + totalH + 5
+            ) {
+              return item;
+            }
+          }
+        } else if (item.type === 'shelf') {
+          const t = m.slotW * 0.857;
+          const leftX = leftCx - t * 0.5;
+          const rightX = rightCx + t * 0.5;
+          const topY = upperCy + m.slotH * 0.04;
+          const botY = lowerCy + m.slotH * 0.11;
+          if (px >= leftX - 5 && px <= rightX + 5 && py >= topY - 5 && py <= botY + 5) {
+            return item;
+          }
         } else {
-          remaining.push(sh);
+          const t = Math.max(7.5, Math.min(11.5, m.pitchX * 0.145));
+          const leftX = leftCx - t * 0.5;
+          const rightX = rightCx + t * 0.5;
+          const topY = upperCy - m.slotH * 0.62;
+          const botY = lowerCy + m.slotH * 0.62;
+          if (px >= leftX - 4 && px <= rightX + 4 && py >= topY - 4 && py <= botY + 4) {
+            return item;
+          }
         }
       }
-      remaining.push({
-        gx1: mergedGx1,
-        gx2: mergedGx2,
-        gy,
-        colorKey,
-        lift: withAnim ? 0.08 : 1,
-      });
-      shelvesList = remaining;
+      return null;
     };
 
-    const addCabinet = (
-      gx1: number,
-      gx2: number,
-      gy: number,
-      colorKey: PillarColorKey,
-      withAnim: boolean
-    ) => {
-      if (gx2 - gx1 < MIN_CABINET_SPAN) return;
-      for (let gx = gx1; gx <= gx2; gx++) {
-        hooksMap.delete(keyOf(gx, gy));
-        hooksMap.delete(keyOf(gx, gy + 1));
+    /**
+     * Finds the closest valid (cols x rows) mortise grid rectangle near floating grid coords
+     * while dragging an existing item across the wall.
+     */
+    const findNearestValidRect = (
+      floatGx1: number,
+      floatGy1: number,
+      cols: number,
+      rows: number
+    ): { gx1: number; gx2: number; gy1: number; gy2: number } | null => {
+      const baseGx = Math.round(floatGx1);
+      const baseGy = Math.round(floatGy1);
+      if (canPlaceRect(baseGx, baseGx + cols - 1, baseGy, baseGy + rows - 1)) {
+        return {
+          gx1: baseGx,
+          gx2: baseGx + cols - 1,
+          gy1: baseGy,
+          gy2: baseGy + rows - 1,
+        };
       }
-      shelvesList = shelvesList.filter(
-        (sh) => !(Math.abs(sh.gy - gy) <= 1 && sh.gx1 <= gx2 && sh.gx2 >= gx1)
-      );
-      cabinetsList = cabinetsList.filter(
-        (cab) => !(Math.abs(cab.gy - gy) <= 1 && cab.gx1 <= gx2 && cab.gx2 >= gx1)
-      );
-      cabinetsList.push({ gx1, gx2, gy, colorKey, lift: withAnim ? 0.08 : 1 });
+
+      let bestRect: { gx1: number; gx2: number; gy1: number; gy2: number } | null = null;
+      let bestDist = Infinity;
+      for (let dy = -2; dy <= 2; dy++) {
+        for (let dx = -2; dx <= 2; dx++) {
+          if (dx === 0 && dy === 0) continue;
+          const gx1 = baseGx + dx;
+          const gy1 = baseGy + dy;
+          const gx2 = gx1 + cols - 1;
+          const gy2 = gy1 + rows - 1;
+          if (!canPlaceRect(gx1, gx2, gy1, gy2)) continue;
+          const d = Math.hypot(gx1 - floatGx1, gy1 - floatGy1);
+          if (d < bestDist) {
+            bestDist = d;
+            bestRect = { gx1, gx2, gy1, gy2 };
+          }
+        }
+      }
+      return bestRect;
     };
 
     const rebuildGrid = () => {
@@ -534,7 +684,6 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
             vy: prev ? prev.vy : 0,
             rot: prev ? prev.rot : 0,
             vrot: prev ? prev.vrot : 0,
-            lift: hooksMap.has(k) ? (prev ? prev.lift : 1) : 0,
             hoverHeat: prev ? prev.hoverHeat : 0,
           });
         }
@@ -705,69 +854,99 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
     };
 
     /**
-     * True 3D cast shadow of the CNC-cut J-profile Wall Hook under upper-left directional light.
-     * Reveals the projecting hook saddle/notch and upturned front catch nose on the white wall.
+     * True 3D cast shadow of the CNC-cut J-profile Wall Hook (single or multi-cell hook rail)
+     * under upper-left directional light. Reveals projecting hook saddles and upturned catch noses.
      */
     const drawWallHookIsoShadow = (
-      cx: number,
-      cy: number,
+      gx1: number,
+      gx2: number,
+      gy1: number,
+      gy2: number,
       m: GridMeta,
-      lift: number
+      lift: number,
+      ox: number,
+      oy: number
     ) => {
       if (lift <= 0.02) return;
+      const cols = Math.max(1, gx2 - gx1 + 1);
+      const rows = Math.max(1, gy2 - gy1 + 1);
       const hookW = m.slotW * 0.857;
       const upperH = m.slotH * 0.768;
       const lowerH = m.slotH * 1.382;
-      const totalH = upperH + lowerH;
-      const hx = cx - hookW * 0.5;
-      const hy = cy + m.slotH * 0.04 - (1 - lift) * 6;
-      const rightEdge = hx + hookW;
+      const extraH = Math.max(0, rows - 1) * m.pitchY;
+      const totalH = upperH + extraH + lowerH;
+      const bendY = upperH + extraH;
+      const liftOffset = (1 - lift) * 6;
+      const upperCy = m.centerY + gy1 * m.pitchY + oy;
+      const hy = upperCy + m.slotH * 0.04 - liftOffset;
 
-      // Real 3D wall projection depth of the CNC J-hook (~0.66 of total vertical height)
-      const depth = totalH * 0.66 * lift;
+      // Real 3D wall projection depth of the CNC J-hook (~0.66 of standard single-cell height)
+      const baseH = upperH + lowerH;
+      const depth = baseH * 0.66 * lift;
       const projX = (x: number, zFrac: number) => x + depth * zFrac * LIGHT_KX;
-      const projY = (yFrac: number, zFrac: number) =>
-        hy + totalH * yFrac + depth * zFrac * LIGHT_KY;
+      const projY = (yPx: number, zFrac: number) => hy + yPx + depth * zFrac * LIGHT_KY;
 
       ctx.save();
       ctx.beginPath();
-      // Wall-contact top-right corner of the upper mounting cleat
-      ctx.moveTo(rightEdge, hy);
-      // Cleat projects slightly forward from the wall, then drops along the inner back spine
-      ctx.lineTo(projX(rightEdge, 0.22), projY(0.06, 0.22));
-      ctx.lineTo(projX(rightEdge, 0.26), projY(0.48, 0.26));
-      // Smoothly rounds through the recessed U-shaped coat-hanging saddle notch
-      ctx.quadraticCurveTo(
-        projX(rightEdge, 0.44),
-        projY(0.68, 0.44),
-        projX(rightEdge, 0.68),
-        projY(0.56, 0.68)
-      );
-      // Rises forward to the upturned rounded front catch nose tip
-      ctx.quadraticCurveTo(
-        projX(rightEdge, 0.94),
-        projY(0.32, 0.94),
-        projX(rightEdge, 1.0),
-        projY(0.36, 1.0)
-      );
-      // Curves down around the front outer hook nose
-      ctx.quadraticCurveTo(
-        projX(rightEdge, 1.04),
-        projY(0.62, 1.04),
-        projX(rightEdge, 0.82),
-        projY(0.84, 0.82)
-      );
-      // Sweeps diagonally back along the lower underside to bottom-left wall contact
-      ctx.lineTo(projX(hx, 0.42), projY(0.98, 0.42));
-      ctx.lineTo(hx, hy + totalH);
-      ctx.lineTo(hx, hy);
-      ctx.closePath();
 
+      // If multi-column hook rail (cols > 1), include the subtle backplate rail shadow first
+      if (cols > 1) {
+        const leftCx = m.centerX + gx1 * m.pitchX + ox;
+        const rightCx = m.centerX + gx2 * m.pitchX + ox;
+        const railX = leftCx - hookW * 0.5;
+        const railW = rightCx - leftCx + hookW;
+        const railH = upperH + extraH * 0.38;
+        const railDepth = m.slotH * 0.34 * lift;
+        appendExtrudedBoxShadowPath(
+          railX,
+          hy,
+          railW,
+          railH,
+          railDepth * LIGHT_KX,
+          railDepth * LIGHT_KY,
+          m.slotW * 0.143
+        );
+      }
+
+      for (let gx = gx1; gx <= gx2; gx++) {
+        const cx = m.centerX + gx * m.pitchX + ox;
+        const hx = cx - hookW * 0.5;
+        const rightEdge = hx + hookW;
+
+        ctx.moveTo(rightEdge, hy);
+        ctx.lineTo(projX(rightEdge, 0.22), projY(upperH * 0.17, 0.22));
+        ctx.lineTo(projX(rightEdge, 0.26), projY(bendY + lowerH * 0.19, 0.26));
+        ctx.quadraticCurveTo(
+          projX(rightEdge, 0.44),
+          projY(bendY + lowerH * 0.5, 0.44),
+          projX(rightEdge, 0.68),
+          projY(bendY + lowerH * 0.31, 0.68)
+        );
+        ctx.quadraticCurveTo(
+          projX(rightEdge, 0.94),
+          projY(bendY - lowerH * 0.06, 0.94),
+          projX(rightEdge, 1.0),
+          projY(bendY + lowerH * 0.01, 1.0)
+        );
+        ctx.quadraticCurveTo(
+          projX(rightEdge, 1.04),
+          projY(bendY + lowerH * 0.41, 1.04),
+          projX(rightEdge, 0.82),
+          projY(bendY + lowerH * 0.75, 0.82)
+        );
+        ctx.lineTo(projX(hx, 0.42), projY(totalH - lowerH * 0.03, 0.42));
+        ctx.lineTo(hx, hy + totalH);
+        ctx.lineTo(hx, hy);
+        ctx.closePath();
+      }
+
+      const firstHx = m.centerX + gx1 * m.pitchX + ox - hookW * 0.5;
+      const lastRight = m.centerX + gx2 * m.pitchX + ox + hookW * 0.5;
       fillDirectionalCastShadow(
-        hx,
+        firstHx,
         hy,
-        projX(rightEdge, 1.0),
-        projY(1.0, 0.85),
+        projX(lastRight, 1.0),
+        projY(totalH, 0.85),
         lift,
         5
       );
@@ -776,7 +955,7 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
 
     /**
      * Helper to append a clockwise 3D extruded rectangle cast shadow into the active canvas path
-     * (used for vertical cheek brackets and horizontal shelf board without double-darkening seams).
+     * (used for vertical cheek brackets, hook rails, and horizontal shelf boards without double-darkening seams).
      */
     const appendExtrudedBoxShadowPath = (
       x: number,
@@ -815,7 +994,8 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
     const drawShelfIsoShadow = (
       gx1: number,
       gx2: number,
-      gy: number,
+      gy1: number,
+      gy2: number,
       m: GridMeta,
       lift: number,
       ox: number,
@@ -826,8 +1006,8 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       const r = m.slotW * 0.143;
       const leftCx = m.centerX + gx1 * m.pitchX + ox;
       const rightCx = m.centerX + gx2 * m.pitchX + ox;
-      const upperCy = m.centerY + gy * m.pitchY + oy;
-      const lowerCy = m.centerY + (gy + 1) * m.pitchY + oy;
+      const upperCy = m.centerY + gy1 * m.pitchY + oy;
+      const lowerCy = m.centerY + gy2 * m.pitchY + oy;
 
       const liftOffset = (1 - lift) * 6;
       const topY = upperCy + m.slotH * 0.04 - liftOffset;
@@ -841,12 +1021,12 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       const shelfTopY = upperCy + m.slotH * 0.5 - liftOffset;
       const shelfH = t;
       const shelfFullW = Math.max(0, rightCx - leftCx);
-      const rodDiam = Math.min(t * 1.48, bracketH * 0.24);
-      const rodBotY = botY - bracketH * 0.16;
+      const rodDiam = Math.min(t * 1.48, m.pitchY * 0.25);
+      const rodBotY = botY - Math.min(bracketH * 0.16, m.pitchY * 0.18);
       const rodTopY = rodBotY - rodDiam;
 
-      // Real 3D shelf projection depth (~0.68 of bracket height); rod suspended at ~64% depth out from wall
-      const shelfDepth = bracketH * 0.68 * lift;
+      // Grounded 3D shelf projection depth stays realistic even on taller 3-row shelves
+      const shelfDepth = Math.min(bracketH, m.pitchY * 1.15) * 0.68 * lift;
       const dx = shelfDepth * LIGHT_KX;
       const dy = shelfDepth * LIGHT_KY;
 
@@ -894,7 +1074,8 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
     const drawCabinetIsoShadow = (
       gx1: number,
       gx2: number,
-      gy: number,
+      gy1: number,
+      gy2: number,
       m: GridMeta,
       lift: number,
       ox: number,
@@ -903,11 +1084,10 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       if (lift <= 0.02) return;
       const leftCx = m.centerX + gx1 * m.pitchX + ox;
       const rightCx = m.centerX + gx2 * m.pitchX + ox;
-      const upperCy = m.centerY + gy * m.pitchY + oy;
-      const lowerCy = m.centerY + (gy + 1) * m.pitchY + oy;
+      const upperCy = m.centerY + gy1 * m.pitchY + oy;
+      const lowerCy = m.centerY + gy2 * m.pitchY + oy;
 
-      const spanW = Math.max(m.pitchX, rightCx - leftCx);
-      const t = Math.max(7.5, Math.min(11.5, spanW * 0.05));
+      const t = Math.max(7.5, Math.min(11.5, m.pitchX * 0.145));
       const liftOffset = (1 - lift) * 7;
       const leftX = leftCx - t * 0.5;
       const rightX = rightCx + t * 0.5;
@@ -916,8 +1096,8 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       const botY = lowerCy + m.slotH * 0.62 - liftOffset;
       const cabH = botY - topY;
 
-      // Real 3D cabinet box projection depth (~0.48 of cabinet height per Rhino CAD proportions)
-      const cabDepth = cabH * 0.48 * lift;
+      // Realistic 3D wall projection depth (capped cleanly for tall 3- and 4-row cabinets)
+      const cabDepth = Math.min(cabH, m.pitchY * 1.45) * 0.48 * lift;
       const dx = cabDepth * LIGHT_KX;
       const dy = cabDepth * LIGHT_KY;
 
@@ -936,21 +1116,29 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
     };
 
     const drawWallHook = (
-      cx: number,
-      cy: number,
+      gx1: number,
+      gx2: number,
+      gy1: number,
+      gy2: number,
       m: GridMeta,
       lift: number,
+      ox: number,
+      oy: number,
       isGhost: boolean,
       seed = 0
     ) => {
+      const cols = Math.max(1, gx2 - gx1 + 1);
+      const rows = Math.max(1, gy2 - gy1 + 1);
       const hookW = m.slotW * 0.857;
       const r = m.slotW * 0.143;
       const upperH = m.slotH * 0.768;
       const lowerH = m.slotH * 1.382;
-      const totalH = upperH + lowerH;
-      const hx = cx - hookW * 0.5;
-      const hy = cy + m.slotH * 0.04 - (1 - lift) * 6;
-      const seamY = hy + upperH;
+      const extraH = Math.max(0, rows - 1) * m.pitchY;
+      const totalH = upperH + extraH + lowerH;
+      const liftOffset = (1 - lift) * 6;
+      const upperCy = m.centerY + gy1 * m.pitchY + oy;
+      const hy = upperCy + m.slotH * 0.04 - liftOffset;
+      const seamY = hy + upperH + extraH;
 
       ctx.save();
       if (isGhost) {
@@ -958,45 +1146,79 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
         ctx.setLineDash([4, 3]);
       }
 
-      if (isGhost) {
-        drawRoundRect(hx, hy, hookW, totalH, r);
-        ctx.fillStyle = '#E8D5B5';
-        ctx.fill();
-      } else {
-        ctx.save();
-        drawRoundRect(hx, hy, hookW, totalH, r);
-        ctx.clip();
+      // Multi-column horizontal CNC Maple mounting rail connecting the hooks when cols > 1
+      if (cols > 1) {
+        const leftCx = m.centerX + gx1 * m.pitchX + ox;
+        const rightCx = m.centerX + gx2 * m.pitchX + ox;
+        const railX = leftCx - hookW * 0.5;
+        const railW = rightCx - leftCx + hookW;
+        const railH = upperH + extraH * 0.38;
 
-        // Continuous exposed 3/4" Baltic Birch multi-ply edge on both upper & lower hook faces
-        drawBirchEdge(hx, hy, hookW, totalH, 'vertical', seed + 1.1);
+        if (isGhost) {
+          drawRoundRect(railX, hy, railW, railH, r);
+          ctx.fillStyle = '#EAD8BD';
+          ctx.fill();
+        } else {
+          ctx.save();
+          drawRoundRect(railX, hy, railW, railH, r);
+          ctx.clip();
+          drawMapleFace(railX, hy, railW, railH, 'horizontal', undefined, 0, seed + 3.7);
+          ctx.restore();
+        }
 
-        // Subtle lighting cues on lower angled hook bevel so the 3D bend reads crisply
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.28)';
-        ctx.fillRect(hx + 1.5, seamY + 1.2, hookW - 3, Math.max(2.6, lowerH * 0.12));
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.26)';
-        ctx.lineWidth = 1.2;
-        ctx.beginPath();
-        ctx.moveTo(hx + hookW * 0.26, hy + totalH - Math.max(4, r * 1.3));
-        ctx.lineTo(hx + hookW * 0.74, hy + totalH - Math.max(4, r * 1.3));
+        drawRoundRect(railX, hy, railW, railH, r);
+        ctx.strokeStyle = COLORS.black;
+        ctx.lineWidth = isGhost ? 1.4 : 1.85;
         ctx.stroke();
-
-        ctx.restore();
       }
 
-      // Crisp architectural outline
-      drawRoundRect(hx, hy, hookW, totalH, r);
-      ctx.strokeStyle = COLORS.black;
-      ctx.lineWidth = isGhost ? 1.5 : 1.85;
-      ctx.stroke();
+      // Individual CNC-cut 13-ply Baltic Birch J-hooks at each column in gx1..gx2
+      for (let gx = gx1; gx <= gx2; gx++) {
+        const cx = m.centerX + gx * m.pitchX + ox;
+        const hx = cx - hookW * 0.5;
+        const colSeed = seed + gx * 7.3;
 
-      // Horizontal bend transition crease between upper neck & lower hook edge
-      ctx.setLineDash([]);
-      ctx.beginPath();
-      ctx.moveTo(hx, seamY);
-      ctx.lineTo(hx + hookW, seamY);
-      ctx.strokeStyle = COLORS.black;
-      ctx.lineWidth = isGhost ? 1.2 : 1.65;
-      ctx.stroke();
+        if (isGhost) {
+          drawRoundRect(hx, hy, hookW, totalH, r);
+          ctx.fillStyle = '#E8D5B5';
+          ctx.fill();
+        } else {
+          ctx.save();
+          drawRoundRect(hx, hy, hookW, totalH, r);
+          ctx.clip();
+
+          // Continuous exposed 3/4" Baltic Birch multi-ply edge on both upper & lower hook faces
+          drawBirchEdge(hx, hy, hookW, totalH, 'vertical', colSeed + 1.1);
+
+          // Subtle lighting cues on lower angled hook bevel so the 3D bend reads crisply
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.28)';
+          ctx.fillRect(hx + 1.5, seamY + 1.2, hookW - 3, Math.max(2.6, lowerH * 0.12));
+          ctx.strokeStyle = 'rgba(0, 0, 0, 0.26)';
+          ctx.lineWidth = 1.2;
+          ctx.beginPath();
+          ctx.moveTo(hx + hookW * 0.26, hy + totalH - Math.max(4, r * 1.3));
+          ctx.lineTo(hx + hookW * 0.74, hy + totalH - Math.max(4, r * 1.3));
+          ctx.stroke();
+
+          ctx.restore();
+        }
+
+        // Crisp architectural outline
+        if (isGhost) ctx.setLineDash([4, 3]);
+        drawRoundRect(hx, hy, hookW, totalH, r);
+        ctx.strokeStyle = COLORS.black;
+        ctx.lineWidth = isGhost ? 1.5 : 1.85;
+        ctx.stroke();
+
+        // Horizontal bend transition crease between upper neck & lower hook edge
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.moveTo(hx, seamY);
+        ctx.lineTo(hx + hookW, seamY);
+        ctx.strokeStyle = COLORS.black;
+        ctx.lineWidth = isGhost ? 1.2 : 1.65;
+        ctx.stroke();
+      }
 
       ctx.restore();
     };
@@ -1004,20 +1226,22 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
     const drawShelfWithRod = (
       gx1: number,
       gx2: number,
-      gy: number,
+      gy1: number,
+      gy2: number,
       m: GridMeta,
       lift: number,
       ox: number,
       oy: number,
-      isGhost: boolean
+      isGhost: boolean,
+      seed = 0
     ) => {
       const t = m.slotW * 0.857;
       const r = m.slotW * 0.143;
       const leftCx = m.centerX + gx1 * m.pitchX + ox;
       const rightCx = m.centerX + gx2 * m.pitchX + ox;
-      const upperCy = m.centerY + gy * m.pitchY + oy;
-      const lowerCy = m.centerY + (gy + 1) * m.pitchY + oy;
-      const seed = gx1 * 7 + gx2 * 13 + gy * 19;
+      const upperCy = m.centerY + gy1 * m.pitchY + oy;
+      const lowerCy = m.centerY + gy2 * m.pitchY + oy;
+      const grainSeed = seed || gx1 * 7 + gx2 * 13 + gy1 * 19 + gy2 * 23;
 
       const liftOffset = (1 - lift) * 6;
       const topY = upperCy + m.slotH * 0.04 - liftOffset;
@@ -1031,8 +1255,8 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       const shelfTopY = upperCy + m.slotH * 0.5 - liftOffset;
       const shelfH = t;
       const shelfFullW = Math.max(0, rightCx - leftCx);
-      const rodDiam = Math.min(t * 1.48, bracketH * 0.24);
-      const rodBotY = botY - bracketH * 0.16;
+      const rodDiam = Math.min(t * 1.48, m.pitchY * 0.25);
+      const rodBotY = botY - Math.min(bracketH * 0.16, m.pitchY * 0.18);
       const rodTopY = rodBotY - rodDiam;
 
       ctx.save();
@@ -1097,8 +1321,8 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
         ctx.stroke();
       };
 
-      drawCheekBracket(leftX, seed + 5);
-      drawCheekBracket(rightX, seed + 9);
+      drawCheekBracket(leftX, grainSeed + 5);
+      drawCheekBracket(rightX, grainSeed + 9);
 
       // 3. Continuous Horizontal Shelf Board seated into half-lap dados (leftCx..rightCx)
       //    Clean uninterrupted 13-ply horizontal Baltic Birch edge — no top color stripe or extra black dividers
@@ -1107,7 +1331,7 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
         ctx.fillStyle = '#E8D5B5';
         ctx.fillRect(leftCx, shelfTopY, shelfFullW, shelfH);
       } else {
-        drawBirchEdge(leftCx, shelfTopY, shelfFullW, shelfH, 'horizontal', seed + 1);
+        drawBirchEdge(leftCx, shelfTopY, shelfFullW, shelfH, 'horizontal', grainSeed + 1);
       }
       ctx.strokeStyle = COLORS.black;
       ctx.lineWidth = isGhost ? 1.3 : 1.75;
@@ -1125,22 +1349,23 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
     const drawSlidingDoorCabinet = (
       gx1: number,
       gx2: number,
-      gy: number,
+      gy1: number,
+      gy2: number,
       m: GridMeta,
       lift: number,
       ox: number,
       oy: number,
-      isGhost: boolean
+      isGhost: boolean,
+      seed = 0
     ) => {
       const leftCx = m.centerX + gx1 * m.pitchX + ox;
       const rightCx = m.centerX + gx2 * m.pitchX + ox;
-      const upperCy = m.centerY + gy * m.pitchY + oy;
-      const lowerCy = m.centerY + (gy + 1) * m.pitchY + oy;
-      const seed = gx1 * 11 + gx2 * 17 + gy * 23;
+      const upperCy = m.centerY + gy1 * m.pitchY + oy;
+      const lowerCy = m.centerY + gy2 * m.pitchY + oy;
+      const grainSeed = seed || gx1 * 11 + gx2 * 17 + gy1 * 23 + gy2 * 29;
 
-      const spanW = Math.max(m.pitchX, rightCx - leftCx);
-      // Carcass wall thickness & rabbet corner joinery matching Rhino CAD (CASEGOODS2.svg)
-      const t = Math.max(7.5, Math.min(11.5, spanW * 0.05));
+      // Uniform 3/4" carcass plywood thickness across all variable widths & heights
+      const t = Math.max(7.5, Math.min(11.5, m.pitchX * 0.145));
       const liftOffset = (1 - lift) * 7;
       const leftX = leftCx - t * 0.5;
       const rightX = rightCx + t * 0.5;
@@ -1159,10 +1384,10 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       const leftDoorW = Math.max(0, seamX - innerX);
       const rightDoorW = Math.max(0, innerX + innerW - seamX);
 
-      // Circular finger-pull cutouts positioned symmetrically in upper-left & upper-right door corners per CAD
-      const pullR = Math.max(4.6, Math.min(innerH * 0.068, innerW * 0.042));
-      const pullInsetX = Math.max(pullR + 5, innerW * 0.125);
-      const pullInsetY = Math.max(pullR + 5, innerH * 0.2);
+      // Circular finger-pull cutouts positioned cleanly in upper-left & upper-right door corners
+      const pullR = Math.max(4.6, Math.min(m.pitchY * 0.1, innerH * 0.075, innerW * 0.042));
+      const pullInsetX = Math.max(pullR + 5, Math.min(innerW * 0.125, m.pitchX * 0.42));
+      const pullInsetY = Math.max(pullR + 6, Math.min(innerH * 0.2, m.pitchY * 0.36));
       const leftPullCx = innerX + pullInsetX;
       const rightPullCx = innerX + innerW - pullInsetX;
       const pullCy = innerY + pullInsetY;
@@ -1178,18 +1403,18 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
         ctx.fillRect(leftX, topY, cabW, cabH);
       } else {
         // 1. Outer Carcass Exposed 13-Ply Baltic Birch Edges with True Half-Lap Rabbet Orientation
-        drawBirchEdge(leftX, topY, t * 0.5, cabH, 'vertical', seed + 1);
-        drawBirchEdge(leftCx, innerY, t * 0.5, innerH, 'vertical', seed + 1.4);
-        drawBirchEdge(rightCx, topY, t * 0.5, cabH, 'vertical', seed + 2);
-        drawBirchEdge(innerX + innerW, innerY, t * 0.5, innerH, 'vertical', seed + 2.4);
+        drawBirchEdge(leftX, topY, t * 0.5, cabH, 'vertical', grainSeed + 1);
+        drawBirchEdge(leftCx, innerY, t * 0.5, innerH, 'vertical', grainSeed + 1.4);
+        drawBirchEdge(rightCx, topY, t * 0.5, cabH, 'vertical', grainSeed + 2);
+        drawBirchEdge(innerX + innerW, innerY, t * 0.5, innerH, 'vertical', grainSeed + 2.4);
 
         // Top & bottom horizontal carcass panels seated into half-lap rabbets (leftCx..rightCx)
-        drawBirchEdge(leftCx, topY, rightCx - leftCx, t, 'horizontal', seed + 3);
-        drawBirchEdge(leftCx, innerY + innerH, rightCx - leftCx, t, 'horizontal', seed + 4);
+        drawBirchEdge(leftCx, topY, rightCx - leftCx, t, 'horizontal', grainSeed + 3);
+        drawBirchEdge(leftCx, innerY + innerH, rightCx - leftCx, t, 'horizontal', grainSeed + 4);
 
         // 2. Left (Front) & Right (Rear) Bypass Sliding Doors — Pure Natural Hard Maple horizontal grain
-        drawMapleFace(innerX, innerY, leftDoorW, innerH, 'horizontal', undefined, 0, seed + 5);
-        drawMapleFace(seamX, innerY, rightDoorW, innerH, 'horizontal', undefined, 0, seed + 9);
+        drawMapleFace(innerX, innerY, leftDoorW, innerH, 'horizontal', undefined, 0, grainSeed + 5);
+        drawMapleFace(seamX, innerY, rightDoorW, innerH, 'horizontal', undefined, 0, grainSeed + 9);
 
         // Subtle shadow cast by front left door onto rear right door
         const overlapShadowW = Math.max(2.6, Math.min(5.5, t * 0.48));
@@ -1264,7 +1489,7 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
             pullR * 2,
             Math.max(2.6, pullR * 0.56),
             'horizontal',
-            seed + i * 3
+            grainSeed + i * 3
           );
           ctx.fillStyle = 'rgba(0, 0, 0, 0.22)';
           ctx.fillRect(px - pullR, pullCy - pullR, pullR * 2, Math.max(2.6, pullR * 0.56));
@@ -1288,258 +1513,188 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       ensureLoop();
     };
 
-    const applyPreset = (idx: number, withPulse: boolean) => {
-      hooksMap.clear();
-      shelvesList = [];
-      cabinetsList = [];
-
-      const leftOpenGx: number[] = [];
-      const rightOpenGx: number[] = [];
-      for (let gx = gridMeta.minGx; gx <= gridMeta.maxGx; gx++) {
-        const cx = gridMeta.centerX + gx * gridMeta.pitchX;
-        if (cx > 18 && cx < heroRect.left - gridMeta.slotW * 0.55) leftOpenGx.push(gx);
-        if (cx < cssW - 18 && cx > heroRect.right + gridMeta.slotW * 0.55) rightOpenGx.push(gx);
-      }
-
-      const openGy: number[] = [];
-      for (let gy = gridMeta.minGy; gy <= gridMeta.maxGy; gy++) {
-        const cy = gridMeta.centerY + gy * gridMeta.pitchY;
-        if (cy > topSafeY + gridMeta.slotH * 0.6 && cy < bottomSafeY - gridMeta.slotH * 0.6) {
-          openGy.push(gy);
-        }
-      }
-      if (openGy.length === 0) return;
-
-      const rTop = openGy.length >= 5 ? openGy[1] : openGy[0];
-      const rMid = openGy[Math.floor((openGy.length - 1) * 0.5)];
-      const rBot = openGy.length >= 5 ? openGy[openGy.length - 2] : openGy[openGy.length - 1];
-      const shelfTopRow = openGy.length >= 4 ? openGy[0] : rTop;
-      const shelfMidRow = Math.max(
-        openGy[0],
-        Math.min(openGy[openGy.length - 2] ?? openGy[0], rMid)
+    /**
+     * Generates a fresh randomized composition of `targetCount` (default 7) varied modular items
+     * across available open mortise wall cells on every page reload or Rearrange click.
+     */
+    const applyRandomArrangement = (
+      targetCount = INITIAL_RANDOM_COUNT,
+      withPulse = false
+    ) => {
+      placedItems = [];
+      const openSlots = slots.filter(
+        (s) => !s.blocked && s.cx >= 14 && s.cx <= cssW - 14
       );
-      const cabBotRow = openGy.length >= 4 ? openGy[openGy.length - 2] : shelfMidRow;
+      if (openSlots.length === 0) return;
 
-      const placeHook = (
-        gx: number | undefined,
-        gy: number | undefined,
-        colorKey: PillarColorKey
-      ) => {
-        if (gx === undefined || gy === undefined) return;
-        const s = slotByCoord(gx, gy);
-        if (!s || s.blocked) return;
-        if (
-          isSlotOccupiedByList(shelvesList, gx, gy) ||
-          isSlotOccupiedByList(cabinetsList, gx, gy)
-        ) {
-          return;
+      const usedCells = new Set<string>();
+      const pickRandom = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
+
+      const isRectFree = (gx1: number, gx2: number, gy1: number, gy2: number) => {
+        if (!canPlaceRect(gx1, gx2, gy1, gy2)) return false;
+        for (let gy = gy1; gy <= gy2; gy++) {
+          for (let gx = gx1; gx <= gx2; gx++) {
+            if (usedCells.has(keyOf(gx, gy))) return false;
+          }
         }
-        hooksMap.set(keyOf(gx, gy), colorKey);
-        s.lift = withPulse ? 0.08 : 1;
-      };
-      const placeShelf = (
-        gx1: number | undefined,
-        gx2: number | undefined,
-        gy: number | undefined,
-        colorKey: PillarColorKey
-      ) => {
-        if (gx1 === undefined || gx2 === undefined || gy === undefined) return;
-        if (gx2 - gx1 < MIN_SHELF_SPAN) return;
-        if (!canPlaceSpan(gx1, gx2, gy)) return;
-        addOrMergeShelf(gx1, gx2, gy, colorKey, withPulse);
-      };
-      const placeCabinet = (
-        gx1: number | undefined,
-        gx2: number | undefined,
-        gy: number | undefined,
-        colorKey: PillarColorKey
-      ) => {
-        if (gx1 === undefined || gx2 === undefined || gy === undefined) return;
-        if (gx2 - gx1 < MIN_CABINET_SPAN) return;
-        if (!canPlaceSpan(gx1, gx2, gy)) return;
-        addCabinet(gx1, gx2, gy, colorKey, withPulse);
+        return true;
       };
 
-      const mode = idx % 3;
-      if (leftOpenGx.length >= 2 && rightOpenGx.length >= 2) {
-        const lInner = leftOpenGx[leftOpenGx.length - 1];
-        const lMid = leftOpenGx[Math.max(0, leftOpenGx.length - 2)];
-        const lOuter = leftOpenGx[Math.max(0, leftOpenGx.length - 3)];
-        const lSpan4Start = leftOpenGx[Math.max(0, leftOpenGx.length - 4)];
-        const rInner = rightOpenGx[0];
-        const rMid = rightOpenGx[Math.min(rightOpenGx.length - 1, 1)];
-        const rOuter = rightOpenGx[Math.min(rightOpenGx.length - 1, 2)];
-        const rSpan4End = rightOpenGx[Math.min(rightOpenGx.length - 1, 3)];
-
-        const leftHas4 = leftOpenGx.length >= 4;
-        const rightHas4 = rightOpenGx.length >= 4;
-
-        if (mode === 0) {
-          if (leftHas4) placeShelf(lSpan4Start, lInner, shelfTopRow, '01');
-          else placeHook(lInner, shelfTopRow, '01');
-          if (leftHas4 && cabBotRow >= shelfTopRow + 2) {
-            placeCabinet(lSpan4Start, lInner, cabBotRow, '06');
-          } else {
-            placeHook(lOuter, rBot, '06');
-          }
-
-          if (rightHas4) placeShelf(rInner, rSpan4End, shelfMidRow, '02');
-          else placeHook(rInner, shelfMidRow, '02');
-          placeHook(rMid, shelfTopRow, '06');
-          placeHook(rOuter, rBot, '01');
-        } else if (mode === 1) {
-          if (leftHas4) placeCabinet(lSpan4Start, lInner, cabBotRow, '02');
-          else placeHook(lMid, rBot, '02');
-          placeHook(lInner, shelfTopRow, '01');
-
-          if (rightHas4) placeShelf(rInner, rSpan4End, shelfTopRow, '01');
-          else placeHook(rInner, shelfTopRow, '01');
-          if (rightHas4 && cabBotRow >= shelfTopRow + 2) {
-            placeCabinet(rInner, rSpan4End, cabBotRow, '06');
-          } else {
-            placeHook(rInner, rBot, '02');
-            placeHook(rOuter, rBot, '06');
-          }
-        } else {
-          placeHook(lOuter, rTop, '06');
-          placeHook(lInner, rMid, '01');
-          placeHook(lMid, rBot, '02');
-
-          if (rightHas4) placeShelf(rInner, rSpan4End, shelfTopRow, '06');
-          else placeHook(rInner, shelfTopRow, '06');
-          if (rightHas4 && cabBotRow >= shelfTopRow + 2) {
-            placeCabinet(rInner, rSpan4End, cabBotRow, '02');
-          } else {
-            placeHook(rOuter, rBot, '02');
+      const markRectUsed = (gx1: number, gx2: number, gy1: number, gy2: number) => {
+        for (let gy = gy1; gy <= gy2; gy++) {
+          for (let gx = gx1; gx <= gx2; gx++) {
+            usedCells.add(keyOf(gx, gy));
           }
         }
-      } else if (leftOpenGx.length === 1 && rightOpenGx.length === 1) {
-        const lx = leftOpenGx[0];
-        const rx = rightOpenGx[0];
-        if (mode === 0) {
-          placeHook(lx, rTop, '01');
-          placeHook(lx, rBot, '02');
-          placeHook(rx, rMid, '06');
-        } else if (mode === 1) {
-          placeHook(lx, rMid, '06');
-          placeHook(rx, rTop, '01');
-          placeHook(rx, rBot, '02');
-        } else {
-          placeHook(lx, rTop, '02');
-          placeHook(rx, rMid, '01');
-          placeHook(lx, rBot, '06');
-        }
-      } else {
-        // Portrait / narrow mobile layout: populate open mortise wall BOTH above and below the centered stack
-        const fullOpenGx: number[] = [];
-        for (let gx = gridMeta.minGx; gx <= gridMeta.maxGx; gx++) {
-          const cx = gridMeta.centerX + gx * gridMeta.pitchX;
-          if (cx > 18 && cx < cssW - 18) fullOpenGx.push(gx);
-        }
+      };
 
-        const aboveOpenGy: number[] = [];
-        const belowOpenGy: number[] = [];
-        for (let gy = gridMeta.minGy; gy <= gridMeta.maxGy; gy++) {
-          const cy = gridMeta.centerY + gy * gridMeta.pitchY;
-          if (cy - gridMeta.slotH * 0.55 > topSafeY && cy + gridMeta.slotH * 0.55 < heroRect.top - 8) {
-            aboveOpenGy.push(gy);
-          }
-          if (
-            cy > heroRect.bottom + gridMeta.slotH * 0.65 &&
-            cy < bottomSafeY - gridMeta.slotH * 1.15
-          ) {
-            belowOpenGy.push(gy);
-          }
-        }
+      const tryPlaceRandomOfSize = (
+        type: WallTool,
+        cols: number,
+        rows: number,
+        preferSide?: 'left' | 'right'
+      ): boolean => {
+        const candidates: Array<{ gx1: number; gx2: number; gy1: number; gy2: number }> = [];
+        const preferred: Array<{ gx1: number; gx2: number; gy1: number; gy2: number }> = [];
 
-        // Fill above the centered card (4-slot-wide spans)
-        if (fullOpenGx.length >= 4 && aboveOpenGy.length >= 2) {
-          const topRow = aboveOpenGy[0];
-          const startIdx = Math.floor((fullOpenGx.length - 4) / 2);
-          const gxStart = fullOpenGx[startIdx];
-          const gxEnd = fullOpenGx[startIdx + 3];
-          const leftEdge = fullOpenGx[0];
-          const rightEdge = fullOpenGx[fullOpenGx.length - 1];
-
-          placeShelf(gxStart, gxEnd, topRow, mode === 0 ? '01' : mode === 1 ? '06' : '02');
-          const topCy = gridMeta.centerY + topRow * gridMeta.pitchY;
-          if (topCy + gridMeta.slotH * 2.25 < heroRect.top - 4) {
-            if (leftEdge < gxStart) placeHook(leftEdge, topRow, '06');
-            if (rightEdge > gxEnd) placeHook(rightEdge, topRow, '02');
-          }
-        } else if (fullOpenGx.length >= 2 && aboveOpenGy.length >= 1) {
-          const topRow = aboveOpenGy[0];
-          const topCy = gridMeta.centerY + topRow * gridMeta.pitchY;
-          if (topCy + gridMeta.slotH * 2.25 < heroRect.top - 4) {
-            const colors: PillarColorKey[] = ['01', '02', '06'];
-            placeHook(fullOpenGx[0], topRow, colors[mode % 3]);
-            placeHook(fullOpenGx[fullOpenGx.length - 1], topRow, colors[(mode + 2) % 3]);
-            if (fullOpenGx.length >= 4) {
-              placeHook(fullOpenGx[Math.floor(fullOpenGx.length / 2)], topRow, colors[(mode + 1) % 3]);
+        for (let i = 0; i < openSlots.length; i++) {
+          const s = openSlots[i];
+          const gx1 = s.gx;
+          const gx2 = s.gx + cols - 1;
+          const gy1 = s.gy;
+          const gy2 = s.gy + rows - 1;
+          if (!isRectFree(gx1, gx2, gy1, gy2)) continue;
+          const rect = { gx1, gx2, gy1, gy2 };
+          candidates.push(rect);
+          if (preferSide) {
+            const midX = mMidX(gx1, gx2);
+            if (
+              (preferSide === 'left' && midX < cssW * 0.5) ||
+              (preferSide === 'right' && midX >= cssW * 0.5)
+            ) {
+              preferred.push(rect);
             }
           }
         }
 
-        // Fill below the centered card (4-slot-wide spans)
-        if (fullOpenGx.length >= 4 && belowOpenGy.length >= 2) {
-          const row0 = belowOpenGy[0];
-          const startIdx = Math.floor((fullOpenGx.length - 4) / 2);
-          const gxStart = fullOpenGx[startIdx];
-          const gxEnd = fullOpenGx[startIdx + 3];
-          const leftEdge = fullOpenGx[0];
-          const rightEdge = fullOpenGx[fullOpenGx.length - 1];
+        const pool = preferred.length > 0 ? preferred : candidates;
+        if (pool.length === 0) return false;
+        const chosen = pickRandom(pool);
+        addPlacedItem(type, chosen.gx1, chosen.gx2, chosen.gy1, chosen.gy2, withPulse);
+        markRectUsed(chosen.gx1, chosen.gx2, chosen.gy1, chosen.gy2);
+        return true;
+      };
 
-          if (mode === 0) {
-            placeShelf(gxStart, gxEnd, row0, '02');
-            if (leftEdge < gxStart) placeHook(leftEdge, row0, '01');
-            if (rightEdge > gxEnd) placeHook(rightEdge, row0, '06');
-          } else if (mode === 1) {
-            placeCabinet(gxStart, gxEnd, row0, '01');
-            if (leftEdge < gxStart) placeHook(leftEdge, row0, '06');
-            if (rightEdge > gxEnd) placeHook(rightEdge, row0, '02');
-          } else {
-            placeShelf(gxStart, gxEnd, row0, '06');
-            if (leftEdge < gxStart) placeHook(leftEdge, row0, '02');
-            if (rightEdge > gxEnd) placeHook(rightEdge, row0, '01');
+      const mMidX = (gx1: number, gx2: number) =>
+        gridMeta.centerX + ((gx1 + gx2) * 0.5) * gridMeta.pitchX;
+
+      // Build a balanced, genuinely randomized 7-item recipe (cabinets + shelves + varied hooks)
+      const cabCount = Math.random() < 0.55 ? 2 : 1;
+      const shelfCount = Math.random() < 0.55 ? 2 : 1;
+      const hookCount = Math.max(1, targetCount - cabCount - shelfCount);
+
+      const largeSpecs: Array<{
+        type: WallTool;
+        sizes: Array<{ cols: number; rows: number }>;
+      }> = [];
+
+      // Cabinet: grows in both width and height, never less than 4 mortises wide x 2 tall
+      const cabinetSizePool: Array<{ cols: number; rows: number }> = [
+        { cols: 4, rows: 2 },
+        { cols: 5, rows: 2 },
+        { cols: 6, rows: 2 },
+        { cols: 4, rows: 3 },
+        { cols: 5, rows: 3 },
+        { cols: 4, rows: 4 },
+      ];
+      // Shelf + Rod: grows in width only (fixed at 2 mortises tall, min 4 wide)
+      const shelfSizePool: Array<{ cols: number; rows: number }> = [
+        { cols: 4, rows: 2 },
+        { cols: 5, rows: 2 },
+        { cols: 6, rows: 2 },
+      ];
+      // Hook: grows in width only (fixed at 1 mortise tall)
+      const hookSizePool: Array<{ cols: number; rows: number }> = [
+        { cols: 1, rows: 1 },
+        { cols: 1, rows: 1 },
+        { cols: 2, rows: 1 },
+        { cols: 3, rows: 1 },
+      ];
+
+      for (let i = 0; i < cabCount; i++) {
+        const primary = pickRandom(cabinetSizePool);
+        largeSpecs.push({
+          type: 'cabinet',
+          sizes: [primary, { cols: 4, rows: 2 }],
+        });
+      }
+      for (let i = 0; i < shelfCount; i++) {
+        const primary = pickRandom(shelfSizePool);
+        largeSpecs.push({
+          type: 'shelf',
+          sizes: [primary, { cols: 4, rows: 2 }],
+        });
+      }
+
+      // Shuffle order of large pieces and alternate preferred left/right flanks for visual balance
+      for (let i = largeSpecs.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [largeSpecs[i], largeSpecs[j]] = [largeSpecs[j], largeSpecs[i]];
+      }
+
+      let leftCount = 0;
+      let rightCount = 0;
+      const nextSide = (): 'left' | 'right' => {
+        if (leftCount < rightCount) return 'left';
+        if (rightCount < leftCount) return 'right';
+        return Math.random() < 0.5 ? 'left' : 'right';
+      };
+
+      const recordLastSide = () => {
+        const last = placedItems[placedItems.length - 1];
+        if (!last) return;
+        if (mMidX(last.gx1, last.gx2) < cssW * 0.5) leftCount++;
+        else rightCount++;
+      };
+
+      for (const spec of largeSpecs) {
+        let placed = false;
+        const side = nextSide();
+        for (const sz of spec.sizes) {
+          if (tryPlaceRandomOfSize(spec.type, sz.cols, sz.rows, side)) {
+            placed = true;
+            recordLastSide();
+            break;
           }
-        } else if (fullOpenGx.length >= 2 && belowOpenGy.length >= 1) {
-          const row0 = belowOpenGy[0];
-          const colors: PillarColorKey[] = ['01', '02', '06'];
-          placeHook(fullOpenGx[0], row0, colors[mode % 3]);
-          placeHook(fullOpenGx[fullOpenGx.length - 1], row0, colors[(mode + 1) % 3]);
-          if (fullOpenGx.length >= 4) {
-            placeHook(fullOpenGx[Math.floor(fullOpenGx.length / 2)], row0, colors[(mode + 2) % 3]);
+        }
+        if (!placed) {
+          // Graceful fallback on narrow screens so we still reach 7 total items
+          const fallbackSize = pickRandom(hookSizePool);
+          if (
+            tryPlaceRandomOfSize('hook', fallbackSize.cols, fallbackSize.rows, side) ||
+            tryPlaceRandomOfSize('hook', 1, 1)
+          ) {
+            recordLastSide();
           }
         }
       }
 
-      // On wider viewports with generous space directly above the centered card, fill top center too
-      if (leftOpenGx.length >= 1 && rightOpenGx.length >= 1) {
-        const centerOpenGx: number[] = [];
-        for (let gx = gridMeta.minGx; gx <= gridMeta.maxGx; gx++) {
-          const cx = gridMeta.centerX + gx * gridMeta.pitchX;
-          if (cx >= heroRect.left && cx <= heroRect.right) centerOpenGx.push(gx);
-        }
-        const aboveOpenGy: number[] = [];
-        for (let gy = gridMeta.minGy; gy <= gridMeta.maxGy; gy++) {
-          const cy = gridMeta.centerY + gy * gridMeta.pitchY;
-          if (cy - gridMeta.slotH * 0.55 > topSafeY && cy + gridMeta.slotH * 0.55 < heroRect.top - 8) {
-            aboveOpenGy.push(gy);
-          }
-        }
-        if (aboveOpenGy.length >= 2 && centerOpenGx.length >= 4) {
-          const topRow = aboveOpenGy[0];
-          const startIdx = Math.floor((centerOpenGx.length - 4) / 2);
-          const gx1 = centerOpenGx[startIdx];
-          const gx2 = centerOpenGx[startIdx + 3];
-          placeShelf(gx1, gx2, topRow, mode === 0 ? '02' : mode === 1 ? '06' : '01');
-        } else if (aboveOpenGy.length >= 1 && centerOpenGx.length >= 2) {
-          const topRow = aboveOpenGy[0];
-          const topCy = gridMeta.centerY + topRow * gridMeta.pitchY;
-          if (topCy + gridMeta.slotH * 2.25 < heroRect.top - 4) {
-            placeHook(centerOpenGx[0], topRow, '01');
-            placeHook(centerOpenGx[centerOpenGx.length - 1], topRow, '06');
-          }
+      // Place remaining varied hooks up to targetCount (7)
+      let remaining = Math.max(hookCount, targetCount - placedItems.length);
+      let guard = 0;
+      while (placedItems.length < targetCount && remaining > 0 && guard < 24) {
+        guard++;
+        const side = nextSide();
+        const sz = pickRandom(hookSizePool);
+        if (
+          tryPlaceRandomOfSize('hook', sz.cols, sz.rows, side) ||
+          tryPlaceRandomOfSize('hook', 1, 1, side) ||
+          tryPlaceRandomOfSize('hook', 1, 1)
+        ) {
+          recordLastSide();
+          remaining--;
+        } else {
+          break;
         }
       }
 
@@ -1548,32 +1703,63 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
 
     const renderFrame = (now: number) => {
       const m = gridMeta;
-      const { activeTool, motionOn, isModalOpen: modalActive } = stateRef.current;
+      const {
+        activeTool,
+        toolSizes,
+        motionOn,
+        isModalOpen: modalActive,
+        canInteract: interactiveActive,
+      } = stateRef.current;
       const influenceR = Math.max(m.pitchX, m.pitchY) * 2.15;
       const rippleAge = (now - rippleTime) / 1000;
-      const effectiveOverUI = pointerOverUI || modalActive;
+      const effectiveOverUI = pointerOverUI || modalActive || !interactiveActive;
 
       ctx.fillStyle = COLORS.white;
       ctx.fillRect(0, 0, cssW, cssH);
 
-      hoveredIdx = -1;
-      hoveredShelfCandidate = null;
-      hoveredCabinetCandidate = null;
-      hoveredExistingCabinetIdx =
-        !effectiveOverUI && pointerX > -1000 ? findCabinetAtPoint(pointerX, pointerY) : -1;
-      hoveredExistingShelfIdx =
-        !effectiveOverUI && hoveredExistingCabinetIdx === -1 && pointerX > -1000
-          ? findShelfAtPoint(pointerX, pointerY)
-          : -1;
+      const activeDrag = dragSession && dragSession.active ? dragSession : null;
+      const draggedItemId = activeDrag ? activeDrag.itemId : null;
 
+      // Index occupied mortise slots & highlighted anchor slots from all grounded placed items
+      const occupiedKeys = new Set<string>();
+      const anchorKeys = new Set<string>();
+      const visibleItems: Array<{ item: PlacedItem; ox: number; oy: number }> = [];
+      let draggedItem: PlacedItem | null = null;
+
+      for (let i = 0; i < placedItems.length; i++) {
+        const item = placedItems[i];
+        item.lift = motionOn ? item.lift + (1 - item.lift) * 0.2 : 1;
+        if (item.id === draggedItemId) {
+          draggedItem = item;
+          continue;
+        }
+        if (!isItemVisible(item)) continue;
+
+        for (let gy = item.gy1; gy <= item.gy2; gy++) {
+          for (let gx = item.gx1; gx <= item.gx2; gx++) {
+            const k = keyOf(gx, gy);
+            occupiedKeys.add(k);
+            if (item.type === 'shelf') {
+              if (gx === item.gx1 || gx === item.gx2) anchorKeys.add(k);
+            } else {
+              anchorKeys.add(k);
+            }
+          }
+        }
+      }
+
+      hoveredIdx = -1;
+      hoveredPlacementCandidate = null;
+      const hitItem =
+        !activeDrag && !effectiveOverUI && pointerX > -1000
+          ? findItemAtPoint(pointerX, pointerY)
+          : null;
+      hoveredItemId = hitItem ? hitItem.id : null;
       let closestDist = 9999;
 
       for (let i = 0; i < slots.length; i++) {
         const s = slots[i];
-        const hasHook = !s.blocked && hooksMap.has(keyOf(s.gx, s.gy));
-        const hasShelf = !s.blocked && isSlotOccupiedByList(shelvesList, s.gx, s.gy);
-        const hasCabinet = !s.blocked && isSlotOccupiedByList(cabinetsList, s.gx, s.gy);
-        const isOccupied = hasHook || hasShelf || hasCabinet;
+        const isOccupied = !s.blocked && occupiedKeys.has(keyOf(s.gx, s.gy));
 
         let targetOx = 0;
         let targetOy = 0;
@@ -1588,7 +1774,9 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
           if (
             !s.blocked &&
             !effectiveOverUI &&
-            dist < Math.max(m.pitchX, m.pitchY) * 0.5 &&
+            !activeDrag &&
+            hoveredItemId === null &&
+            dist < Math.max(m.pitchX, m.pitchY) * 0.56 &&
             dist < closestDist
           ) {
             closestDist = dist;
@@ -1629,7 +1817,6 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
           s.rot = 0;
           s.vrot = 0;
           s.hoverHeat = i === hoveredIdx ? 1 : 0;
-          s.lift = hasHook ? 1 : 0;
         } else {
           s.vx = (s.vx + (targetOx - s.ox) * 0.13) * 0.78;
           s.vy = (s.vy + (targetOy - s.oy) * 0.13) * 0.78;
@@ -1638,46 +1825,44 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
           s.vrot = (s.vrot + (targetRot - s.rot) * 0.14) * 0.76;
           s.rot += s.vrot;
           s.hoverHeat += (targetHeat - s.hoverHeat) * 0.16;
-          s.lift += ((hasHook ? 1 : 0) - s.lift) * 0.22;
         }
       }
 
-      for (const sh of shelvesList) sh.lift = motionOn ? sh.lift + (1 - sh.lift) * 0.2 : 1;
-      for (const cab of cabinetsList) cab.lift = motionOn ? cab.lift + (1 - cab.lift) * 0.2 : 1;
-
-      const hoveringExistingBlock =
-        hoveredExistingShelfIdx !== -1 || hoveredExistingCabinetIdx !== -1;
-      if (activeTool === 'shelf' && hoveredIdx !== -1 && !hoveringExistingBlock) {
-        hoveredShelfCandidate = getShelfCandidateForSlot(slots[hoveredIdx]);
-      } else if (activeTool === 'cabinet' && hoveredIdx !== -1 && !hoveringExistingBlock) {
-        hoveredCabinetCandidate = getCabinetCandidateForSlot(slots[hoveredIdx]);
+      const activeSize = toolSizes[activeTool];
+      if (!effectiveOverUI && !activeDrag && hoveredItemId === null && hoveredIdx !== -1) {
+        hoveredPlacementCandidate = getCandidateForSlot(
+          slots[hoveredIdx],
+          activeSize.cols,
+          activeSize.rows
+        );
       }
 
       document.body.classList.toggle(
-        'wall-slot-hover',
-        !effectiveOverUI && (hoveringExistingBlock || hoveredIdx !== -1)
+        'wall-piece-hover',
+        !effectiveOverUI && !activeDrag && hoveredItemId !== null
       );
-
-      const isShelfBracketSlot = (gx: number, gy: number) => {
-        for (let i = 0; i < shelvesList.length; i++) {
-          const sh = shelvesList[i];
-          if (!isSpanVisible(sh)) continue;
-          if ((gy === sh.gy || gy === sh.gy + 1) && (gx === sh.gx1 || gx === sh.gx2)) {
-            return true;
-          }
-        }
-        return false;
-      };
+      document.body.classList.toggle(
+        'wall-slot-hover',
+        !effectiveOverUI &&
+          !activeDrag &&
+          hoveredItemId === null &&
+          hoveredPlacementCandidate !== null
+      );
 
       // Draw mortise slots (never render any slot behind text or UI clearance zones)
       for (let i = 0; i < slots.length; i++) {
         const s = slots[i];
         if (s.blocked) continue;
-        const hasHook = hooksMap.has(keyOf(s.gx, s.gy));
-        const hasShelf = isSlotOccupiedByList(shelvesList, s.gx, s.gy);
-        const hasShelfBracket = isShelfBracketSlot(s.gx, s.gy);
-        const hasCabinet = isSlotOccupiedByList(cabinetsList, s.gx, s.gy);
-        const isHov = i === hoveredIdx && !hoveringExistingBlock;
+        const k = keyOf(s.gx, s.gy);
+        const isOccupied = occupiedKeys.has(k);
+        const isAnchored = anchorKeys.has(k);
+        const isHov = i === hoveredIdx;
+        const isDragSnapSlot =
+          activeDrag !== null &&
+          s.gx >= activeDrag.snapRect.gx1 &&
+          s.gx <= activeDrag.snapRect.gx2 &&
+          s.gy >= activeDrag.snapRect.gy1 &&
+          s.gy <= activeDrag.snapRect.gy2;
         const x = -m.slotW * 0.5;
         const y = -m.slotH * 0.5;
 
@@ -1685,10 +1870,10 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
         ctx.translate(s.cx + s.ox, s.cy + s.oy);
         ctx.rotate(s.rot);
 
-        if (!hasHook && !hasShelf && !hasCabinet && (s.hoverHeat > 0.06 || isHov)) {
+        if ((!isOccupied && (s.hoverHeat > 0.06 || isHov)) || isDragSnapSlot) {
           drawRoundRect(x, y, m.slotW, m.slotH, m.slotR);
           ctx.fillStyle = '#DEC7A4';
-          ctx.globalAlpha = isHov ? 0.42 : s.hoverHeat * 0.24;
+          ctx.globalAlpha = isDragSnapSlot ? 0.55 : isHov ? 0.42 : s.hoverHeat * 0.24;
           ctx.fill();
           ctx.globalAlpha = 1;
         }
@@ -1704,32 +1889,25 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
 
         drawRoundRect(x, y, m.slotW, m.slotH, m.slotR);
         ctx.strokeStyle =
-          hasHook || hasShelfBracket || hasCabinet
+          isAnchored || isDragSnapSlot
             ? COLORS.black
             : isHov || s.hoverHeat > 0.38
               ? COLORS.black
               : COLORS.gray;
-        ctx.lineWidth = isHov ? 1.9 : 1.4;
+        ctx.lineWidth = isHov || isDragSnapSlot ? 1.9 : 1.4;
         ctx.stroke();
         ctx.restore();
       }
 
-      // Pass 1: Subtle 3D isometric Rhino line-drawing shadows projected down & right behind each piece
-      for (const s of slots) {
-        if (s.blocked) continue;
-        if (hooksMap.has(keyOf(s.gx, s.gy))) {
-          drawWallHookIsoShadow(s.cx + s.ox, s.cy + s.oy, m, s.lift);
-        }
-      }
-
-      const shelfOffsets: Array<{ sh: SpanPlacement; ox: number; oy: number }> = [];
-      for (const sh of shelvesList) {
-        if (sh.gx2 - sh.gx1 < MIN_SHELF_SPAN || !isSpanVisible(sh)) continue;
+      // Compute gentle spring offsets & draw Pass 1 (directional 3D cast shadows) for grounded items
+      for (let i = 0; i < placedItems.length; i++) {
+        const item = placedItems[i];
+        if (item.id === draggedItemId || !isItemVisible(item)) continue;
         let avgOx = 0;
         let avgOy = 0;
         let count = 0;
-        for (let gx = sh.gx1; gx <= sh.gx2; gx++) {
-          const ks = slotByCoord(gx, sh.gy);
+        for (let gx = item.gx1; gx <= item.gx2; gx++) {
+          const ks = slotByCoord(gx, item.gy1);
           if (ks) {
             avgOx += ks.ox;
             avgOy += ks.oy;
@@ -1738,80 +1916,216 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
         }
         const ox = count ? avgOx / count : 0;
         const oy = count ? avgOy / count : 0;
-        shelfOffsets.push({ sh, ox, oy });
-        drawShelfIsoShadow(sh.gx1, sh.gx2, sh.gy, m, sh.lift, ox, oy);
-      }
+        visibleItems.push({ item, ox, oy });
 
-      const cabOffsets: Array<{ cab: SpanPlacement; ox: number; oy: number }> = [];
-      for (const cab of cabinetsList) {
-        if (cab.gx2 - cab.gx1 < MIN_CABINET_SPAN || !isSpanVisible(cab)) continue;
-        let avgOx = 0;
-        let avgOy = 0;
-        let count = 0;
-        for (let gx = cab.gx1; gx <= cab.gx2; gx++) {
-          const ks = slotByCoord(gx, cab.gy);
-          if (ks) {
-            avgOx += ks.ox;
-            avgOy += ks.oy;
-            count++;
-          }
-        }
-        const ox = count ? avgOx / count : 0;
-        const oy = count ? avgOy / count : 0;
-        cabOffsets.push({ cab, ox, oy });
-        drawCabinetIsoShadow(cab.gx1, cab.gx2, cab.gy, m, cab.lift, ox, oy);
-      }
-
-      // Pass 2: Draw installed front-elevation hooks, shelves, and cabinets cleanly on top of isometric shadows
-      for (const s of slots) {
-        if (s.blocked) continue;
-        if (hooksMap.has(keyOf(s.gx, s.gy))) {
-          drawWallHook(
-            s.cx + s.ox,
-            s.cy + s.oy,
+        if (item.type === 'hook') {
+          drawWallHookIsoShadow(
+            item.gx1,
+            item.gx2,
+            item.gy1,
+            item.gy2,
             m,
-            s.lift,
-            false,
-            s.gx * 13 + s.gy * 29
+            item.lift,
+            ox,
+            oy
+          );
+        } else if (item.type === 'shelf') {
+          drawShelfIsoShadow(
+            item.gx1,
+            item.gx2,
+            item.gy1,
+            item.gy2,
+            m,
+            item.lift,
+            ox,
+            oy
+          );
+        } else {
+          drawCabinetIsoShadow(
+            item.gx1,
+            item.gx2,
+            item.gy1,
+            item.gy2,
+            m,
+            item.lift,
+            ox,
+            oy
           );
         }
       }
 
-      for (const { sh, ox, oy } of shelfOffsets) {
-        drawShelfWithRod(sh.gx1, sh.gx2, sh.gy, m, sh.lift, ox, oy, false);
-      }
-
-      for (const { cab, ox, oy } of cabOffsets) {
-        drawSlidingDoorCabinet(cab.gx1, cab.gx2, cab.gy, m, cab.lift, ox, oy, false);
-      }
-
-      // Ghost hover preview
-      if (!effectiveOverUI && !hoveringExistingBlock && hoveredIdx !== -1) {
-        const hs = slots[hoveredIdx];
-        if (activeTool === 'hook') {
-          if (
-            !hooksMap.has(keyOf(hs.gx, hs.gy)) &&
-            !isSlotOccupiedByList(shelvesList, hs.gx, hs.gy) &&
-            !isSlotOccupiedByList(cabinetsList, hs.gx, hs.gy)
-          ) {
-            drawWallHook(hs.cx + hs.ox, hs.cy + hs.oy, m, 1, true);
-          }
-        } else if (activeTool === 'shelf' && hoveredShelfCandidate) {
+      // Pass 2: Draw grounded front-elevation hardware cleanly on top of directional cast shadows
+      for (let i = 0; i < visibleItems.length; i++) {
+        const { item, ox, oy } = visibleItems[i];
+        if (item.type === 'hook') {
+          drawWallHook(
+            item.gx1,
+            item.gx2,
+            item.gy1,
+            item.gy2,
+            m,
+            item.lift,
+            ox,
+            oy,
+            false,
+            item.seed
+          );
+        } else if (item.type === 'shelf') {
           drawShelfWithRod(
-            hoveredShelfCandidate.gx1,
-            hoveredShelfCandidate.gx2,
-            hoveredShelfCandidate.gy,
+            item.gx1,
+            item.gx2,
+            item.gy1,
+            item.gy2,
+            m,
+            item.lift,
+            ox,
+            oy,
+            false,
+            item.seed
+          );
+        } else {
+          drawSlidingDoorCabinet(
+            item.gx1,
+            item.gx2,
+            item.gy1,
+            item.gy2,
+            m,
+            item.lift,
+            ox,
+            oy,
+            false,
+            item.seed
+          );
+        }
+      }
+
+      // Pass 3: While dragging an existing item, show its magnetic snap target + lifted floating piece
+      if (activeDrag && draggedItem) {
+        const snap = activeDrag.snapRect;
+        if (draggedItem.type === 'hook') {
+          drawWallHook(snap.gx1, snap.gx2, snap.gy1, snap.gy2, m, 1, 0, 0, true);
+        } else if (draggedItem.type === 'shelf') {
+          drawShelfWithRod(snap.gx1, snap.gx2, snap.gy1, snap.gy2, m, 1, 0, 0, true);
+        } else {
+          drawSlidingDoorCabinet(snap.gx1, snap.gx2, snap.gy1, snap.gy2, m, 1, 0, 0, true);
+        }
+
+        const dragOx = pointerX - activeDrag.startX;
+        const dragOy = pointerY - activeDrag.startY - 3;
+        const elevatedLift = 1.14;
+
+        if (draggedItem.type === 'hook') {
+          drawWallHookIsoShadow(
+            draggedItem.gx1,
+            draggedItem.gx2,
+            draggedItem.gy1,
+            draggedItem.gy2,
+            m,
+            elevatedLift,
+            dragOx,
+            dragOy
+          );
+          drawWallHook(
+            draggedItem.gx1,
+            draggedItem.gx2,
+            draggedItem.gy1,
+            draggedItem.gy2,
+            m,
+            1,
+            dragOx,
+            dragOy,
+            false,
+            draggedItem.seed
+          );
+        } else if (draggedItem.type === 'shelf') {
+          drawShelfIsoShadow(
+            draggedItem.gx1,
+            draggedItem.gx2,
+            draggedItem.gy1,
+            draggedItem.gy2,
+            m,
+            elevatedLift,
+            dragOx,
+            dragOy
+          );
+          drawShelfWithRod(
+            draggedItem.gx1,
+            draggedItem.gx2,
+            draggedItem.gy1,
+            draggedItem.gy2,
+            m,
+            1,
+            dragOx,
+            dragOy,
+            false,
+            draggedItem.seed
+          );
+        } else {
+          drawCabinetIsoShadow(
+            draggedItem.gx1,
+            draggedItem.gx2,
+            draggedItem.gy1,
+            draggedItem.gy2,
+            m,
+            elevatedLift,
+            dragOx,
+            dragOy
+          );
+          drawSlidingDoorCabinet(
+            draggedItem.gx1,
+            draggedItem.gx2,
+            draggedItem.gy1,
+            draggedItem.gy2,
+            m,
+            1,
+            dragOx,
+            dragOy,
+            false,
+            draggedItem.seed
+          );
+        }
+      }
+
+      // Ghost hover preview showing exact adjusted (cols x rows) footprint before placing a new item
+      if (
+        !effectiveOverUI &&
+        !activeDrag &&
+        hoveredItemId === null &&
+        hoveredPlacementCandidate &&
+        hoveredIdx !== -1
+      ) {
+        const hs = slots[hoveredIdx];
+        const cand = hoveredPlacementCandidate;
+        if (activeTool === 'hook') {
+          drawWallHook(
+            cand.gx1,
+            cand.gx2,
+            cand.gy1,
+            cand.gy2,
+            m,
+            1,
+            hs.ox * 0.45,
+            hs.oy * 0.45,
+            true
+          );
+        } else if (activeTool === 'shelf') {
+          drawShelfWithRod(
+            cand.gx1,
+            cand.gx2,
+            cand.gy1,
+            cand.gy2,
             m,
             1,
             hs.ox * 0.4,
             hs.oy * 0.4,
             true
           );
-        } else if (activeTool === 'cabinet' && hoveredCabinetCandidate) {
+        } else if (activeTool === 'cabinet') {
           drawSlidingDoorCabinet(
-            hoveredCabinetCandidate.gx1,
-            hoveredCabinetCandidate.gx2,
-            hoveredCabinetCandidate.gy,
+            cand.gx1,
+            cand.gx2,
+            cand.gy1,
+            cand.gy2,
             m,
             1,
             hs.ox * 0.35,
@@ -1842,6 +2156,14 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       else renderFrame(performance.now());
     };
 
+    const countVisiblePlacedItems = () => {
+      let n = 0;
+      for (let i = 0; i < placedItems.length; i++) {
+        if (isItemVisible(placedItems[i])) n++;
+      }
+      return n;
+    };
+
     const sizeCanvas = () => {
       cssW = window.innerWidth;
       cssH = window.innerHeight;
@@ -1850,57 +2172,193 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       canvas.height = Math.round(cssH * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       rebuildGrid();
-      if (!hasUserEdited) {
-        applyPreset(presetIdx, false);
+      if (!hasInitializedRandom) {
+        hasInitializedRandom = true;
+        applyRandomArrangement(INITIAL_RANDOM_COUNT, false);
+      } else if (!hasUserEdited && countVisiblePlacedItems() < 3) {
+        applyRandomArrangement(INITIAL_RANDOM_COUNT, false);
       }
       if (!stateRef.current.motionOn) renderFrame(performance.now());
     };
 
+    const cancelActiveDrag = () => {
+      if (dragSession) {
+        dragSession = null;
+        document.body.classList.remove('wall-dragging');
+      }
+    };
+
     controller.registerActions({
       rearrange: () => {
+        cancelActiveDrag();
         hasUserEdited = false;
-        presetIdx = (presetIdx + 1) % 3;
-        applyPreset(presetIdx, true);
+        applyRandomArrangement(INITIAL_RANDOM_COUNT, true);
         if (!stateRef.current.motionOn) renderFrame(performance.now());
       },
       clearWall: () => {
+        cancelActiveDrag();
         hasUserEdited = true;
-        hooksMap.clear();
-        shelvesList = [];
-        cabinetsList = [];
+        placedItems = [];
         triggerRipple(0.5, 0.5);
         if (!stateRef.current.motionOn) renderFrame(performance.now());
       },
       triggerRipple,
     });
 
-    const onPointerMove = (e: PointerEvent) => {
-      if (stateRef.current.isModalOpen) {
-        pointerOverUI = true;
+    const onPointerDown = (e: PointerEvent) => {
+      if (stateRef.current.isModalOpen || !stateRef.current.canInteract) return;
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      const target = e.target as HTMLElement | null;
+      if (
+        target?.closest?.('.ui-surface, [role="dialog"], button, a, input, select, textarea')
+      ) {
         return;
       }
+
+      pointerX = e.clientX;
+      pointerY = e.clientY;
+      pointerOverUI = false;
+
+      const hit = findItemAtPoint(e.clientX, e.clientY);
+      if (!hit) return;
+
+      const topLeftCx = gridMeta.centerX + hit.gx1 * gridMeta.pitchX;
+      const topLeftCy = gridMeta.centerY + hit.gy1 * gridMeta.pitchY;
+
+      dragSession = {
+        itemId: hit.id,
+        pointerId: e.pointerId,
+        startX: e.clientX,
+        startY: e.clientY,
+        grabOffsetX: e.clientX - topLeftCx,
+        grabOffsetY: e.clientY - topLeftCy,
+        cols: hit.gx2 - hit.gx1 + 1,
+        rows: hit.gy2 - hit.gy1 + 1,
+        active: false,
+        snapRect: {
+          gx1: hit.gx1,
+          gx2: hit.gx2,
+          gy1: hit.gy1,
+          gy2: hit.gy2,
+        },
+      };
+    };
+
+    const onPointerMove = (e: PointerEvent) => {
+      if (stateRef.current.isModalOpen || !stateRef.current.canInteract) {
+        pointerOverUI = true;
+        cancelActiveDrag();
+        return;
+      }
+
+      const isDraggingThisPointer = dragSession && dragSession.pointerId === e.pointerId;
+      if (!hasFinePointer && !isDraggingThisPointer) return;
+
       pointerX = e.clientX;
       pointerY = e.clientY;
       const target = e.target as HTMLElement | null;
-      pointerOverUI = Boolean(target?.closest?.('.ui-surface, [role="dialog"]'));
+      pointerOverUI = isDraggingThisPointer
+        ? false
+        : Boolean(target?.closest?.('.ui-surface, [role="dialog"]'));
+
+      if (isDraggingThisPointer && dragSession) {
+        if (
+          !dragSession.active &&
+          Math.hypot(e.clientX - dragSession.startX, e.clientY - dragSession.startY) >= 5
+        ) {
+          dragSession.active = true;
+          hasUserEdited = true;
+          suppressNextClick = true;
+
+          // Bring dragged piece to the front layer so it glides cleanly above other pieces
+          const idx = placedItems.findIndex((it) => it.id === dragSession?.itemId);
+          if (idx !== -1 && idx < placedItems.length - 1) {
+            const [picked] = placedItems.splice(idx, 1);
+            placedItems.push(picked);
+          }
+
+          document.body.classList.add('wall-dragging');
+          document.body.classList.remove('wall-piece-hover', 'wall-slot-hover');
+        }
+
+        if (dragSession.active) {
+          const floatGx1 =
+            (e.clientX - dragSession.grabOffsetX - gridMeta.centerX) / gridMeta.pitchX;
+          const floatGy1 =
+            (e.clientY - dragSession.grabOffsetY - gridMeta.centerY) / gridMeta.pitchY;
+          const nextSnap = findNearestValidRect(
+            floatGx1,
+            floatGy1,
+            dragSession.cols,
+            dragSession.rows
+          );
+          if (nextSnap) {
+            dragSession.snapRect = nextSnap;
+          }
+          if (!stateRef.current.motionOn) renderFrame(performance.now());
+          else ensureLoop();
+          return;
+        }
+      }
+
       if (!stateRef.current.motionOn) renderFrame(performance.now());
     };
 
+    const finishDrag = (e: PointerEvent, commit: boolean) => {
+      if (!dragSession || dragSession.pointerId !== e.pointerId) return;
+      const session = dragSession;
+      dragSession = null;
+      document.body.classList.remove('wall-dragging');
+
+      if (session.active) {
+        if (commit) {
+          const item = placedItems.find((it) => it.id === session.itemId);
+          if (item) {
+            item.gx1 = session.snapRect.gx1;
+            item.gx2 = session.snapRect.gx2;
+            item.gy1 = session.snapRect.gy1;
+            item.gy2 = session.snapRect.gy2;
+            item.lift = 0.72;
+            triggerRipple(
+              e.clientX / Math.max(1, cssW),
+              e.clientY / Math.max(1, cssH)
+            );
+          }
+        }
+        window.setTimeout(() => {
+          suppressNextClick = false;
+        }, 80);
+        if (!stateRef.current.motionOn) renderFrame(performance.now());
+      }
+    };
+
+    const onPointerUp = (e: PointerEvent) => finishDrag(e, true);
+    const onPointerCancel = (e: PointerEvent) => finishDrag(e, false);
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (dragSession?.active) {
+        e.preventDefault();
+      }
+    };
+
     const onPointerLeave = () => {
+      if (dragSession?.active) return;
       pointerX = -9999;
       pointerY = -9999;
       pointerOverUI = false;
       hoveredIdx = -1;
-      hoveredShelfCandidate = null;
-      hoveredCabinetCandidate = null;
-      hoveredExistingShelfIdx = -1;
-      hoveredExistingCabinetIdx = -1;
-      document.body.classList.remove('wall-slot-hover');
+      hoveredItemId = null;
+      hoveredPlacementCandidate = null;
+      document.body.classList.remove('wall-slot-hover', 'wall-piece-hover');
       if (!stateRef.current.motionOn) renderFrame(performance.now());
     };
 
     const onClick = (e: MouseEvent) => {
-      if (stateRef.current.isModalOpen) return;
+      if (suppressNextClick) {
+        suppressNextClick = false;
+        return;
+      }
+      if (stateRef.current.isModalOpen || !stateRef.current.canInteract) return;
       const target = e.target as HTMLElement | null;
       if (
         target?.closest?.('.ui-surface, [role="dialog"], button, a, input, select, textarea')
@@ -1910,39 +2368,20 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
 
       const clickX = e.clientX;
       const clickY = e.clientY;
-      const { activePillar, activeTool } = stateRef.current;
 
-      const hitCabIdx = findCabinetAtPoint(clickX, clickY);
-      if (hitCabIdx !== -1) {
-        hasUserEdited = true;
-        cabinetsList.splice(hitCabIdx, 1);
-        triggerRipple(clickX / Math.max(1, cssW), clickY / Math.max(1, cssH));
+      // Clicking directly on an existing piece without dragging does NOT delete or clone it
+      const hitExisting = findItemAtPoint(clickX, clickY);
+      if (hitExisting) {
+        hitExisting.lift = 0.84;
         if (!stateRef.current.motionOn) renderFrame(performance.now());
+        else ensureLoop();
         return;
       }
 
-      const hitShelfIdx = findShelfAtPoint(clickX, clickY);
-      if (hitShelfIdx !== -1) {
-        hasUserEdited = true;
-        shelvesList.splice(hitShelfIdx, 1);
-        triggerRipple(clickX / Math.max(1, cssW), clickY / Math.max(1, cssH));
-        if (!stateRef.current.motionOn) renderFrame(performance.now());
-        return;
-      }
-
-      if (activeTool === 'hook') {
-        const hitHook = findHookAtPoint(clickX, clickY);
-        if (hitHook) {
-          hasUserEdited = true;
-          hooksMap.delete(keyOf(hitHook.gx, hitHook.gy));
-          triggerRipple(clickX / Math.max(1, cssW), clickY / Math.max(1, cssH));
-          if (!stateRef.current.motionOn) renderFrame(performance.now());
-          return;
-        }
-      }
+      const { activeTool, toolSizes } = stateRef.current;
 
       let best: SlotNode | null = null;
-      let bestDist = Math.max(gridMeta.pitchX, gridMeta.pitchY) * 0.56;
+      let bestDist = Math.max(gridMeta.pitchX, gridMeta.pitchY) * 0.62;
       for (const s of slots) {
         if (s.blocked) continue;
         const d = Math.hypot(s.cx - clickX, s.cy - clickY);
@@ -1953,36 +2392,19 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       }
       if (!best) return;
 
-      if (activeTool === 'hook') {
+      // Purely additive placement — unlimited items stay on the wall until Clear is clicked
+      const size = toolSizes[activeTool];
+      const cand = getCandidateForSlot(best, size.cols, size.rows);
+      if (cand) {
         hasUserEdited = true;
-        const k = keyOf(best.gx, best.gy);
-        if (hooksMap.has(k)) hooksMap.delete(k);
-        else {
-          hooksMap.set(k, activePillar);
-          best.lift = 0.08;
-        }
+        addPlacedItem(activeTool, cand.gx1, cand.gx2, cand.gy1, cand.gy2, true);
         triggerRipple(clickX / Math.max(1, cssW), clickY / Math.max(1, cssH));
-      } else if (activeTool === 'shelf') {
-        const cand = getShelfCandidateForSlot(best);
-        if (cand) {
-          hasUserEdited = true;
-          addOrMergeShelf(cand.gx1, cand.gx2, cand.gy, activePillar, true);
-          triggerRipple(clickX / Math.max(1, cssW), clickY / Math.max(1, cssH));
-        }
-      } else if (activeTool === 'cabinet') {
-        const cand = getCabinetCandidateForSlot(best);
-        if (cand) {
-          hasUserEdited = true;
-          addCabinet(cand.gx1, cand.gx2, cand.gy, activePillar, true);
-          triggerRipple(clickX / Math.max(1, cssW), clickY / Math.max(1, cssH));
-        }
       }
 
       if (!stateRef.current.motionOn) renderFrame(performance.now());
     };
 
     sizeCanvas();
-    applyPreset(0, false);
     renderFrame(performance.now());
     if (stateRef.current.motionOn) ensureLoop();
 
@@ -1990,8 +2412,8 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
     if (typeof ResizeObserver !== 'undefined') {
       resizeObserver = new ResizeObserver(() => {
         rebuildGrid();
-        if (!hasUserEdited) {
-          applyPreset(presetIdx, false);
+        if (!hasUserEdited && countVisiblePlacedItems() < 3) {
+          applyRandomArrangement(INITIAL_RANDOM_COUNT, false);
         }
         if (!stateRef.current.motionOn) renderFrame(performance.now());
       });
@@ -2010,8 +2432,12 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
 
     window.addEventListener('resize', sizeCanvas);
     window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('pointerdown', onPointerDown);
+    window.addEventListener('pointermove', onPointerMove, { passive: true });
+    window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('pointercancel', onPointerCancel);
+    window.addEventListener('touchmove', onTouchMove, { passive: false });
     if (hasFinePointer) {
-      window.addEventListener('pointermove', onPointerMove, { passive: true });
       document.addEventListener('pointerleave', onPointerLeave);
     }
     document.addEventListener('click', onClick);
@@ -2020,10 +2446,14 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       disposed = true;
       if (rafId) window.cancelAnimationFrame(rafId);
       if (resizeObserver) resizeObserver.disconnect();
-      document.body.classList.remove('wall-slot-hover');
+      document.body.classList.remove('wall-slot-hover', 'wall-piece-hover', 'wall-dragging');
       window.removeEventListener('resize', sizeCanvas);
       window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('pointerdown', onPointerDown);
       window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+      window.removeEventListener('pointercancel', onPointerCancel);
+      window.removeEventListener('touchmove', onTouchMove);
       document.removeEventListener('pointerleave', onPointerLeave);
       document.removeEventListener('click', onClick);
     };
@@ -2031,7 +2461,14 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
 
   useEffect(() => {
     syncLoopRef.current();
-  }, [controller.motionOn, controller.activePillar, controller.activeTool, isModalOpen]);
+  }, [
+    controller.motionOn,
+    controller.activePillar,
+    controller.activeTool,
+    controller.toolSizes,
+    isModalOpen,
+    canInteract,
+  ]);
 
   return <canvas ref={canvasRef} className="mortise-wall-canvas" aria-hidden="true" />;
 };
@@ -2039,7 +2476,15 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
 export const MortiseWallToolbar: React.FC<{ controller: MortiseWallController }> = ({
   controller,
 }) => {
-  const { activeTool, setActiveTool, rearrange, clearWall } = controller;
+  const isDesktopInteractive = useDesktopInteractiveWall();
+  const { activeTool, setActiveTool, toolSizes, adjustToolSize, rearrange, clearWall } =
+    controller;
+  const currentSize = toolSizes[activeTool];
+  const currentLimits = TOOL_SIZE_LIMITS[activeTool];
+  const activeLabel =
+    activeTool === 'hook' ? 'Hook' : activeTool === 'shelf' ? 'Shelf + Rod' : 'Cabinet';
+
+  if (!isDesktopInteractive) return null;
 
   return (
     <div className="wall-toolbar ui-surface" aria-label="Interactive modular wall controls">
@@ -2064,6 +2509,9 @@ export const MortiseWallToolbar: React.FC<{ controller: MortiseWallController }>
             <line x1="8.5" y1="10" x2="15.5" y2="10" />
           </svg>
           <span>Hook</span>
+          <span className="wall-tool-size">
+            {toolSizes.hook.cols}×{toolSizes.hook.rows}
+          </span>
         </button>
 
         <button
@@ -2088,6 +2536,9 @@ export const MortiseWallToolbar: React.FC<{ controller: MortiseWallController }>
             <line x1="6" y1="15.5" x2="18" y2="15.5" strokeWidth="2.8" />
           </svg>
           <span>Shelf + Rod</span>
+          <span className="wall-tool-size">
+            {toolSizes.shelf.cols}×{toolSizes.shelf.rows}
+          </span>
         </button>
 
         <button
@@ -2112,7 +2563,72 @@ export const MortiseWallToolbar: React.FC<{ controller: MortiseWallController }>
             <circle cx="17.8" cy="8.5" r="1.45" />
           </svg>
           <span>Cabinet</span>
+          <span className="wall-tool-size">
+            {toolSizes.cabinet.cols}×{toolSizes.cabinet.rows}
+          </span>
         </button>
+      </div>
+
+      <div
+        className="wall-size-controls"
+        role="group"
+        aria-label={`Adjust ${activeLabel} cell width and height`}
+      >
+        <div className="wall-size-stepper">
+          <span className="wall-size-axis" title="Width in mortise cells">
+            W
+          </span>
+          <button
+            type="button"
+            className="wall-size-step-btn"
+            aria-label={`Make ${activeLabel} 1 cell narrower`}
+            disabled={currentSize.cols <= currentLimits.minCols}
+            onClick={() => adjustToolSize(activeTool, 'cols', -1)}
+          >
+            −
+          </button>
+          <span className="wall-size-val" aria-live="polite">
+            {currentSize.cols}
+          </span>
+          <button
+            type="button"
+            className="wall-size-step-btn"
+            aria-label={`Make ${activeLabel} 1 cell wider`}
+            disabled={currentSize.cols >= currentLimits.maxCols}
+            onClick={() => adjustToolSize(activeTool, 'cols', 1)}
+          >
+            +
+          </button>
+        </div>
+
+        {currentLimits.maxRows > currentLimits.minRows && (
+          <div className="wall-size-stepper">
+            <span className="wall-size-axis" title="Height in mortise cells">
+              H
+            </span>
+            <button
+              type="button"
+              className="wall-size-step-btn"
+              aria-label={`Make ${activeLabel} 1 cell shorter`}
+              disabled={currentSize.rows <= currentLimits.minRows}
+              onClick={() => adjustToolSize(activeTool, 'rows', -1)}
+            >
+              −
+            </button>
+            <span className="wall-size-val" aria-live="polite">
+              {currentSize.rows}
+            </span>
+            <button
+              type="button"
+              className="wall-size-step-btn"
+              aria-label={`Make ${activeLabel} 1 cell taller`}
+              disabled={currentSize.rows >= currentLimits.maxRows}
+              onClick={() => adjustToolSize(activeTool, 'rows', 1)}
+            >
+              +
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="mortise-actions">

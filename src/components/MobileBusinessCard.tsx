@@ -152,6 +152,7 @@ export const MobileBusinessCard: React.FC = () => {
         heroSelector="#card-main-stack"
         headerSelector=""
         footerSelector="#card-footer"
+        interactive={false}
       />
       <div className="mortise-page-shell min-h-screen text-black font-nexa antialiased flex flex-col p-4 sm:p-6">
         <div className="flex-1 flex flex-col justify-center py-6">

@@ -102,6 +102,17 @@ body.wall-slot-hover {
   cursor: pointer;
 }
 
+body.wall-piece-hover {
+  cursor: grab;
+}
+
+body.wall-dragging,
+body.wall-dragging * {
+  cursor: grabbing !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+
 .mortise-wall-canvas {
   position: fixed;
   inset: 0;
@@ -190,6 +201,91 @@ body.wall-slot-hover {
   flex-shrink: 0;
 }
 
+.wall-tool-size {
+  font-family: 'Space Mono', monospace;
+  font-size: 0.60rem;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  opacity: 0.72;
+  margin-left: 1px;
+}
+
+.wall-tool-btn[aria-pressed="true"] .wall-tool-size {
+  opacity: 1;
+  font-weight: 700;
+}
+
+/* Compact Inline Width & Height Cell Variance Steppers */
+.wall-size-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.wall-size-stepper {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  border: 1.5px solid var(--cg-black);
+  border-radius: 6px;
+  background-color: var(--cg-white);
+  overflow: hidden;
+}
+
+.wall-size-axis {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 0 7px;
+  background-color: var(--cg-black);
+  color: var(--cg-white);
+  font-size: 0.62rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  user-select: none;
+}
+
+.wall-size-step-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 100%;
+  background: transparent;
+  border: 0;
+  color: var(--cg-black);
+  font-size: 0.82rem;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.wall-size-step-btn:hover:not(:disabled) {
+  background-color: var(--cg-orange);
+  color: var(--cg-black);
+}
+
+.wall-size-step-btn:disabled {
+  color: var(--cg-gray);
+  cursor: not-allowed;
+}
+
+.wall-size-val {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 100%;
+  font-family: 'Space Mono', monospace;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--cg-black);
+  user-select: none;
+}
+
 .mortise-actions {
   display: inline-flex;
   align-items: center;
@@ -214,4 +310,5 @@ body.wall-slot-hover {
 .text-action-link:hover {
   border-bottom-color: var(--cg-black);
 }
+
 
