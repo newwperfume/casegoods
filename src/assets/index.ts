@@ -1,5 +1,7 @@
 // Centralized High-Resolution Brand & Project Assets
-const logoFull = '/assets/aistudio/CASEGOODS_LOGO_FINAL6.png';
+const logoFull = '/assets/casegoods_logo_1560.png';
+const logoFullSrcSet =
+  '/assets/casegoods_logo_800.png 800w, /assets/casegoods_logo_1560.png 1560w, /assets/casegoods_logo_2340.png 2340w';
 import logoMark from './logo_mark.png';
 const brandIconsBc = '/assets/aistudio/LOGO_4_IMAGES.png';
 const brandIconsPdf = '/assets/aistudio/LOGO_4_IMAGES.png';
@@ -21,6 +23,7 @@ import cadKidsKitchenSection from './cad_1070MCG_section.png';
 export const ASSETS = {
   brand: {
     logoFull,
+    logoFullSrcSet,
     logoMark,
     brandIconsBc,
     brandIconsPdf,

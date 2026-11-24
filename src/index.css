@@ -134,33 +134,34 @@ body.wall-dragging * {
   pointer-events: auto;
 }
 
-/* Compact Bauhaus Wall Control Strip */
+/* Frameless Bauhaus Wall Control Strip — Single Line, Flush with Bubbles Above */
 .wall-toolbar {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   justify-content: space-between;
-  gap: 10px 14px;
-  padding: 9px 12px;
-  background-color: rgba(255, 255, 255, 0.94);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
-  border: 1.5px solid var(--cg-black);
-  border-radius: var(--radius-cg);
+  gap: 14px;
+  width: 100%;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
 }
 
 .wall-tool-group {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  flex-shrink: 0;
+  gap: 8px;
 }
 
 .wall-tool-btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 7px;
-  height: 32px;
-  padding: 0 11px;
+  height: 34px;
+  padding: 0 12px;
   border: 1.5px solid var(--cg-gray);
   border-radius: 6px;
   background-color: #eadbc4;
@@ -195,15 +196,15 @@ body.wall-dragging * {
 }
 
 .wall-tool-icon {
-  width: 16px;
-  height: 16px;
+  width: 15px;
+  height: 15px;
   display: block;
   flex-shrink: 0;
 }
 
 .wall-tool-size {
   font-family: 'Space Mono', monospace;
-  font-size: 0.60rem;
+  font-size: 0.6rem;
   font-weight: 400;
   letter-spacing: 0.02em;
   opacity: 0.72;
@@ -215,17 +216,31 @@ body.wall-dragging * {
   font-weight: 700;
 }
 
+/* Right-hand controls kept cleanly on the same single line, flush right */
+.wall-controls-panel {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0;
+}
+
 /* Compact Inline Width & Height Cell Variance Steppers */
 .wall-size-controls {
   display: inline-flex;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 6px;
+  flex-shrink: 0;
 }
 
 .wall-size-stepper {
   display: inline-flex;
   align-items: center;
-  height: 32px;
+  height: 34px;
   border: 1.5px solid var(--cg-black);
   border-radius: 6px;
   background-color: var(--cg-white);
@@ -251,12 +266,12 @@ body.wall-dragging * {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
+  width: 22px;
   height: 100%;
   background: transparent;
   border: 0;
   color: var(--cg-black);
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   font-weight: 500;
   line-height: 1;
   cursor: pointer;
@@ -277,7 +292,7 @@ body.wall-dragging * {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 18px;
+  min-width: 17px;
   height: 100%;
   font-family: 'Space Mono', monospace;
   font-size: 0.68rem;
@@ -288,19 +303,22 @@ body.wall-dragging * {
 
 .mortise-actions {
   display: inline-flex;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 12px;
+  flex-shrink: 0;
+  margin-left: auto;
 }
 
 .text-action-link {
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   font-weight: 500;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--cg-black);
   background: none;
   border: 0;
-  padding: 3px 2px;
+  padding: 3px 0;
   border-bottom: 1px solid transparent;
   cursor: pointer;
   transition: border-color 140ms ease;
@@ -311,71 +329,83 @@ body.wall-dragging * {
   border-bottom-color: var(--cg-black);
 }
 
-/* Compact 430px Variant — Flush with Business Card Email & Website Buttons */
+/* Compact 430px Variant — Frameless & Rescaled Flush with Email & Website Buttons Above */
 .wall-toolbar--compact {
+  flex-direction: column;
+  align-items: stretch;
   width: 100%;
-  padding: 8px 10px;
-  gap: 8px 10px;
+  padding: 0;
+  gap: 8px;
+  background: transparent;
+  border: 0;
 }
 
 .wall-toolbar--compact .wall-tool-group {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   width: 100%;
-  gap: 6px;
+  gap: 8px;
 }
 
 .wall-toolbar--compact .wall-tool-btn {
   width: 100%;
   justify-content: center;
-  height: 30px;
+  height: 34px;
   padding: 0 6px;
-  gap: 4px;
-  font-size: 0.60rem;
-  letter-spacing: 0.05em;
+  gap: 5px;
+  font-size: 0.62rem;
+  letter-spacing: 0.06em;
 }
 
 .wall-toolbar--compact .wall-tool-icon {
-  width: 13px;
-  height: 13px;
+  width: 14px;
+  height: 14px;
 }
 
 .wall-toolbar--compact .wall-tool-size {
-  font-size: 0.56rem;
+  font-size: 0.58rem;
   margin-left: 0;
 }
 
+.wall-toolbar--compact .wall-controls-panel {
+  width: 100%;
+  padding: 0;
+  gap: 8px;
+}
+
 .wall-toolbar--compact .wall-size-controls {
-  gap: 5px;
+  gap: 6px;
 }
 
 .wall-toolbar--compact .wall-size-stepper {
-  height: 28px;
+  height: 32px;
 }
 
 .wall-toolbar--compact .wall-size-axis {
-  padding: 0 6px;
-  font-size: 0.58rem;
+  padding: 0 7px;
+  font-size: 0.6rem;
 }
 
 .wall-toolbar--compact .wall-size-step-btn {
-  width: 21px;
-  font-size: 0.78rem;
+  width: 22px;
+  font-size: 0.8rem;
 }
 
 .wall-toolbar--compact .wall-size-val {
-  min-width: 16px;
-  font-size: 0.64rem;
+  min-width: 17px;
+  font-size: 0.66rem;
 }
 
 .wall-toolbar--compact .mortise-actions {
-  gap: 10px;
+  gap: 12px;
   margin-left: auto;
 }
 
 .wall-toolbar--compact .text-action-link {
-  font-size: 0.64rem;
-  letter-spacing: 0.08em;
+  font-size: 0.66rem;
+  letter-spacing: 0.09em;
 }
+
+
 
 

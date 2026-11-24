@@ -707,639 +707,642 @@ Concept Image Link: ${imageLink}`;
 
   return (
     <div>
-      {/* Standalone Section Title Block Bar — Bauhaus Orange (#EF6922) + Black Ink */}
-      <div
-        className={`w-full ${headerBarBg} border-[1.5px] border-black rounded-[9px] px-5 py-3 mb-3.5 flex flex-wrap items-center justify-between gap-2 select-none`}
-      >
-        <span className="text-[0.80rem] sm:text-[0.86rem] tracking-cad uppercase font-medium">
-          06 / CUSTOM CONCEPT VISUALIZER — TEST YOUR CUSTOM BUILD IDEA IN 3D RENDER OR 2D CAD
-        </span>
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-          <span className="hidden sm:inline text-[0.70rem] tracking-cad uppercase font-medium">
-            DWG-CG-006
+      {/* Unified Main Framed Concept Studio Container with Incorporated Bauhaus Orange Header */}
+      <div className="w-full bg-white border-[1.5px] border-black rounded-[9px] overflow-hidden">
+        {/* Incorporated Section Title Block Bar — Bauhaus Orange (#EF6922) + Black Ink */}
+        <div
+          className={`w-full ${headerBarBg} border-b-[1.5px] border-black px-5 py-3 flex flex-wrap items-center justify-between gap-2 select-none`}
+        >
+          <span className="text-[0.80rem] sm:text-[0.86rem] tracking-cad uppercase font-medium">
+            06 / CUSTOM CONCEPT VISUALIZER — TEST YOUR CUSTOM BUILD IDEA IN 3D RENDER OR 2D CAD
           </span>
-          {user ? (
-            <button
-              type="button"
-              onClick={() => signOutUser()}
-              className="bg-black text-white hover:bg-white hover:text-black border border-black rounded-[9px] px-3 py-1 text-[0.66rem] tracking-cad uppercase font-medium transition-colors cursor-pointer"
-              title="Sign out of your account"
-            >
-              {user.displayName || user.email || 'SIGNED IN'} · SIGN OUT
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => signInWithGoogle()}
-              className="bg-[#FDCB33] hover:bg-black text-black hover:text-white border border-black rounded-[9px] px-3 py-1 text-[0.66rem] tracking-cad uppercase font-medium transition-colors cursor-pointer"
-              title="Sign in with Google to link your saved concepts to your account"
-            >
-              GOOGLE SIGN IN
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => setShowArchiveModal(true)}
-            className="bg-white hover:bg-black text-black hover:text-white border border-black rounded-[9px] px-3 py-1 text-[0.66rem] tracking-cad uppercase font-medium transition-colors cursor-pointer inline-flex items-center gap-1.5"
-            title="View all customer concepts generated through this visualizer"
-          >
-            <FolderOpen className="w-3.5 h-3.5" />
-            <span>STUDIO CONCEPT LOG</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Main Framed Concept Studio Container */}
-      <div className="w-full bg-white border-[1.5px] border-black rounded-[9px] p-5 sm:p-7 space-y-6">
-        {/* Top Row: Lead Instructions + Output Style Switcher (3D Realistic Rendering vs 2D Elevation Sketch) */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-black pb-5">
-          <div className="text-left space-y-1">
-            <p className="text-[0.72rem] tracking-cad uppercase font-medium text-black">
-              DESCRIBE A PIECE OR UPLOAD A ROOM PHOTO / HAND SKETCH
-            </p>
-            <p className="text-[0.90rem] font-light text-black max-w-[68ch]">
-              Choose a basic starter idea or write your own, pick your primary timber, design
-              style, and added cabinetry details, and generate a visual concept that is shared with Josh.
-            </p>
-          </div>
-
-          {/* Visual Representation Mode Toggle */}
-          <div
-            className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 shrink-0"
-            role="group"
-            aria-label="Visual Output Style"
-          >
-            <button
-              type="button"
-              onClick={() =>
-                onChangeState((prev) => ({ ...prev, visualStyle: 'render-3d' }))
-              }
-              className={`py-2.5 px-4 rounded-[9px] border border-black text-[0.72rem] tracking-cad uppercase transition-colors cursor-pointer flex items-center justify-center gap-2.5 whitespace-nowrap ${
-                state.visualStyle === 'render-3d'
-                  ? 'bg-[#EF6922] text-black font-medium'
-                  : 'bg-white text-black hover:bg-[#CBCBCB] font-normal'
-              }`}
-            >
-              <ProcessedCubeIcon
-                src="/assets/aistudio/IMG_4823_b2889f31.JPG"
-                className="w-4 h-4 object-contain shrink-0"
-              />
-              <span>3D REALISTIC RENDERING</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() =>
-                onChangeState((prev) => ({ ...prev, visualStyle: 'cad-2d' }))
-              }
-              className={`py-2.5 px-4 rounded-[9px] border border-black text-[0.72rem] tracking-cad uppercase transition-colors cursor-pointer flex items-center justify-center gap-2.5 whitespace-nowrap ${
-                state.visualStyle === 'cad-2d'
-                  ? 'bg-[#FDCB33] text-black font-medium'
-                  : 'bg-white text-black hover:bg-[#CBCBCB] font-normal'
-              }`}
-            >
-              <img
-                src="/assets/aistudio/Asset-1_70446043.png"
-                alt=""
-                className="w-4 h-4 object-contain shrink-0"
-              />
-              <span>2D ELEVATION SKETCH</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Full-Width Customization Workbench + Full-Width Concept Preview Stage Below */}
-        <div className="w-full space-y-5 text-left">
-          {/* Row 1: 4 Basic Quick Concept Templates (Full-Width 4-Column Strip) */}
-          <div className="space-y-2">
-            <span className="block text-[0.68rem] tracking-cad uppercase font-medium text-black">
-              QUICK CONCEPT TEMPLATES (4 BASIC STARTING IDEAS):
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <span className="hidden sm:inline text-[0.70rem] tracking-cad uppercase font-medium">
+              DWG-CG-006
             </span>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              {QUICK_IDEA_PRESETS.map((preset) => (
-                <button
-                  key={preset.label}
-                  type="button"
-                  onClick={() =>
-                    onChangeState((prev) => ({
-                      ...prev,
-                      ideaPrompt: preset.prompt,
-                      woodSpecies: preset.wood,
-                      designStyle: preset.style,
-                      addedDetails: preset.details,
-                    }))
-                  }
-                  className="py-2.5 px-3.5 rounded-[9px] border border-black bg-white hover:bg-[#EF6922] text-black text-[0.70rem] tracking-cad uppercase font-medium text-left transition-colors cursor-pointer truncate"
-                >
-                  {preset.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Row 2: 01 / Custom Idea Prompt Input (Full Width) */}
-          <div className="space-y-2">
-            <label
-              htmlFor={`visualizer-prompt-${placement}`}
-              className="block bg-[#CBCBCB] text-black border border-black rounded-[9px] py-2 px-3.5 text-[0.70rem] tracking-cad uppercase font-medium cursor-pointer"
-            >
-              01 / DESCRIBE YOUR CUSTOM PIECE, BUILT-IN OR DIMENSIONS *
-            </label>
-            <textarea
-              id={`visualizer-prompt-${placement}`}
-              rows={3}
-              value={state.ideaPrompt}
-              onChange={(e) =>
-                onChangeState((prev) => ({ ...prev, ideaPrompt: e.target.value }))
-              }
-              placeholder="Describe what you want to build (e.g., a dining table, built-in bookcase, media console, desk, or custom bar)..."
-              className="w-full bg-white text-black text-[0.90rem] p-3.5 rounded-[9px] border border-black font-light focus:outline-none focus:bg-[#FDCB33]/10 placeholder:text-black/45 leading-relaxed resize-y"
-            />
-          </div>
-
-          {/* Row 3: 2-Column Bauhaus Selectors (02 Primary Timber with Swatch · 03 Design Style) */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* 02 / PRIMARY TIMBER */}
-            <div className="space-y-2">
-              <label
-                htmlFor={`visualizer-wood-${placement}`}
-                className="flex items-center justify-between gap-2 bg-[#27AAE0] text-black border border-black rounded-[9px] py-2 px-3.5 text-[0.70rem] tracking-cad uppercase font-medium cursor-pointer"
-              >
-                <span>02 / PRIMARY TIMBER</span>
-                {WOOD_SWATCH_META[state.woodSpecies] && (
-                  <span className="inline-flex items-center gap-1.5 text-[0.62rem] tracking-normal normal-case font-medium bg-white/90 px-2 py-0.5 rounded-[5px] border border-black">
-                    <span
-                      className="w-2.5 h-2.5 rounded-full border border-black shrink-0"
-                      style={{ backgroundColor: WOOD_SWATCH_META[state.woodSpecies].color }}
-                    />
-                    <span>{WOOD_SWATCH_META[state.woodSpecies].hint}</span>
-                  </span>
-                )}
-              </label>
-              <select
-                id={`visualizer-wood-${placement}`}
-                value={state.woodSpecies}
-                onChange={(e) =>
-                  onChangeState((prev) => ({ ...prev, woodSpecies: e.target.value }))
-                }
-                className="w-full h-[44px] bg-white text-black text-[0.86rem] px-3 rounded-[9px] border border-black font-normal focus:outline-none cursor-pointer"
-              >
-                {WOOD_OPTIONS.map((wood) => (
-                  <option key={wood} value={wood}>
-                    {wood === 'Something Exotic'
-                      ? 'Something Exotic (Enter Own Text)'
-                      : wood}
-                  </option>
-                ))}
-              </select>
-
-              {state.woodSpecies === 'Something Exotic' && (
-                <input
-                  type="text"
-                  value={state.customWoodText}
-                  onChange={(e) =>
-                    onChangeState((prev) => ({ ...prev, customWoodText: e.target.value }))
-                  }
-                  placeholder="Enter exotic wood or custom material..."
-                  className="w-full h-[42px] bg-white text-black text-[0.86rem] px-3.5 rounded-[9px] border-[0.75px] border-black font-light focus:outline-none focus:bg-[#27AAE0]/10 placeholder:text-black/45"
-                />
-              )}
-            </div>
-
-            {/* 03 / DESIGN STYLE */}
-            <div className="space-y-2">
-              <label
-                htmlFor={`visualizer-style-${placement}`}
-                className="block bg-[#FDCB33] text-black border border-black rounded-[9px] py-2 px-3.5 text-[0.70rem] tracking-cad uppercase font-medium cursor-pointer"
-              >
-                03 / DESIGN STYLE
-              </label>
-              <select
-                id={`visualizer-style-${placement}`}
-                value={state.designStyle}
-                onChange={(e) =>
-                  onChangeState((prev) => ({ ...prev, designStyle: e.target.value }))
-                }
-                className="w-full h-[44px] bg-white text-black text-[0.86rem] px-3 rounded-[9px] border border-black font-normal focus:outline-none cursor-pointer"
-              >
-                {DESIGN_STYLE_OPTIONS.map((styleOpt) => (
-                  <option key={styleOpt} value={styleOpt}>
-                    {styleOpt === 'Custom Style'
-                      ? 'Custom Style (Enter Own Text)'
-                      : styleOpt}
-                  </option>
-                ))}
-              </select>
-
-              {state.designStyle === 'Custom Style' && (
-                <input
-                  type="text"
-                  value={state.customStyleText}
-                  onChange={(e) =>
-                    onChangeState((prev) => ({ ...prev, customStyleText: e.target.value }))
-                  }
-                  placeholder="Describe your preferred design style..."
-                  className="w-full h-[42px] bg-white text-black text-[0.86rem] px-3.5 rounded-[9px] border-[0.75px] border-black font-light focus:outline-none focus:bg-[#FDCB33]/10 placeholder:text-black/45"
-                />
-              )}
-            </div>
-          </div>
-
-          {/* Row 3B: Full-Width Multi-Select 04 / ADDED DETAILS (Pick up to 3 compatible details) */}
-          <div className="space-y-2">
-            <div className="flex flex-wrap items-center justify-between gap-2 bg-[#EF6922] text-black border border-black rounded-[9px] py-2 px-3.5 text-[0.70rem] tracking-cad uppercase font-medium select-none">
-              <span>04 / ADDED DETAILS — PICK UP TO {MAX_SELECTED_DETAILS}</span>
-              <span className="bg-white text-black border border-black rounded-[5px] px-2 py-0.5 text-[0.62rem]">
-                {selectedDetailsList.length} / {MAX_SELECTED_DETAILS} SELECTED
-              </span>
-            </div>
-
-            <div
-              className="flex flex-wrap gap-2 p-3 rounded-[9px] border border-black bg-white"
-              role="group"
-              aria-label="Added cabinetry and joinery details"
-            >
-              {ADDED_DETAILS_OPTIONS.map((detailOpt) => {
-                const isSelected = selectedDetailsList.includes(detailOpt);
-                return (
-                  <button
-                    key={detailOpt}
-                    type="button"
-                    aria-pressed={isSelected}
-                    onClick={() => toggleAddedDetail(detailOpt)}
-                    className={`px-3 py-1.5 rounded-[7px] border border-black text-[0.76rem] transition-colors cursor-pointer inline-flex items-center gap-1.5 ${
-                      isSelected
-                        ? 'bg-[#EF6922] text-black font-medium shadow-[2px_2px_0_#000]'
-                        : 'bg-white text-black hover:bg-[#CBCBCB]/60 font-light'
-                    }`}
-                  >
-                    {isSelected && <Check className="w-3.5 h-3.5 shrink-0" />}
-                    <span>{detailOpt}</span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {hasCustomDetailSelected && (
-              <input
-                type="text"
-                value={state.customDetailsText}
-                onChange={(e) =>
-                  onChangeState((prev) => ({ ...prev, customDetailsText: e.target.value }))
-                }
-                placeholder="Enter custom door, drawer, hardware, or joinery details..."
-                className="w-full h-[42px] bg-white text-black text-[0.86rem] px-3.5 rounded-[9px] border-[0.75px] border-black font-light focus:outline-none focus:bg-[#EF6922]/10 placeholder:text-black/45"
-              />
-            )}
-          </div>
-
-          {/* Row 4: 05 / Room Photo or Sketch Upload (Full Width) */}
-          <div className="space-y-2">
-            <label
-              htmlFor={`visualizer-photo-${placement}`}
-              className="block bg-[#CBCBCB] text-black border border-black rounded-[9px] py-2 px-3.5 text-[0.70rem] tracking-cad uppercase font-medium cursor-pointer"
-            >
-              05 / UPLOAD ROOM PHOTO OR HAND SKETCH (OPTIONAL)
-            </label>
-            <input
-              id={`visualizer-photo-${placement}`}
-              ref={photoInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handlePhotoUpload}
-              className="hidden"
-            />
-
-            {!state.uploadedPhoto ? (
+            {user ? (
               <button
                 type="button"
-                onClick={() => photoInputRef.current?.click()}
-                className="w-full py-2.5 px-4 rounded-[9px] border border-black bg-white hover:bg-[#CBCBCB] text-[0.82rem] text-black flex items-center justify-center gap-2 transition-colors cursor-pointer font-normal"
+                onClick={() => signOutUser()}
+                className="bg-black text-white hover:bg-white hover:text-black border border-black rounded-[9px] px-3 py-1 text-[0.66rem] tracking-cad uppercase font-medium transition-colors cursor-pointer"
+                title="Sign out of your account"
               >
-                <Upload className="w-4 h-4 text-black shrink-0" />
-                <span>Upload a photo of your wall/alcove or a rough sketch</span>
+                {user.displayName || user.email || 'SIGNED IN'} · SIGN OUT
               </button>
             ) : (
-              <div className="flex items-center justify-between gap-3 p-2.5 rounded-[9px] border border-black bg-[#FDCB33]/20">
-                <div className="flex items-center gap-3 min-w-0">
-                  <img
-                    src={state.uploadedPhoto.dataUrl}
-                    alt={state.uploadedPhoto.name}
-                    className="w-12 h-12 rounded-[6px] border-[0.75px] border-black object-cover shrink-0 bg-white"
-                  />
-                  <div className="min-w-0">
-                    <p className="text-[0.72rem] tracking-cad uppercase font-medium text-black truncate">
-                      {state.uploadedPhoto.name}
-                    </p>
-                    <p className="text-[0.76rem] font-light text-black">
-                      Will visualize piece inside this photo / sketch
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleClearPhoto}
-                  className="p-2 rounded-[9px] border-[0.75px] border-black bg-white hover:bg-[#EF6922] text-black transition-colors cursor-pointer shrink-0"
-                  aria-label="Remove uploaded room photo"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => signInWithGoogle()}
+                className="bg-[#FDCB33] hover:bg-black text-black hover:text-white border border-black rounded-[9px] px-3 py-1 text-[0.66rem] tracking-cad uppercase font-medium transition-colors cursor-pointer"
+                title="Sign in with Google to link your saved concepts to your account"
+              >
+                GOOGLE SIGN IN
+              </button>
             )}
+            <button
+              type="button"
+              onClick={() => setShowArchiveModal(true)}
+              className="bg-white hover:bg-black text-black hover:text-white border border-black rounded-[9px] px-3 py-1 text-[0.66rem] tracking-cad uppercase font-medium transition-colors cursor-pointer inline-flex items-center gap-1.5"
+              title="View all customer concepts generated through this visualizer"
+            >
+              <FolderOpen className="w-3.5 h-3.5" />
+              <span>STUDIO CONCEPT LOG</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Inner Sheet Body */}
+        <div className="p-5 sm:p-7 space-y-6">
+          {/* Top Row: Lead Instructions + Output Style Switcher (3D Realistic Rendering vs 2D Elevation Sketch) */}
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-black/20 pb-5">
+            <div className="text-left space-y-1">
+              <p className="text-[0.72rem] tracking-cad uppercase font-medium text-black">
+                DESCRIBE A PIECE OR UPLOAD A ROOM PHOTO / HAND SKETCH
+              </p>
+              <p className="text-[0.90rem] font-light text-black max-w-[68ch]">
+                Choose a basic starter idea or write your own, pick your primary timber, design
+                style, and added cabinetry details, and generate a visual concept that is shared with Josh.
+              </p>
+            </div>
+
+            {/* Visual Representation Mode Toggle */}
+            <div
+              className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 shrink-0"
+              role="group"
+              aria-label="Visual Output Style"
+            >
+              <button
+                type="button"
+                onClick={() =>
+                  onChangeState((prev) => ({ ...prev, visualStyle: 'render-3d' }))
+                }
+                className={`py-2.5 px-4 rounded-[9px] border border-black text-[0.72rem] tracking-cad uppercase transition-colors cursor-pointer flex items-center justify-center gap-2.5 whitespace-nowrap ${
+                  state.visualStyle === 'render-3d'
+                    ? 'bg-[#EF6922] text-black font-medium'
+                    : 'bg-white text-black hover:bg-[#CBCBCB] font-normal'
+                }`}
+              >
+                <ProcessedCubeIcon
+                  src="/assets/aistudio/IMG_4823_b2889f31.JPG"
+                  className="w-4 h-4 object-contain shrink-0"
+                />
+                <span>3D REALISTIC RENDERING</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  onChangeState((prev) => ({ ...prev, visualStyle: 'cad-2d' }))
+                }
+                className={`py-2.5 px-4 rounded-[9px] border border-black text-[0.72rem] tracking-cad uppercase transition-colors cursor-pointer flex items-center justify-center gap-2.5 whitespace-nowrap ${
+                  state.visualStyle === 'cad-2d'
+                    ? 'bg-[#FDCB33] text-black font-medium'
+                    : 'bg-white text-black hover:bg-[#CBCBCB] font-normal'
+                }`}
+              >
+                <img
+                  src="/assets/aistudio/Asset-1_70446043.png"
+                  alt=""
+                  className="w-4 h-4 object-contain shrink-0"
+                />
+                <span>2D ELEVATION SKETCH</span>
+              </button>
+            </div>
           </div>
 
-          {errorMsg && (
-            <div className="p-3.5 rounded-[9px] border border-black bg-[#EF6922] text-black text-[0.82rem] font-medium">
-              {errorMsg}
-            </div>
-          )}
-
-          {/* Row 5: Full-Width GENERATE CUSTOM CONCEPT Button */}
-          <button
-            type="button"
-            disabled={isGenerating}
-            onClick={() => runGeneration('new')}
-            className={`w-full py-4 px-6 rounded-[9px] border border-black text-[0.80rem] tracking-cad uppercase font-medium transition-colors cursor-pointer flex items-center justify-center gap-2 ${
-              isGenerating
-                ? 'bg-[#CBCBCB] text-black cursor-wait'
-                : 'bg-[#EF6922] text-black hover:bg-black hover:text-white'
-            }`}
-          >
-            {isGenerating ? (
-              <>
-                <RefreshCw className="w-4 h-4 animate-spin" />
-                <span>GENERATING CUSTOM CONCEPT...</span>
-              </>
-            ) : (
-              <span>GENERATE CUSTOM CONCEPT</span>
-            )}
-          </button>
-
-          {/* Row 6: Full-Width Concept Preview Stage (Placed Below the Generator Button) */}
-          <div className="w-full border border-black rounded-[9px] bg-white p-4 sm:p-5 space-y-4">
-            {/* Viewport Header Strip */}
-            <div
-              className={`w-full ${
-                activeConcept?.visualStyle === 'cad-2d'
-                  ? 'bg-[#FDCB33] text-black'
-                  : 'bg-[#27AAE0] text-black'
-              } border-[0.75px] border-black rounded-[9px] px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 text-[0.70rem] tracking-cad uppercase font-medium`}
-            >
-              <span>
-                {activeConcept
-                  ? activeConcept.visualStyle === 'cad-2d'
-                    ? 'GENERATED SHEET · 2D ELEVATION SKETCH'
-                    : 'GENERATED SHEET · 3D REALISTIC RENDERING'
-                  : 'CONCEPT PREVIEW STAGE · 16:9 SHEET'}
+          {/* Full-Width Customization Workbench + Full-Width Concept Preview Stage Below */}
+          <div className="w-full space-y-5 text-left">
+            {/* Row 1: 4 Basic Quick Concept Templates (Full-Width 4-Column Strip) */}
+            <div className="space-y-2">
+              <span className="block text-[0.68rem] tracking-cad uppercase font-medium text-black">
+                QUICK CONCEPT TEMPLATES (4 BASIC STARTING IDEAS):
               </span>
-              <span>
-                {activeConcept
-                  ? `SAVED & SENT TO STUDIO (${activeConcept.timestamp})`
-                  : 'READY TO GENERATE'}
-              </span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                {QUICK_IDEA_PRESETS.map((preset) => (
+                  <button
+                    key={preset.label}
+                    type="button"
+                    onClick={() =>
+                      onChangeState((prev) => ({
+                        ...prev,
+                        ideaPrompt: preset.prompt,
+                        woodSpecies: preset.wood,
+                        designStyle: preset.style,
+                        addedDetails: preset.details,
+                      }))
+                    }
+                    className="py-2.5 px-3.5 rounded-[9px] border border-black bg-white hover:bg-[#EF6922] text-black text-[0.70rem] tracking-cad uppercase font-medium text-left transition-colors cursor-pointer truncate"
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            {/* Full-Width Visual Canvas */}
-            <div className="w-full cad-grid-bg border-[0.75px] border-black rounded-[9px] overflow-hidden min-h-[320px] sm:min-h-[440px] flex items-center justify-center relative">
-              {isGenerating ? (
-                <div className="p-8 text-center space-y-3">
-                  <div className="w-12 h-12 mx-auto rounded-[9px] border-[0.75px] border-black bg-[#EF6922] flex items-center justify-center animate-pulse">
-                    <RefreshCw className="w-5 h-5 text-black animate-spin" />
-                  </div>
-                  <p className="text-[0.76rem] tracking-cad uppercase font-medium text-black">
-                    ENGINEERING CUSTOM CONCEPT SHEET...
-                  </p>
-                  <p className="text-[0.84rem] font-light text-black max-w-md mx-auto">
-                    Applying {resolvedWoodSpecies}, {resolvedDesignStyle} &amp;{' '}
-                    {resolvedAddedDetails} in{' '}
-                    {state.visualStyle === 'cad-2d'
-                      ? '2D elevation sketch format'
-                      : '3D realistic rendering format'}
-                    .
-                  </p>
-                </div>
-              ) : activeConcept ? (
-                <div className="w-full h-full relative group p-2 sm:p-4">
-                  <img
-                    src={activeConcept.imageUrl}
-                    alt={activeConcept.summarySpec}
-                    onClick={() => setFullscreenConcept(activeConcept)}
-                    className="w-full max-h-[540px] object-contain cursor-zoom-in select-none mx-auto"
+            {/* Row 2: 01 / Custom Idea Prompt Input (Unified Flush-Header Card) */}
+            <div className="border border-black rounded-[9px] bg-white overflow-hidden flex flex-col">
+              <label
+                htmlFor={`visualizer-prompt-${placement}`}
+                className="block bg-[#CBCBCB] text-black border-b border-black py-2 px-3.5 text-[0.70rem] tracking-cad uppercase font-medium cursor-pointer"
+              >
+                01 / DESCRIBE YOUR CUSTOM PIECE, BUILT-IN OR DIMENSIONS *
+              </label>
+              <textarea
+                id={`visualizer-prompt-${placement}`}
+                rows={3}
+                value={state.ideaPrompt}
+                onChange={(e) =>
+                  onChangeState((prev) => ({ ...prev, ideaPrompt: e.target.value }))
+                }
+                placeholder="Describe what you want to build (e.g., a dining table, built-in bookcase, media console, desk, or custom bar)..."
+                className="w-full bg-white text-black text-[0.90rem] p-3.5 font-light focus:outline-none focus:bg-[#FDCB33]/10 placeholder:text-black/45 leading-relaxed resize-y"
+              />
+            </div>
+
+            {/* Row 3: 2-Column Bauhaus Selectors (02 Primary Timber with Swatch · 03 Design Style) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+              {/* 02 / PRIMARY TIMBER */}
+              <div className="border border-black rounded-[9px] bg-white overflow-hidden flex flex-col">
+                <label
+                  htmlFor={`visualizer-wood-${placement}`}
+                  className="flex items-center justify-between gap-2 bg-[#27AAE0] text-black border-b border-black py-2 px-3.5 text-[0.70rem] tracking-cad uppercase font-medium cursor-pointer"
+                >
+                  <span>02 / PRIMARY TIMBER</span>
+                  {WOOD_SWATCH_META[state.woodSpecies] && (
+                    <span className="inline-flex items-center gap-1.5 text-[0.62rem] tracking-normal normal-case font-medium bg-white/90 px-2 py-0.5 rounded-[5px] border border-black">
+                      <span
+                        className="w-2.5 h-2.5 rounded-full border border-black shrink-0"
+                        style={{ backgroundColor: WOOD_SWATCH_META[state.woodSpecies].color }}
+                      />
+                      <span>{WOOD_SWATCH_META[state.woodSpecies].hint}</span>
+                    </span>
+                  )}
+                </label>
+                <select
+                  id={`visualizer-wood-${placement}`}
+                  value={state.woodSpecies}
+                  onChange={(e) =>
+                    onChangeState((prev) => ({ ...prev, woodSpecies: e.target.value }))
+                  }
+                  className="w-full h-[44px] bg-white text-black text-[0.86rem] px-3 font-normal focus:outline-none cursor-pointer"
+                >
+                  {WOOD_OPTIONS.map((wood) => (
+                    <option key={wood} value={wood}>
+                      {wood === 'Something Exotic'
+                        ? 'Something Exotic (Enter Own Text)'
+                        : wood}
+                    </option>
+                  ))}
+                </select>
+
+                {state.woodSpecies === 'Something Exotic' && (
+                  <input
+                    type="text"
+                    value={state.customWoodText}
+                    onChange={(e) =>
+                      onChangeState((prev) => ({ ...prev, customWoodText: e.target.value }))
+                    }
+                    placeholder="Enter exotic wood or custom material..."
+                    className="w-full h-[42px] bg-white text-black text-[0.86rem] px-3.5 border-t border-black/20 font-light focus:outline-none focus:bg-[#27AAE0]/10 placeholder:text-black/45"
                   />
-                  <div className="absolute bottom-4 right-4 flex items-center gap-2">
+                )}
+              </div>
+
+              {/* 03 / DESIGN STYLE */}
+              <div className="border border-black rounded-[9px] bg-white overflow-hidden flex flex-col">
+                <label
+                  htmlFor={`visualizer-style-${placement}`}
+                  className="block bg-[#FDCB33] text-black border-b border-black py-2 px-3.5 text-[0.70rem] tracking-cad uppercase font-medium cursor-pointer"
+                >
+                  03 / DESIGN STYLE
+                </label>
+                <select
+                  id={`visualizer-style-${placement}`}
+                  value={state.designStyle}
+                  onChange={(e) =>
+                    onChangeState((prev) => ({ ...prev, designStyle: e.target.value }))
+                  }
+                  className="w-full h-[44px] bg-white text-black text-[0.86rem] px-3 font-normal focus:outline-none cursor-pointer"
+                >
+                  {DESIGN_STYLE_OPTIONS.map((styleOpt) => (
+                    <option key={styleOpt} value={styleOpt}>
+                      {styleOpt === 'Custom Style'
+                        ? 'Custom Style (Enter Own Text)'
+                        : styleOpt}
+                    </option>
+                  ))}
+                </select>
+
+                {state.designStyle === 'Custom Style' && (
+                  <input
+                    type="text"
+                    value={state.customStyleText}
+                    onChange={(e) =>
+                      onChangeState((prev) => ({ ...prev, customStyleText: e.target.value }))
+                    }
+                    placeholder="Describe your preferred design style..."
+                    className="w-full h-[42px] bg-white text-black text-[0.86rem] px-3.5 border-t border-black/20 font-light focus:outline-none focus:bg-[#FDCB33]/10 placeholder:text-black/45"
+                  />
+                )}
+              </div>
+            </div>
+
+            {/* Row 3B: Full-Width Multi-Select 04 / ADDED DETAILS (Unified Flush-Header Card) */}
+            <div className="border border-black rounded-[9px] bg-white overflow-hidden">
+              <div className="flex flex-wrap items-center justify-between gap-2 bg-[#EF6922] text-black border-b border-black py-2 px-3.5 text-[0.70rem] tracking-cad uppercase font-medium select-none">
+                <span>04 / ADDED DETAILS — PICK UP TO {MAX_SELECTED_DETAILS}</span>
+                <span className="bg-white text-black border border-black rounded-[5px] px-2 py-0.5 text-[0.62rem]">
+                  {selectedDetailsList.length} / {MAX_SELECTED_DETAILS} SELECTED
+                </span>
+              </div>
+
+              <div
+                className="flex flex-wrap gap-2 p-3 bg-white"
+                role="group"
+                aria-label="Added cabinetry and joinery details"
+              >
+                {ADDED_DETAILS_OPTIONS.map((detailOpt) => {
+                  const isSelected = selectedDetailsList.includes(detailOpt);
+                  return (
                     <button
+                      key={detailOpt}
                       type="button"
-                      onClick={() => handleDownloadConcept(activeConcept)}
-                      className="bg-white hover:bg-[#FDCB33] text-black border-[0.75px] border-black rounded-[9px] py-1.5 px-3.5 text-[0.68rem] tracking-cad uppercase font-medium flex items-center gap-1.5 cursor-pointer shadow-sm"
-                      title="Download Concept PNG"
+                      aria-pressed={isSelected}
+                      onClick={() => toggleAddedDetail(detailOpt)}
+                      className={`px-3 py-1.5 rounded-[7px] border border-black text-[0.76rem] transition-colors cursor-pointer inline-flex items-center gap-1.5 ${
+                        isSelected
+                          ? 'bg-[#EF6922] text-black font-medium shadow-[2px_2px_0_#000]'
+                          : 'bg-white text-black hover:bg-[#CBCBCB]/60 font-light'
+                      }`}
                     >
-                      <Download className="w-3.5 h-3.5" />
-                      <span>SAVE PNG</span>
+                      {isSelected && <Check className="w-3.5 h-3.5 shrink-0" />}
+                      <span>{detailOpt}</span>
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => setFullscreenConcept(activeConcept)}
-                      className="bg-black hover:bg-[#EF6922] text-white hover:text-black border-[0.75px] border-black rounded-[9px] py-1.5 px-3.5 text-[0.68rem] tracking-cad uppercase font-medium flex items-center gap-1.5 cursor-pointer shadow-sm"
-                      title="Zoom Fullscreen"
-                    >
-                      <Maximize2 className="w-3.5 h-3.5" />
-                      <span>ZOOM</span>
-                    </button>
-                  </div>
-                </div>
+                  );
+                })}
+              </div>
+
+              {hasCustomDetailSelected && (
+                <input
+                  type="text"
+                  value={state.customDetailsText}
+                  onChange={(e) =>
+                    onChangeState((prev) => ({ ...prev, customDetailsText: e.target.value }))
+                  }
+                  placeholder="Enter custom door, drawer, hardware, or joinery details..."
+                  className="w-full h-[42px] bg-white text-black text-[0.86rem] px-3.5 border-t border-black/20 font-light focus:outline-none focus:bg-[#EF6922]/10 placeholder:text-black/45"
+                />
+              )}
+            </div>
+
+            {/* Row 4: 05 / Room Photo or Sketch Upload (Unified Flush-Header Card) */}
+            <div className="border border-black rounded-[9px] bg-white overflow-hidden">
+              <label
+                htmlFor={`visualizer-photo-${placement}`}
+                className="block bg-[#CBCBCB] text-black border-b border-black py-2 px-3.5 text-[0.70rem] tracking-cad uppercase font-medium cursor-pointer"
+              >
+                05 / UPLOAD ROOM PHOTO OR HAND SKETCH (OPTIONAL)
+              </label>
+              <input
+                id={`visualizer-photo-${placement}`}
+                ref={photoInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handlePhotoUpload}
+                className="hidden"
+              />
+
+              {!state.uploadedPhoto ? (
+                <button
+                  type="button"
+                  onClick={() => photoInputRef.current?.click()}
+                  className="w-full py-3 px-4 bg-white hover:bg-[#CBCBCB] text-[0.82rem] text-black flex items-center justify-center gap-2 transition-colors cursor-pointer font-normal"
+                >
+                  <Upload className="w-4 h-4 text-black shrink-0" />
+                  <span>Upload a photo of your wall/alcove or a rough sketch</span>
+                </button>
               ) : (
-                <div className="p-8 sm:p-12 text-center space-y-3">
-                  <div className="w-11 h-11 mx-auto rounded-[9px] border-[0.75px] border-black bg-white flex items-center justify-center">
-                    <ImageIcon className="w-5 h-5 text-black" />
+                <div className="flex items-center justify-between gap-3 p-3 bg-[#FDCB33]/20">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <img
+                      src={state.uploadedPhoto.dataUrl}
+                      alt={state.uploadedPhoto.name}
+                      className="w-12 h-12 rounded-[6px] border-[0.75px] border-black object-cover shrink-0 bg-white"
+                    />
+                    <div className="min-w-0">
+                      <p className="text-[0.72rem] tracking-cad uppercase font-medium text-black truncate">
+                        {state.uploadedPhoto.name}
+                      </p>
+                      <p className="text-[0.76rem] font-light text-black">
+                        Will visualize piece inside this photo / sketch
+                      </p>
+                    </div>
                   </div>
-                  <p className="text-[0.76rem] tracking-cad uppercase font-medium text-black">
-                    YOUR GENERATED 3D REALISTIC RENDERING OR 2D ELEVATION SKETCH WILL APPEAR HERE
-                  </p>
-                  <p className="text-[0.84rem] font-light text-black max-w-md mx-auto">
-                    Click any of the 4 basic starter ideas above or describe your custom
-                    piece and click GENERATE CUSTOM CONCEPT.
-                  </p>
+                  <button
+                    type="button"
+                    onClick={handleClearPhoto}
+                    className="p-2 rounded-[9px] border-[0.75px] border-black bg-white hover:bg-[#EF6922] text-black transition-colors cursor-pointer shrink-0"
+                    aria-label="Remove uploaded room photo"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
                 </div>
               )}
             </div>
 
-            {/* Active Concept Controls: Automatic Dispatch Notice, Direct SMS/Email to Josh, Refine & Convert */}
-            {activeConcept && (
-              <div className="space-y-3 pt-1 text-left">
-                <div className="bg-[#CBCBCB]/40 border-[0.75px] border-black rounded-[9px] px-3.5 py-2.5 space-y-1">
-                  <div className="flex items-center justify-between gap-2 text-[0.68rem] tracking-cad uppercase font-medium text-black">
-                    <span>✓ LOGGED &amp; DISPATCHED TO JOSH ({OWNER_EMAIL})</span>
-                    {activeConcept.publicPath && (
-                      <a
-                        href={activeConcept.publicPath}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="underline hover:text-[#EF6922]"
+            {errorMsg && (
+              <div className="p-3.5 rounded-[9px] border border-black bg-[#EF6922] text-black text-[0.82rem] font-medium">
+                {errorMsg}
+              </div>
+            )}
+
+            {/* Row 5: Full-Width GENERATE CUSTOM CONCEPT Button */}
+            <button
+              type="button"
+              disabled={isGenerating}
+              onClick={() => runGeneration('new')}
+              className={`w-full py-4 px-6 rounded-[9px] border border-black text-[0.80rem] tracking-cad uppercase font-medium transition-colors cursor-pointer flex items-center justify-center gap-2 ${
+                isGenerating
+                  ? 'bg-[#CBCBCB] text-black cursor-wait'
+                  : 'bg-[#EF6922] text-black hover:bg-black hover:text-white'
+              }`}
+            >
+              {isGenerating ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <span>GENERATING CUSTOM CONCEPT...</span>
+                </>
+              ) : (
+                <span>GENERATE CUSTOM CONCEPT</span>
+              )}
+            </button>
+
+            {/* Row 6: Full-Width Flush-Header Concept Preview Stage (Matching Sheet A1 / Sheet 04) */}
+            <div className="w-full border border-black rounded-[9px] bg-white overflow-hidden">
+              {/* Flush Viewport Header Strip */}
+              <div
+                className={`w-full ${
+                  activeConcept?.visualStyle === 'cad-2d'
+                    ? 'bg-[#FDCB33] text-black'
+                    : 'bg-[#27AAE0] text-black'
+                } border-b border-black px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 text-[0.70rem] tracking-cad uppercase font-medium select-none`}
+              >
+                <span>
+                  {activeConcept
+                    ? activeConcept.visualStyle === 'cad-2d'
+                      ? 'GENERATED SHEET · 2D ELEVATION SKETCH'
+                      : 'GENERATED SHEET · 3D REALISTIC RENDERING'
+                    : 'CONCEPT PREVIEW STAGE · 16:9 SHEET'}
+                </span>
+                <span>
+                  {activeConcept
+                    ? `SAVED & SENT TO STUDIO (${activeConcept.timestamp})`
+                    : 'READY TO GENERATE'}
+                </span>
+              </div>
+
+              {/* Flush Full-Width Visual Canvas */}
+              <div className="w-full cad-grid-bg overflow-hidden min-h-[320px] sm:min-h-[440px] flex items-center justify-center relative">
+                {isGenerating ? (
+                  <div className="p-8 text-center space-y-3">
+                    <div className="w-12 h-12 mx-auto rounded-[9px] border-[0.75px] border-black bg-[#EF6922] flex items-center justify-center animate-pulse">
+                      <RefreshCw className="w-5 h-5 text-black animate-spin" />
+                    </div>
+                    <p className="text-[0.76rem] tracking-cad uppercase font-medium text-black">
+                      ENGINEERING CUSTOM CONCEPT SHEET...
+                    </p>
+                    <p className="text-[0.84rem] font-light text-black max-w-md mx-auto">
+                      Applying {resolvedWoodSpecies}, {resolvedDesignStyle} &amp;{' '}
+                      {resolvedAddedDetails} in{' '}
+                      {state.visualStyle === 'cad-2d'
+                        ? '2D elevation sketch format'
+                        : '3D realistic rendering format'}
+                      .
+                    </p>
+                  </div>
+                ) : activeConcept ? (
+                  <div className="w-full h-full relative group p-2 sm:p-4">
+                    <img
+                      src={activeConcept.imageUrl}
+                      alt={activeConcept.summarySpec}
+                      onClick={() => setFullscreenConcept(activeConcept)}
+                      className="w-full max-h-[540px] object-contain cursor-zoom-in select-none mx-auto"
+                    />
+                    <div className="absolute bottom-4 right-4 flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleDownloadConcept(activeConcept)}
+                        className="bg-white hover:bg-[#FDCB33] text-black border-[0.75px] border-black rounded-[9px] py-1.5 px-3.5 text-[0.68rem] tracking-cad uppercase font-medium flex items-center gap-1.5 cursor-pointer shadow-sm"
+                        title="Download Concept PNG"
                       >
-                        DIRECT IMAGE LINK ↗
-                      </a>
+                        <Download className="w-3.5 h-3.5" />
+                        <span>SAVE PNG</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFullscreenConcept(activeConcept)}
+                        className="bg-black hover:bg-[#EF6922] text-white hover:text-black border-[0.75px] border-black rounded-[9px] py-1.5 px-3.5 text-[0.68rem] tracking-cad uppercase font-medium flex items-center gap-1.5 cursor-pointer shadow-sm"
+                        title="Zoom Fullscreen"
+                      >
+                        <Maximize2 className="w-3.5 h-3.5" />
+                        <span>ZOOM</span>
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-8 sm:p-12 text-center space-y-3">
+                    <div className="w-11 h-11 mx-auto rounded-[9px] border-[0.75px] border-black bg-white flex items-center justify-center">
+                      <ImageIcon className="w-5 h-5 text-black" />
+                    </div>
+                    <p className="text-[0.76rem] tracking-cad uppercase font-medium text-black">
+                      YOUR GENERATED 3D REALISTIC RENDERING OR 2D ELEVATION SKETCH WILL APPEAR HERE
+                    </p>
+                    <p className="text-[0.84rem] font-light text-black max-w-md mx-auto">
+                      Click any of the 4 basic starter ideas above or describe your custom
+                      piece and click GENERATE CUSTOM CONCEPT.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Active Concept Controls: Automatic Dispatch Notice, Direct SMS/Email to Josh, Refine & Convert */}
+              {activeConcept && (
+                <div className="border-t border-black p-4 sm:p-5 bg-white space-y-3.5 text-left">
+                  <div className="border-b border-black/15 pb-3 space-y-1">
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-[0.68rem] tracking-cad uppercase font-medium text-black">
+                      <span>✓ LOGGED &amp; DISPATCHED TO JOSH ({OWNER_EMAIL})</span>
+                      {activeConcept.publicPath && (
+                        <a
+                          href={activeConcept.publicPath}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="underline hover:text-[#EF6922]"
+                        >
+                          DIRECT IMAGE LINK ↗
+                        </a>
+                      )}
+                    </div>
+                    <p className="text-[0.82rem] font-light text-black">
+                      {activeConcept.summarySpec}
+                    </p>
+                    {activeConcept.modelEngine && (
+                      <p className="text-[0.65rem] tracking-cad uppercase text-black/65 font-medium pt-0.5">
+                        ENGINE: {activeConcept.modelEngine}
+                      </p>
                     )}
                   </div>
-                  <p className="text-[0.82rem] font-light text-black">
-                    {activeConcept.summarySpec}
-                  </p>
-                  {activeConcept.modelEngine && (
-                    <p className="text-[0.65rem] tracking-cad uppercase text-black/65 font-medium pt-0.5">
-                      ENGINE: {activeConcept.modelEngine}
-                    </p>
-                  )}
-                </div>
 
-                {/* Live Settings-Changed Banner so changing Timber / Style / Details applies directly to the active image */}
-                {hasSettingsChanged && (
-                  <div className="bg-[#FDCB33]/35 border border-black rounded-[9px] px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div className="space-y-0.5">
-                      <span className="block text-[0.68rem] tracking-cad uppercase font-medium text-black">
-                        SETTINGS UPDATED — READY TO APPLY TO THIS DESIGN
-                      </span>
-                      <span className="block text-[0.80rem] font-light text-black">
-                        {resolvedWoodSpecies} · {resolvedDesignStyle} · {resolvedAddedDetails}
-                      </span>
+                  {/* Live Settings-Changed Banner so changing Timber / Style / Details applies directly to the active image */}
+                  {hasSettingsChanged && (
+                    <div className="bg-[#FDCB33]/35 border border-black rounded-[9px] px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="space-y-0.5">
+                        <span className="block text-[0.68rem] tracking-cad uppercase font-medium text-black">
+                          SETTINGS UPDATED — READY TO APPLY TO THIS DESIGN
+                        </span>
+                        <span className="block text-[0.80rem] font-light text-black">
+                          {resolvedWoodSpecies} · {resolvedDesignStyle} · {resolvedAddedDetails}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={isGenerating}
+                        onClick={() => runGeneration('refine')}
+                        className="shrink-0 bg-[#FDCB33] hover:bg-black text-black hover:text-white border border-black rounded-[9px] px-4 py-2 text-[0.70rem] tracking-cad uppercase font-medium transition-colors cursor-pointer whitespace-nowrap"
+                      >
+                        APPLY TO THIS IMAGE →
+                      </button>
                     </div>
+                  )}
+
+                  {/* Direct Send Concept Link & Specs to Josh via SMS or Email */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => handleDirectSendToJosh(activeConcept, 'sms')}
+                      className="bg-[#FDCB33] hover:bg-black text-black hover:text-white text-[0.68rem] tracking-cad uppercase py-2.5 px-3 rounded-[9px] border-[0.75px] border-black font-medium transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                    >
+                      <MessageSquare className="w-3.5 h-3.5 shrink-0" />
+                      <span>TEXT IMAGE LINK TO JOSH ({OWNER_PHONE_DISPLAY})</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDirectSendToJosh(activeConcept, 'email')}
+                      className="bg-black hover:bg-[#EF6922] text-white hover:text-black text-[0.68rem] tracking-cad uppercase py-2.5 px-3 rounded-[9px] border-[0.75px] border-black font-medium transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                    >
+                      <Mail className="w-3.5 h-3.5 shrink-0" />
+                      <span>EMAIL IMAGE LINK TO JOSH</span>
+                    </button>
+                  </div>
+
+                  {/* Iterative Refinement Input Bar */}
+                  <div className="flex flex-col sm:flex-row gap-2.5">
+                    <input
+                      type="text"
+                      value={refinementText}
+                      onChange={(e) => setRefinementText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !isGenerating && (refinementText.trim() || hasSettingsChanged)) {
+                          e.preventDefault();
+                          runGeneration('refine');
+                        }
+                      }}
+                      placeholder="Refine this concept (e.g., 'Make it 96 inches wide' or 'Add brass toe-kick')..."
+                      className="flex-1 h-[42px] bg-white text-black text-[0.84rem] px-3.5 rounded-[9px] border-[0.75px] border-black font-light focus:outline-none placeholder:text-black/45"
+                    />
+                    <button
+                      type="button"
+                      disabled={isGenerating || (!refinementText.trim() && !hasSettingsChanged)}
+                      onClick={() => runGeneration('refine')}
+                      className="shrink-0 bg-[#27AAE0] text-black disabled:opacity-50 hover:bg-black hover:text-white text-[0.70rem] tracking-cad uppercase px-5 py-2.5 rounded-[9px] border-[0.75px] border-black font-medium transition-colors cursor-pointer whitespace-nowrap"
+                    >
+                      {hasSettingsChanged && !refinementText.trim()
+                        ? 'APPLY UPDATED SETTINGS'
+                        : 'REFINE IMAGE'}
+                    </button>
+                  </div>
+
+                  {/* One-Click Style Conversion + Send to Inquiry */}
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
                     <button
                       type="button"
                       disabled={isGenerating}
-                      onClick={() => runGeneration('refine')}
-                      className="shrink-0 bg-[#FDCB33] hover:bg-black text-black hover:text-white border border-black rounded-[9px] px-4 py-2 text-[0.70rem] tracking-cad uppercase font-medium transition-colors cursor-pointer whitespace-nowrap"
-                    >
-                      APPLY TO THIS IMAGE →
-                    </button>
-                  </div>
-                )}
-
-                {/* Direct Send Concept Link & Specs to Josh via SMS or Email */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  <button
-                    type="button"
-                    onClick={() => handleDirectSendToJosh(activeConcept, 'sms')}
-                    className="bg-[#FDCB33] hover:bg-black text-black hover:text-white text-[0.68rem] tracking-cad uppercase py-2.5 px-3 rounded-[9px] border-[0.75px] border-black font-medium transition-colors cursor-pointer flex items-center justify-center gap-1.5"
-                  >
-                    <MessageSquare className="w-3.5 h-3.5 shrink-0" />
-                    <span>TEXT IMAGE LINK TO JOSH ({OWNER_PHONE_DISPLAY})</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDirectSendToJosh(activeConcept, 'email')}
-                    className="bg-black hover:bg-[#EF6922] text-white hover:text-black text-[0.68rem] tracking-cad uppercase py-2.5 px-3 rounded-[9px] border-[0.75px] border-black font-medium transition-colors cursor-pointer flex items-center justify-center gap-1.5"
-                  >
-                    <Mail className="w-3.5 h-3.5 shrink-0" />
-                    <span>EMAIL IMAGE LINK TO JOSH</span>
-                  </button>
-                </div>
-
-                {/* Iterative Refinement Input Bar */}
-                <div className="flex flex-col sm:flex-row gap-2.5">
-                  <input
-                    type="text"
-                    value={refinementText}
-                    onChange={(e) => setRefinementText(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !isGenerating && (refinementText.trim() || hasSettingsChanged)) {
-                        e.preventDefault();
-                        runGeneration('refine');
+                      onClick={() =>
+                        runGeneration(
+                          'refine',
+                          activeConcept.visualStyle === 'cad-2d' ? 'render-3d' : 'cad-2d'
+                        )
                       }
-                    }}
-                    placeholder="Refine this concept (e.g., 'Make it 96 inches wide' or 'Add brass toe-kick')..."
-                    className="flex-1 h-[42px] bg-white text-black text-[0.84rem] px-3.5 rounded-[9px] border-[0.75px] border-black font-light focus:outline-none placeholder:text-black/45"
-                  />
-                  <button
-                    type="button"
-                    disabled={isGenerating || (!refinementText.trim() && !hasSettingsChanged)}
-                    onClick={() => runGeneration('refine')}
-                    className="shrink-0 bg-[#27AAE0] text-black disabled:opacity-50 hover:bg-black hover:text-white text-[0.70rem] tracking-cad uppercase px-5 py-2.5 rounded-[9px] border-[0.75px] border-black font-medium transition-colors cursor-pointer whitespace-nowrap"
-                  >
-                    {hasSettingsChanged && !refinementText.trim()
-                      ? 'APPLY UPDATED SETTINGS'
-                      : 'REFINE IMAGE'}
-                  </button>
-                </div>
+                      className="bg-white hover:bg-[#CBCBCB] text-black text-[0.68rem] tracking-cad uppercase py-2 px-3.5 rounded-[9px] border-[0.75px] border-black font-medium transition-colors cursor-pointer"
+                    >
+                      {activeConcept.visualStyle === 'cad-2d'
+                        ? 'CONVERT THIS TO 3D REALISTIC RENDERING →'
+                        : 'CONVERT THIS TO 2D ELEVATION SKETCH →'}
+                    </button>
 
-                {/* One-Click Style Conversion + Send to Inquiry */}
-                <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-                  <button
-                    type="button"
-                    disabled={isGenerating}
-                    onClick={() =>
-                      runGeneration(
-                        'refine',
-                        activeConcept.visualStyle === 'cad-2d' ? 'render-3d' : 'cad-2d'
-                      )
-                    }
-                    className="bg-white hover:bg-[#CBCBCB] text-black text-[0.68rem] tracking-cad uppercase py-2 px-3.5 rounded-[9px] border-[0.75px] border-black font-medium transition-colors cursor-pointer"
-                  >
-                    {activeConcept.visualStyle === 'cad-2d'
-                      ? 'CONVERT THIS TO 3D REALISTIC RENDERING →'
-                      : 'CONVERT THIS TO 2D ELEVATION SKETCH →'}
-                  </button>
+                    {(placement === 'visualizer' || placement === 'methodology') &&
+                      onSendToInquiry && (
+                        <button
+                          type="button"
+                          onClick={() => onSendToInquiry(activeConcept)}
+                          className="bg-[#EF6922] hover:bg-black text-black hover:text-white text-[0.70rem] tracking-cad uppercase py-2.5 px-4 rounded-[9px] border-[0.75px] border-black font-medium transition-colors cursor-pointer inline-flex items-center gap-1.5"
+                        >
+                          <span>OPEN IN PAGE 05 COMMISSION INQUIRY</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
+                      )}
 
-                  {(placement === 'visualizer' || placement === 'methodology') &&
-                    onSendToInquiry && (
+                    {placement === 'inquire' && onApplyToInquiryForm && (
                       <button
                         type="button"
-                        onClick={() => onSendToInquiry(activeConcept)}
-                        className="bg-[#EF6922] hover:bg-black text-black hover:text-white text-[0.70rem] tracking-cad uppercase py-2.5 px-4 rounded-[9px] border-[0.75px] border-black font-medium transition-colors cursor-pointer inline-flex items-center gap-1.5"
+                        onClick={() => {
+                          onApplyToInquiryForm(activeConcept);
+                          setSyncedNotice(true);
+                          setTimeout(() => setSyncedNotice(false), 2500);
+                        }}
+                        className="bg-[#FDCB33] hover:bg-black text-black hover:text-white text-[0.70rem] tracking-cad uppercase py-2 px-3.5 rounded-[9px] border-[0.75px] border-black font-medium transition-colors cursor-pointer inline-flex items-center gap-1.5"
                       >
-                        <span>OPEN IN PAGE 05 COMMISSION INQUIRY</span>
-                        <ArrowRight className="w-3.5 h-3.5" />
+                        <Check className="w-3.5 h-3.5" />
+                        <span>
+                          {syncedNotice
+                            ? 'CONCEPT SPECS COPIED TO INQUIRY FORM'
+                            : 'INSERT SPECS INTO INQUIRY FORM BELOW'}
+                        </span>
                       </button>
                     )}
+                  </div>
 
-                  {placement === 'inquire' && onApplyToInquiryForm && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onApplyToInquiryForm(activeConcept);
-                        setSyncedNotice(true);
-                        setTimeout(() => setSyncedNotice(false), 2500);
-                      }}
-                      className="bg-[#FDCB33] hover:bg-black text-black hover:text-white text-[0.70rem] tracking-cad uppercase py-2 px-3.5 rounded-[9px] border-[0.75px] border-black font-medium transition-colors cursor-pointer inline-flex items-center gap-1.5"
-                    >
-                      <Check className="w-3.5 h-3.5" />
-                      <span>
-                        {syncedNotice
-                          ? 'CONCEPT SPECS COPIED TO INQUIRY FORM'
-                          : 'INSERT SPECS INTO INQUIRY FORM BELOW'}
+                  {/* Concept History Strip if multiple variations generated */}
+                  {state.history.length > 1 && (
+                    <div className="pt-2 border-t border-black/20 flex items-center gap-2.5 overflow-x-auto">
+                      <span className="text-[0.66rem] tracking-cad uppercase font-medium text-black shrink-0">
+                        VARIATIONS ({state.history.length}):
                       </span>
-                    </button>
+                      {state.history.map((item) => {
+                        const isSelected = item.id === activeConcept.id;
+                        return (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() =>
+                              onChangeState((prev) => ({ ...prev, activeConceptId: item.id }))
+                            }
+                            className={`relative rounded-[6px] overflow-hidden border-[0.75px] border-black shrink-0 cursor-pointer transition-all ${
+                              isSelected ? 'ring-2 ring-[#EF6922] opacity-100' : 'opacity-60 hover:opacity-100'
+                            }`}
+                          >
+                            <img
+                              src={item.imageUrl}
+                              alt={item.summarySpec}
+                              className="w-16 h-10 object-cover bg-white"
+                            />
+                          </button>
+                        );
+                      })}
+                    </div>
                   )}
                 </div>
-
-                {/* Concept History Strip if multiple variations generated */}
-                {state.history.length > 1 && (
-                  <div className="pt-2 border-t border-black/20 flex items-center gap-2.5 overflow-x-auto">
-                    <span className="text-[0.66rem] tracking-cad uppercase font-medium text-black shrink-0">
-                      VARIATIONS ({state.history.length}):
-                    </span>
-                    {state.history.map((item) => {
-                      const isSelected = item.id === activeConcept.id;
-                      return (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onClick={() =>
-                            onChangeState((prev) => ({ ...prev, activeConceptId: item.id }))
-                          }
-                          className={`relative rounded-[6px] overflow-hidden border-[0.75px] border-black shrink-0 cursor-pointer transition-all ${
-                            isSelected ? 'ring-2 ring-[#EF6922] opacity-100' : 'opacity-60 hover:opacity-100'
-                          }`}
-                        >
-                          <img
-                            src={item.imageUrl}
-                            alt={item.summarySpec}
-                            className="w-16 h-10 object-cover bg-white"
-                          />
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -1353,10 +1356,10 @@ Concept Image Link: ${imageLink}`;
           onClick={() => setShowArchiveModal(false)}
         >
           <div
-            className="w-full max-w-4xl max-h-[85vh] bg-white border-[1.5px] border-black rounded-[9px] p-5 sm:p-6 flex flex-col gap-4 overflow-hidden text-left"
+            className="w-full max-w-4xl max-h-[85vh] bg-white border-[1.5px] border-black rounded-[9px] flex flex-col overflow-hidden text-left"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="bg-[#EF6922] text-black border border-black rounded-[9px] px-4 py-2.5 flex items-center justify-between gap-2 shrink-0">
+            <div className="bg-[#EF6922] text-black border-b-[1.5px] border-black px-5 py-3 flex items-center justify-between gap-2 shrink-0">
               <span className="text-[0.76rem] tracking-cad uppercase font-medium">
                 STUDIO CONCEPT LOG — ALL GENERATED CUSTOMER VISUALIZATIONS
               </span>
@@ -1369,12 +1372,13 @@ Concept Image Link: ${imageLink}`;
               </button>
             </div>
 
-            <p className="text-[0.86rem] font-light text-black shrink-0">
-              Every image generated through the Custom Concept Visualizer is automatically saved to
-              the studio server and dispatched to <strong className="font-medium">{OWNER_EMAIL}</strong>.
-            </p>
+            <div className="p-5 sm:p-6 flex flex-col gap-4 flex-1 overflow-hidden">
+              <p className="text-[0.86rem] font-light text-black shrink-0">
+                Every image generated through the Custom Concept Visualizer is automatically saved to
+                the studio server and dispatched to <strong className="font-medium">{OWNER_EMAIL}</strong>.
+              </p>
 
-            <div className="flex-1 overflow-y-auto space-y-3 pr-1">
+              <div className="flex-1 overflow-y-auto space-y-3 pr-1">
               {loadingArchive ? (
                 <div className="p-8 text-center text-[0.78rem] tracking-cad uppercase font-medium">
                   LOADING SAVED CUSTOMER CONCEPTS...
@@ -1433,6 +1437,7 @@ Concept Image Link: ${imageLink}`;
                   </div>
                 ))
               )}
+              </div>
             </div>
           </div>
         </div>

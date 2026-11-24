@@ -34,7 +34,6 @@ import {
   type PortfolioProject,
 } from '../data/defaultProjects.ts';
 
-type HeroViewMode = 'split' | 'cad' | 'render';
 type TeaserLensId = 'joint' | 'grain' | 'line' | 'color';
 export type ProposedPageId =
   | 'cover'
@@ -221,7 +220,6 @@ export const ProposedStudio: React.FC = () => {
   const [activePage, setActivePage] = useState<ProposedPageId>('cover');
   const wall = useMortiseWallController('01');
   const [menuOpen, setMenuOpen] = useState(false);
-  const [heroView, setHeroView] = useState<HeroViewMode>('split');
   const [activeLens, setActiveLens] = useState<TeaserLensId>('joint');
   const [filter, setFilter] = useState<'all' | 'architectural' | 'furniture' | 'commercial'>('all');
   const [activeImageIdx, setActiveImageIdx] = useState<Record<string, number>>({
@@ -686,121 +684,94 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
           =================================================================== */}
           {activePage === 'methodology' && (
             <section id="methodology" aria-label="01 Design and Methodology">
-              {/* Standalone Section Title Block Bar — Bauhaus Orange (#EF6922) + Black Ink */}
-              <div className="w-full bg-[#EF6922] text-black border-[1.5px] border-black rounded-[9px] px-5 py-3 mb-3.5 flex flex-wrap items-center justify-between gap-2 select-none">
-                <span className="text-[0.80rem] sm:text-[0.86rem] tracking-cad uppercase font-medium">
-                  01 / DESIGN &amp; METHODOLOGY — FROM 2D RHINO CAD TO HANDCRAFTED REALITY
-                </span>
-                <span className="text-[0.72rem] tracking-cad uppercase font-medium">
-                  DWG-CG-001 · TOLERANCE: ± 1/32&quot;
-                </span>
-              </div>
-
-              {/* Primary Sheet Container — 1.5px Solid Black with 9px Radius */}
-              <div className="w-full bg-white border-[1.5px] border-black rounded-[9px] p-5 sm:p-7 space-y-6">
-                {/* Top Lead Row: Left-Aligned Studio Proposition + 3 Pillar Spec Badges */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
-                  <div className="lg:col-span-8 bg-white border border-black rounded-[9px] p-6 flex flex-col justify-center text-left">
-                    <p className="text-[0.72rem] tracking-cad uppercase text-black font-medium mb-2">
-                      OMAHA, NEBRASKA · CUSTOM FURNITURE &amp; ARCHITECTURAL MILLWORK
-                    </p>
-                    <h1 className="text-[1.35rem] sm:text-[1.65rem] font-normal text-black leading-snug mb-3">
-                      we make the things that have never been made before
-                    </h1>
-                    <p className="text-[0.94rem] sm:text-[1.0rem] font-light leading-relaxed text-black max-w-[62ch]">
-                      Every commission in our Omaha studio starts as a dimensioned 2D &amp; 3D Rhino
-                      CAD proposal—resolving every reveal, finger-joint, and spatial clearance to
-                      1/32 of an inch before a single board of domestic hardwood is cut.
-                    </p>
-                  </div>
-
-                  {/* Right 4 Columns: Interactive Three-Pillar Quick Links */}
-                  <div className="lg:col-span-4 flex flex-col justify-between gap-3">
-                    <button
-                      type="button"
-                      onClick={() => navigateToPage('work')}
-                      className="flex-1 bg-[#27AAE0] text-black border border-black rounded-[9px] px-4 py-3 flex flex-col justify-center text-left hover:opacity-90 transition-opacity cursor-pointer"
-                    >
-                      <span className="text-[0.68rem] tracking-cad uppercase font-medium">
-                        02 / SELECTED WORK →
-                      </span>
-                      <span className="text-[0.88rem] font-normal mt-0.5">
-                        Explore Completed Proposals &amp; Sheets
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => navigateToPage('capabilities')}
-                      className="flex-1 bg-[#FDCB33] text-black border border-black rounded-[9px] px-4 py-3 flex flex-col justify-center text-left hover:opacity-90 transition-opacity cursor-pointer"
-                    >
-                      <span className="text-[0.68rem] tracking-cad uppercase font-medium">
-                        03 / CAPABILITIES &amp; SPECS →
-                      </span>
-                      <span className="text-[0.88rem] font-normal mt-0.5">
-                        Hardwoods, Millwork &amp; Joinery
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => navigateToPage('process')}
-                      className="flex-1 bg-[#CBCBCB] text-black border border-black rounded-[9px] px-4 py-3 flex flex-col justify-center text-left hover:opacity-90 transition-opacity cursor-pointer"
-                    >
-                      <span className="text-[0.68rem] tracking-cad uppercase font-medium">
-                        04 / PROCESS &amp; TRADE →
-                      </span>
-                      <span className="text-[0.88rem] font-normal mt-0.5">
-                        6-Step Workflow &amp; Trade Program
-                      </span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Shared Toolbar Above the Split Stage (Unified Pillar 01 Orange Active State) */}
-                <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-                  <span className="text-[0.74rem] tracking-cad uppercase font-medium text-black">
-                    TECHNICAL CAD DRAWINGS &amp; PHOTOREALISTIC PROPOSALS:
+              {/* Unified Sheet Container with Incorporated Bauhaus Orange Header */}
+              <div className="w-full bg-white border-[1.5px] border-black rounded-[9px] overflow-hidden">
+                {/* Incorporated Section Title Block Bar — Bauhaus Orange (#EF6922) + Black Ink */}
+                <div className="w-full bg-[#EF6922] text-black border-b-[1.5px] border-black px-5 py-3 flex flex-wrap items-center justify-between gap-2 select-none">
+                  <span className="text-[0.80rem] sm:text-[0.86rem] tracking-cad uppercase font-medium">
+                    01 / DESIGN &amp; METHODOLOGY — FROM 2D RHINO CAD TO HANDCRAFTED REALITY
                   </span>
-
-                  <div
-                    className="flex flex-wrap items-center gap-2.5"
-                    role="group"
-                    aria-label="Methodology View Switcher"
-                  >
-                    {[
-                      { id: 'split', label: 'SPLIT COMPARISON' },
-                      { id: 'cad', label: '2D RHINO CAD' },
-                      { id: 'render', label: '3D PROPOSAL' },
-                    ].map((mode) => {
-                      const isActive = heroView === mode.id;
-                      return (
-                        <button
-                          key={mode.id}
-                          type="button"
-                          onClick={() => setHeroView(mode.id as HeroViewMode)}
-                          className={`text-[0.72rem] tracking-cad uppercase px-4 py-2 rounded-[9px] border border-black transition-colors cursor-pointer whitespace-nowrap ${
-                            isActive
-                              ? 'bg-[#EF6922] text-black font-medium'
-                              : 'bg-white text-black hover:bg-[#CBCBCB] font-normal'
-                          }`}
-                        >
-                          {mode.label}
-                        </button>
-                      );
-                    })}
-                  </div>
+                  <span className="text-[0.72rem] tracking-cad uppercase font-medium">
+                    DWG-CG-001 · TOLERANCE: ± 1/32&quot;
+                  </span>
                 </div>
 
-                {/* Aligned 2-Column Split Comparison */}
-                {heroView === 'split' && (
+                {/* Inner Sheet Body */}
+                <div className="p-5 sm:p-7 space-y-6">
+                  {/* Top Lead Row: Open Left-Aligned Studio Proposition (No Outline) + 3 Pillar Quick Links */}
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
+                    <div className="lg:col-span-8 py-2 pr-2 sm:pr-4 flex flex-col justify-center text-left">
+                      <p className="text-[0.72rem] tracking-cad uppercase text-black font-medium mb-2">
+                        OMAHA, NEBRASKA · CUSTOM FURNITURE &amp; ARCHITECTURAL MILLWORK
+                      </p>
+                      <h1 className="text-[1.35rem] sm:text-[1.65rem] font-normal text-black leading-snug mb-3">
+                        we make the things that have never been made before
+                      </h1>
+                      <p className="text-[0.94rem] sm:text-[1.0rem] font-light leading-relaxed text-black max-w-[62ch]">
+                        Every commission in our Omaha studio starts as a dimensioned 2D &amp; 3D Rhino
+                        CAD proposal—resolving every reveal, finger-joint, and spatial clearance to
+                        1/32 of an inch before a single board of domestic hardwood is cut.
+                      </p>
+                    </div>
+
+                    {/* Right 4 Columns: Interactive Three-Pillar Quick Links */}
+                    <div className="lg:col-span-4 flex flex-col justify-between gap-3">
+                      <button
+                        type="button"
+                        onClick={() => navigateToPage('work')}
+                        className="flex-1 bg-[#27AAE0] text-black border border-black rounded-[9px] px-4 py-3 flex flex-col justify-center text-left hover:opacity-90 transition-opacity cursor-pointer"
+                      >
+                        <span className="text-[0.68rem] tracking-cad uppercase font-medium">
+                          02 / SELECTED WORK →
+                        </span>
+                        <span className="text-[0.88rem] font-normal mt-0.5">
+                          Explore Completed Proposals &amp; Sheets
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => navigateToPage('capabilities')}
+                        className="flex-1 bg-[#FDCB33] text-black border border-black rounded-[9px] px-4 py-3 flex flex-col justify-center text-left hover:opacity-90 transition-opacity cursor-pointer"
+                      >
+                        <span className="text-[0.68rem] tracking-cad uppercase font-medium">
+                          03 / CAPABILITIES &amp; SPECS →
+                        </span>
+                        <span className="text-[0.88rem] font-normal mt-0.5">
+                          Hardwoods, Millwork &amp; Joinery
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => navigateToPage('process')}
+                        className="flex-1 bg-[#CBCBCB] text-black border border-black rounded-[9px] px-4 py-3 flex flex-col justify-center text-left hover:opacity-90 transition-opacity cursor-pointer"
+                      >
+                        <span className="text-[0.68rem] tracking-cad uppercase font-medium">
+                          04 / PROCESS &amp; TRADE →
+                        </span>
+                        <span className="text-[0.88rem] font-normal mt-0.5">
+                          6-Step Workflow &amp; Trade Program
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Section Subheading Above Sheet A1 & Sheet 04 */}
+                  <div className="pt-1 text-left">
+                    <span className="text-[0.74rem] tracking-cad uppercase font-medium text-black">
+                      TECHNICAL CAD DRAWINGS &amp; PHOTOREALISTIC PROPOSALS:
+                    </span>
+                  </div>
+
+                  {/* Aligned 2-Column Flush Sheet Cards (Sheet A1 & Sheet 04) */}
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
                     {/* Left Card: 2D Rhino CAD */}
-                    <div className="border border-black rounded-[9px] bg-white p-4 sm:p-5 flex flex-col justify-between gap-4">
-                      <div className="bg-[#CBCBCB] text-black border-[0.75px] border-black rounded-[9px] px-4 py-2 flex items-center justify-between text-[0.70rem] tracking-cad uppercase font-medium">
+                    <div className="border border-black rounded-[9px] bg-white overflow-hidden flex flex-col">
+                      <div className="bg-[#CBCBCB] text-black border-b border-black px-4 py-2.5 flex items-center justify-between text-[0.70rem] tracking-cad uppercase font-medium">
                         <span>SHEET A1 · 2D RHINO ELEVATION</span>
                         <span>DWG-1070MCG</span>
                       </div>
 
-                      <div className="cad-grid-bg border-[0.75px] border-black rounded-[9px] p-4 flex items-center justify-center h-[280px] sm:h-[320px]">
+                      <div className="cad-grid-bg border-b border-black/15 px-4 py-3 flex items-center justify-center h-[280px] sm:h-[320px]">
                         <img
                           src={ASSETS.kidsKitchen.elevationA1}
                           alt="Rhino 2D CAD Elevation Shop Drawing with Fractional Callouts"
@@ -809,7 +780,7 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
                         />
                       </div>
 
-                      <p className="text-[0.88rem] font-light text-black leading-relaxed text-left px-1">
+                      <p className="text-[0.88rem] font-light text-black leading-relaxed text-left px-4 py-3.5">
                         <strong className="font-medium uppercase tracking-cad-tight text-[0.74rem] mr-2">
                           2D CAD:
                         </strong>
@@ -818,13 +789,13 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
                     </div>
 
                     {/* Right Card: 3D Proposal */}
-                    <div className="border border-black rounded-[9px] bg-white p-4 sm:p-5 flex flex-col justify-between gap-4">
-                      <div className="bg-[#EF6922] text-black border-[0.75px] border-black rounded-[9px] px-4 py-2 flex items-center justify-between text-[0.70rem] tracking-cad uppercase font-medium">
+                    <div className="border border-black rounded-[9px] bg-white overflow-hidden flex flex-col">
+                      <div className="bg-[#EF6922] text-black border-b border-black px-4 py-2.5 flex items-center justify-between text-[0.70rem] tracking-cad uppercase font-medium">
                         <span>SHEET 04 · 3D HARDWOOD PROPOSAL</span>
                         <span>DWG-1064HEM</span>
                       </div>
 
-                      <div className="bg-white border-[0.75px] border-black rounded-[9px] overflow-hidden flex items-center justify-center h-[280px] sm:h-[320px]">
+                      <div className="bg-white border-b border-black/15 overflow-hidden flex items-center justify-center h-[280px] sm:h-[320px]">
                         <img
                           src={ASSETS.familyRoom.sheet4JoineryDetail}
                           alt="3D Design Proposal showing exposed finger-jointed white oak and fluted walnut"
@@ -833,7 +804,7 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
                         />
                       </div>
 
-                      <p className="text-[0.88rem] font-light text-black leading-relaxed text-left px-1">
+                      <p className="text-[0.88rem] font-light text-black leading-relaxed text-left px-4 py-3.5">
                         <strong className="font-medium uppercase tracking-cad-tight text-[0.74rem] mr-2">
                           3D RENDER:
                         </strong>
@@ -841,158 +812,106 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
                       </p>
                     </div>
                   </div>
-                )}
 
-                {heroView === 'cad' && (
-                  <div className="border border-black rounded-[9px] bg-white p-5 space-y-4">
-                    <div className="cad-grid-bg border-[0.75px] border-black rounded-[9px] p-6 flex items-center justify-center">
-                      <img
-                        src={ASSETS.kidsKitchen.elevationA1}
-                        alt="Full Rhino 2D CAD Elevation Drawing"
-                        className="w-full max-h-[440px] object-contain select-none"
-                        referrerPolicy="no-referrer"
-                      />
+                  {/* Closer Inspection 4-Lens Sub-Module */}
+                  <div className="pt-2 space-y-5">
+                    <div className="space-y-3">
+                      <div className="bg-black text-white border border-black rounded-[9px] px-5 py-2.5 flex items-center justify-between gap-2">
+                        <span className="text-[0.74rem] tracking-cad uppercase font-normal">
+                          CLOSER INSPECTION — SELECT A DETAIL LENS TO EXAMINE JOINERY &amp; FINISHES
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        {INSPECTION_LENSES.map((lens) => {
+                          const isSelected = lens.id === activeLens;
+                          return (
+                            <button
+                              key={lens.id}
+                              type="button"
+                              onClick={() => setActiveLens(lens.id)}
+                              className={`py-2.5 px-3 rounded-[9px] border border-black text-[0.72rem] tracking-cad uppercase transition-colors cursor-pointer text-center ${
+                                isSelected
+                                  ? 'bg-[#EF6922] text-black font-medium'
+                                  : 'bg-white text-black hover:bg-[#CBCBCB] font-normal'
+                              }`}
+                            >
+                              {lens.code}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <p className="text-[0.92rem] font-light text-black">
-                        Dimensioned 2D Rhino shop drawing showing 48 1/4&quot; span, stacked-ball
-                        lathe legs, and 101&quot; built-in storage wall.
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => navigateToPage('work', 'project-kids-kitchen')}
-                        className="text-[0.72rem] tracking-cad uppercase font-medium px-4 py-2.5 rounded-[9px] bg-[#EF6922] text-black border border-black cursor-pointer"
-                      >
-                        OPEN 1070MCG IN SELECTED WORK →
-                      </button>
-                    </div>
-                  </div>
-                )}
 
-                {heroView === 'render' && (
-                  <div className="border border-black rounded-[9px] bg-white p-5 space-y-4">
-                    <div className="bg-white border-[0.75px] border-black rounded-[9px] overflow-hidden flex items-center justify-center">
-                      <img
-                        src={ASSETS.familyRoom.sheet3FlutedDetail}
-                        alt="Close-up of fluted American black walnut doors and custom turned wood pulls"
-                        className="w-full max-h-[440px] object-contain select-none"
-                        referrerPolicy="no-referrer"
-                      />
-                    </div>
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <p className="text-[0.92rem] font-light text-black">
-                        Photorealistic 3D proposal detailing vertical and horizontal semicircular
-                        fluted Black Walnut doors and solid turned pulls.
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => navigateToPage('work', 'project-family-room')}
-                        className="text-[0.72rem] tracking-cad uppercase font-medium px-4 py-2.5 rounded-[9px] bg-[#EF6922] text-black border border-black cursor-pointer"
-                      >
-                        OPEN 1064HEM IN SELECTED WORK →
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Closer Inspection 4-Lens Sub-Module */}
-                <div className="pt-2 space-y-4">
-                  <div className="bg-black text-white border border-black rounded-[9px] px-5 py-2.5 flex flex-wrap items-center justify-between gap-2">
-                    <span className="text-[0.74rem] tracking-cad uppercase font-normal">
-                      CLOSER INSPECTION — SELECT A DETAIL LENS TO EXAMINE JOINERY &amp; FINISHES
-                    </span>
-                    <span className="text-[0.70rem] tracking-cad uppercase text-[#FDCB33]">
-                      {currentLens.dwgRef}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    {INSPECTION_LENSES.map((lens) => {
-                      const isSelected = lens.id === activeLens;
-                      return (
-                        <button
-                          key={lens.id}
-                          type="button"
-                          onClick={() => setActiveLens(lens.id)}
-                          className={`py-2.5 px-3 rounded-[9px] border border-black text-[0.72rem] tracking-cad uppercase transition-colors cursor-pointer text-center ${
-                            isSelected
-                              ? 'bg-[#EF6922] text-black font-medium'
-                              : 'bg-white text-black hover:bg-[#CBCBCB] font-normal'
-                          }`}
-                        >
-                          {lens.code}
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  <div className="border border-black rounded-[9px] p-5 bg-white grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
-                    <div
-                      onClick={() => navigateToPage('work', currentLens.targetProjectId)}
-                      className={`lg:col-span-5 h-[220px] rounded-[9px] border-[0.75px] border-black overflow-hidden cursor-pointer flex items-center justify-center ${
-                        currentLens.isCad ? 'cad-grid-bg p-3' : 'bg-white'
-                      }`}
-                    >
-                      <img
-                        src={currentLens.image}
-                        alt={currentLens.imageAlt}
-                        className={`w-full h-full ${
-                          currentLens.isCad ? 'object-contain' : 'object-cover'
+                    {/* Open Gallery Detail Feature (No Outer Box Outline) */}
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-stretch pt-1">
+                      <div
+                        onClick={() => navigateToPage('work', currentLens.targetProjectId)}
+                        className={`lg:col-span-6 h-[250px] sm:h-[290px] rounded-[9px] border-[0.75px] border-black overflow-hidden cursor-pointer flex items-center justify-center ${
+                          currentLens.isCad ? 'cad-grid-bg p-4' : 'bg-white'
                         }`}
-                        referrerPolicy="no-referrer"
-                      />
-                    </div>
+                      >
+                        <img
+                          src={currentLens.image}
+                          alt={currentLens.imageAlt}
+                          className={`w-full h-full block ${
+                            currentLens.isCad ? 'object-contain' : 'object-cover'
+                          }`}
+                          referrerPolicy="no-referrer"
+                        />
+                      </div>
 
-                    <div className="lg:col-span-7 flex flex-col justify-between gap-4 text-left">
-                      <div>
-                        <div className="inline-block bg-[#CBCBCB] text-black border-[0.75px] border-black rounded-[9px] px-3.5 py-1 text-[0.68rem] tracking-cad uppercase font-medium mb-3">
-                          {currentLens.title}
+                      <div className="lg:col-span-6 flex flex-col justify-between gap-5 py-1 text-left">
+                        <div className="space-y-3">
+                          <div className="inline-block bg-[#CBCBCB] text-black border-[0.75px] border-black rounded-[9px] px-3.5 py-1 text-[0.68rem] tracking-cad uppercase font-medium">
+                            {currentLens.title}
+                          </div>
+                          <h2 className="text-[1.2rem] sm:text-[1.35rem] font-normal text-black leading-snug">
+                            {currentLens.headline}
+                          </h2>
+                          <p className="text-[0.94rem] font-light text-black leading-relaxed max-w-[56ch]">
+                            {currentLens.detail}
+                          </p>
                         </div>
-                        <h2 className="text-[1.12rem] sm:text-[1.25rem] font-normal text-black leading-snug mb-2">
-                          {currentLens.headline}
-                        </h2>
-                        <p className="text-[0.92rem] font-light text-black leading-relaxed max-w-[60ch]">
-                          {currentLens.detail}
-                        </p>
-                      </div>
 
-                      <div className="flex flex-wrap items-center gap-3">
-                        <button
-                          type="button"
-                          onClick={() => navigateToPage('work', currentLens.targetProjectId)}
-                          className="bg-black text-white hover:bg-[#EF6922] hover:text-black text-[0.74rem] tracking-cad uppercase py-2.5 px-5 rounded-[9px] border-[0.75px] border-black transition-colors cursor-pointer font-medium inline-flex items-center gap-2"
-                        >
-                          <span>OPEN COMMISSION SHEET IN 02 / WORK</span>
-                          <ArrowDownRight className="w-4 h-4" />
-                        </button>
+                        <div className="flex flex-wrap items-center gap-3">
+                          <button
+                            type="button"
+                            onClick={() => navigateToPage('work', currentLens.targetProjectId)}
+                            className="bg-black text-white hover:bg-[#EF6922] hover:text-black text-[0.74rem] tracking-cad uppercase py-2.5 px-5 rounded-[9px] border-[0.75px] border-black transition-colors cursor-pointer font-medium inline-flex items-center gap-2"
+                          >
+                            <span>OPEN COMMISSION SHEET IN 02 / WORK</span>
+                            <ArrowDownRight className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Dedicated Callout & Orange Button on Page 01 to Launch Studio Index 06 Concept Visualizer */}
-                <div className="border border-black rounded-[9px] p-5 sm:p-6 bg-white flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5 text-left">
-                  <div className="space-y-1.5">
-                    <div className="inline-block bg-[#EF6922] text-black border-[0.75px] border-black rounded-[9px] px-3.5 py-1 text-[0.68rem] tracking-cad uppercase font-medium">
-                      06 / INTERACTIVE CONCEPT VISUALIZER
+                  {/* Open Bottom Callout for Studio Index 06 Concept Visualizer (No Outer Box Outline) */}
+                  <div className="border-t border-black/20 pt-6 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5 text-left">
+                    <div className="space-y-2">
+                      <div className="inline-block bg-[#EF6922] text-black border-[0.75px] border-black rounded-[9px] px-3.5 py-1 text-[0.68rem] tracking-cad uppercase font-medium">
+                        06 / INTERACTIVE CONCEPT VISUALIZER
+                      </div>
+                      <h3 className="text-[1.12rem] sm:text-[1.24rem] font-normal text-black leading-snug">
+                        Have a custom furniture or built-in idea? See a visual concept in 3D or 2D CAD.
+                      </h3>
+                      <p className="text-[0.92rem] font-light text-black leading-relaxed max-w-[62ch]">
+                        Describe your project, choose your hardwood and joinery profile, or upload a
+                        photo of your room to generate a 3D Hardwood Proposal or 2D CAD Sketch on Page 06.
+                      </p>
                     </div>
-                    <h3 className="text-[1.08rem] sm:text-[1.2rem] font-normal text-black leading-snug">
-                      Have a custom furniture or built-in idea? See a visual concept in 3D or 2D CAD.
-                    </h3>
-                    <p className="text-[0.90rem] font-light text-black leading-relaxed max-w-[62ch]">
-                      Describe your project, choose your hardwood and joinery profile, or upload a
-                      photo of your room to generate a 3D Hardwood Proposal or 2D CAD Sketch on Page 06.
-                    </p>
-                  </div>
 
-                  <button
-                    type="button"
-                    onClick={() => navigateToPage('visualizer')}
-                    className="w-full lg:w-auto shrink-0 bg-[#EF6922] text-black hover:bg-black hover:text-white text-[0.76rem] tracking-cad uppercase py-3.5 px-6 rounded-[9px] border border-black transition-colors cursor-pointer font-medium inline-flex items-center justify-center gap-2 whitespace-nowrap"
-                  >
-                    <span>OPEN 06 / CONCEPT VISUALIZER</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => navigateToPage('visualizer')}
+                      className="w-full lg:w-auto shrink-0 bg-[#EF6922] text-black hover:bg-black hover:text-white text-[0.76rem] tracking-cad uppercase py-3.5 px-6 rounded-[9px] border border-black transition-colors cursor-pointer font-medium inline-flex items-center justify-center gap-2 whitespace-nowrap"
+                    >
+                      <span>OPEN 06 / CONCEPT VISUALIZER</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               </div>
             </section>
@@ -1003,277 +922,287 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
           =================================================================== */}
           {activePage === 'work' && (
             <section id="work" aria-label="02 Selected Work">
-              {/* Standalone Section Title Block Bar — Fabrication Blue (#27AAE0) + Black Ink */}
-              <div className="w-full bg-[#27AAE0] text-black border-[1.5px] border-black rounded-[9px] px-5 py-3 mb-3.5 flex flex-wrap items-center justify-between gap-2 select-none">
-                <span className="text-[0.82rem] sm:text-[0.88rem] tracking-cad uppercase font-medium">
-                  02 / SELECTED WORK — 3D DESIGN PROPOSALS &amp; 2D RHINO SHOP DRAWINGS
-                </span>
-                <span className="text-[0.72rem] tracking-cad uppercase font-medium">
-                  CLICK ANY SHEET TO ZOOM FULLSCREEN
-                </span>
-              </div>
+              {/* Unified Sheet Container with Incorporated Fabrication Blue Header */}
+              <div className="w-full bg-white border-[1.5px] border-black rounded-[9px] overflow-hidden">
+                {/* Incorporated Section Title Block Bar — Fabrication Blue (#27AAE0) + Black Ink */}
+                <div className="w-full bg-[#27AAE0] text-black border-b-[1.5px] border-black px-5 py-3 flex flex-wrap items-center justify-between gap-2 select-none">
+                  <span className="text-[0.82rem] sm:text-[0.88rem] tracking-cad uppercase font-medium">
+                    02 / SELECTED WORK — 3D DESIGN PROPOSALS &amp; 2D RHINO SHOP DRAWINGS
+                  </span>
+                  <span className="text-[0.72rem] tracking-cad uppercase font-medium">
+                    CLICK ANY SHEET TO ZOOM FULLSCREEN
+                  </span>
+                </div>
 
-              {/* Filter Control Row (4 Symmetric rounded-[9px] border border-black Buttons) */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
-                {[
-                  { id: 'all', label: '01 / ALL COMMISSIONS' },
-                  { id: 'architectural', label: '02 / ARCHITECTURAL' },
-                  { id: 'commercial', label: '03 / WET BARS & ISLANDS' },
-                  { id: 'furniture', label: '04 / HEIRLOOM & CAD' },
-                ].map((tab) => {
-                  const isSelected = filter === tab.id;
-                  return (
-                    <button
-                      key={tab.id}
-                      type="button"
-                      onClick={() =>
-                        setFilter(tab.id as 'all' | 'architectural' | 'furniture' | 'commercial')
-                      }
-                      className={`py-2.5 px-3 text-[0.72rem] tracking-cad uppercase rounded-[9px] border border-black transition-colors cursor-pointer text-center ${
-                        isSelected
-                          ? 'bg-[#27AAE0] text-black font-medium'
-                          : 'bg-white text-black hover:bg-[#CBCBCB] font-normal'
-                      }`}
-                    >
-                      {tab.label}
-                    </button>
-                  );
-                })}
-              </div>
+                {/* Inner Sheet Body */}
+                <div className="p-5 sm:p-7 space-y-7">
+                  {/* Filter Control Row (4 Symmetric rounded-[9px] border border-black Buttons) */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {[
+                      { id: 'all', label: '01 / ALL COMMISSIONS' },
+                      { id: 'architectural', label: '02 / ARCHITECTURAL' },
+                      { id: 'commercial', label: '03 / WET BARS & ISLANDS' },
+                      { id: 'furniture', label: '04 / HEIRLOOM & CAD' },
+                    ].map((tab) => {
+                      const isSelected = filter === tab.id;
+                      return (
+                        <button
+                          key={tab.id}
+                          type="button"
+                          onClick={() =>
+                            setFilter(
+                              tab.id as 'all' | 'architectural' | 'furniture' | 'commercial'
+                            )
+                          }
+                          className={`py-2.5 px-3 text-[0.72rem] tracking-cad uppercase rounded-[9px] border border-black transition-colors cursor-pointer text-center ${
+                            isSelected
+                              ? 'bg-[#27AAE0] text-black font-medium'
+                              : 'bg-white text-black hover:bg-[#CBCBCB] font-normal'
+                          }`}
+                        >
+                          {tab.label}
+                        </button>
+                      );
+                    })}
+                  </div>
 
-              {/* Individual Commission Sheets */}
-              <div className="space-y-12">
-                {filteredProjects.map((project) => {
-                  const currentIdx = activeImageIdx[project.id] ?? 0;
-                  const currentImg = project.images[currentIdx] || project.images[0];
-                  const isSpecsOpen = !!showSpecs[project.id];
+                  {/* Individual Commission Sheets */}
+                  <div className="space-y-8">
+                    {filteredProjects.map((project) => {
+                      const currentIdx = activeImageIdx[project.id] ?? 0;
+                      const currentImg = project.images[currentIdx] || project.images[0];
+                      const isSpecsOpen = !!showSpecs[project.id];
 
-                  return (
-                    <article
-                      key={project.id}
-                      id={`project-${project.id}`}
-                      className="scroll-mt-28"
-                    >
-                      {/* Standalone Project Title Bar in its True Pillar Color (#EF6922, #27AAE0, or #FDCB33) + 14px mb-3.5 gap */}
-                      <div
-                        className={`w-full ${project.pillarBg} text-black border-[1.5px] border-black rounded-[9px] px-5 py-3 mb-3.5 flex flex-wrap items-center justify-between gap-2 select-none`}
-                      >
-                        <span className="text-[0.82rem] sm:text-[0.88rem] tracking-cad uppercase font-medium">
-                          {project.title} — DWG {project.code}
-                        </span>
-                        <span className="text-[0.72rem] tracking-cad uppercase font-medium">
-                          {project.pillarCode}
-                        </span>
-                      </div>
-
-                      {/* Unified Black-Framed Project Sheet Container */}
-                      <div className="w-full bg-white border-[1.5px] border-black rounded-[9px] p-5 sm:p-7 space-y-5">
-                        {/* Top Control Strip: Materials Tag + Sheet Switcher Buttons */}
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                          <div className="bg-[#CBCBCB] text-black border border-black rounded-[9px] py-2 px-4 text-[0.72rem] tracking-cad uppercase font-medium select-none">
-                            {project.materials}
+                      return (
+                        <article
+                          key={project.id}
+                          id={`project-${project.id}`}
+                          className="w-full bg-white border border-black rounded-[9px] overflow-hidden scroll-mt-28"
+                        >
+                          {/* Incorporated Flush Project Title Bar in True Pillar Color (#EF6922, #27AAE0, or #FDCB33) */}
+                          <div
+                            className={`w-full ${project.pillarBg} text-black border-b border-black px-5 py-3 flex flex-wrap items-center justify-between gap-2 select-none`}
+                          >
+                            <span className="text-[0.82rem] sm:text-[0.88rem] tracking-cad uppercase font-medium">
+                              {project.title} — DWG {project.code}
+                            </span>
+                            <span className="text-[0.72rem] tracking-cad uppercase font-medium">
+                              {project.pillarCode}
+                            </span>
                           </div>
 
-                          <div className="flex flex-wrap items-center gap-2">
-                            {project.images.map((img, idx) => {
-                              const isSheetActive = !isSpecsOpen && currentIdx === idx;
-                              return (
+                          {/* Commission Sheet Body */}
+                          <div className="p-5 sm:p-6 space-y-5">
+                            {/* Top Control Strip: Materials Tag + Sheet Switcher Buttons */}
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                              <div className="bg-[#CBCBCB] text-black border border-black rounded-[9px] py-2 px-4 text-[0.72rem] tracking-cad uppercase font-medium select-none">
+                                {project.materials}
+                              </div>
+
+                              <div className="flex flex-wrap items-center gap-2">
+                                {project.images.map((img, idx) => {
+                                  const isSheetActive = !isSpecsOpen && currentIdx === idx;
+                                  return (
+                                    <button
+                                      key={`${img.sheetNumber}-${idx}`}
+                                      type="button"
+                                      onClick={() => setSheetIndex(project.id, idx)}
+                                      className={`text-[0.70rem] tracking-cad uppercase px-3.5 py-2 rounded-[9px] border border-black transition-colors cursor-pointer ${
+                                        isSheetActive
+                                          ? `${project.pillarBg} text-black font-medium`
+                                          : 'bg-white text-black hover:bg-[#CBCBCB] font-normal'
+                                      }`}
+                                    >
+                                      {img.sheetNumber}
+                                    </button>
+                                  );
+                                })}
+
                                 <button
-                                  key={`${img.sheetNumber}-${idx}`}
                                   type="button"
-                                  onClick={() => setSheetIndex(project.id, idx)}
+                                  onClick={() =>
+                                    setShowSpecs((prev) => ({
+                                      ...prev,
+                                      [project.id]: !prev[project.id],
+                                    }))
+                                  }
                                   className={`text-[0.70rem] tracking-cad uppercase px-3.5 py-2 rounded-[9px] border border-black transition-colors cursor-pointer ${
-                                    isSheetActive
+                                    isSpecsOpen
                                       ? `${project.pillarBg} text-black font-medium`
                                       : 'bg-white text-black hover:bg-[#CBCBCB] font-normal'
                                   }`}
                                 >
-                                  {img.sheetNumber}
+                                  SPEC SCHEDULE
                                 </button>
-                              );
-                            })}
 
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setShowSpecs((prev) => ({
-                                  ...prev,
-                                  [project.id]: !prev[project.id],
-                                }))
-                              }
-                              className={`text-[0.70rem] tracking-cad uppercase px-3.5 py-2 rounded-[9px] border border-black transition-colors cursor-pointer ${
-                                isSpecsOpen
-                                  ? `${project.pillarBg} text-black font-medium`
-                                  : 'bg-white text-black hover:bg-[#CBCBCB] font-normal'
-                              }`}
-                            >
-                              SPEC SCHEDULE
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setLightboxState({
-                                  project,
-                                  imageIndex: currentIdx,
-                                  showSpecs: isSpecsOpen,
-                                })
-                              }
-                              className="text-[0.70rem] tracking-cad uppercase px-3.5 py-2 rounded-[9px] border border-black bg-black text-white hover:bg-[#EF6922] hover:text-black transition-colors cursor-pointer flex items-center gap-1.5 font-medium"
-                              title="Open High-Resolution Fullscreen Viewer"
-                            >
-                              <Maximize2 className="w-3.5 h-3.5" />
-                              <span className="hidden md:inline">FULLSCREEN</span>
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Visual Stage or Spec Schedule Table */}
-                        {!isSpecsOpen && currentImg ? (
-                          <div className="space-y-4">
-                            <div
-                              className={`relative w-full rounded-[9px] border border-black overflow-hidden flex items-center justify-center ${
-                                currentImg.type === 'cad' ? 'cad-grid-bg p-4 sm:p-8' : 'bg-white'
-                              }`}
-                            >
-                              <div
-                                onClick={() =>
-                                  setLightboxState({ project, imageIndex: currentIdx })
-                                }
-                                className="w-full cursor-zoom-in flex items-center justify-center"
-                              >
-                                <img
-                                  src={currentImg.src}
-                                  alt={currentImg.alt}
-                                  loading="lazy"
-                                  decoding="async"
-                                  className="w-full max-h-[540px] object-contain select-none"
-                                  referrerPolicy="no-referrer"
-                                />
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setLightboxState({
+                                      project,
+                                      imageIndex: currentIdx,
+                                      showSpecs: isSpecsOpen,
+                                    })
+                                  }
+                                  className="text-[0.70rem] tracking-cad uppercase px-3.5 py-2 rounded-[9px] border border-black bg-black text-white hover:bg-[#EF6922] hover:text-black transition-colors cursor-pointer flex items-center gap-1.5 font-medium"
+                                  title="Open High-Resolution Fullscreen Viewer"
+                                >
+                                  <Maximize2 className="w-3.5 h-3.5" />
+                                  <span className="hidden md:inline">FULLSCREEN</span>
+                                </button>
                               </div>
-
-                              {project.images.length > 1 && (
-                                <>
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      setSheetIndex(
-                                        project.id,
-                                        currentIdx === 0
-                                          ? project.images.length - 1
-                                          : currentIdx - 1
-                                      )
-                                    }
-                                    aria-label="Previous sheet"
-                                    className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-[9px] bg-white hover:bg-[#CBCBCB] text-black border-[0.75px] border-black flex items-center justify-center transition-colors cursor-pointer shadow-sm"
-                                  >
-                                    <ChevronLeft className="w-4 h-4" />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      setSheetIndex(
-                                        project.id,
-                                        currentIdx === project.images.length - 1
-                                          ? 0
-                                          : currentIdx + 1
-                                      )
-                                    }
-                                    aria-label="Next sheet"
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-[9px] bg-white hover:bg-[#CBCBCB] text-black border-[0.75px] border-black flex items-center justify-center transition-colors cursor-pointer shadow-sm"
-                                  >
-                                    <ChevronRight className="w-4 h-4" />
-                                  </button>
-                                </>
-                              )}
                             </div>
 
-                            {/* Thumbnail Strip */}
-                            {project.images.length > 1 && (
-                              <div className="w-full px-5 py-3.5 rounded-[9px] border border-black bg-white flex flex-wrap items-center justify-between gap-4">
-                                <div className="flex items-center gap-3 overflow-x-auto">
-                                  {project.images.map((thumb, idx) => {
-                                    const isSelected = currentIdx === idx;
-                                    return (
+                            {/* Visual Stage or Spec Schedule Table */}
+                            {!isSpecsOpen && currentImg ? (
+                              <div className="space-y-4">
+                                <div
+                                  className={`relative w-full rounded-[9px] border-[0.75px] border-black overflow-hidden flex items-center justify-center ${
+                                    currentImg.type === 'cad'
+                                      ? 'cad-grid-bg p-4 sm:p-8'
+                                      : 'bg-white'
+                                  }`}
+                                >
+                                  <div
+                                    onClick={() =>
+                                      setLightboxState({ project, imageIndex: currentIdx })
+                                    }
+                                    className="w-full cursor-zoom-in flex items-center justify-center"
+                                  >
+                                    <img
+                                      src={currentImg.src}
+                                      alt={currentImg.alt}
+                                      loading="lazy"
+                                      decoding="async"
+                                      className="w-full max-h-[540px] object-contain select-none"
+                                      referrerPolicy="no-referrer"
+                                    />
+                                  </div>
+
+                                  {project.images.length > 1 && (
+                                    <>
                                       <button
-                                        key={`${thumb.sheetNumber}-${idx}`}
                                         type="button"
-                                        onClick={() => setSheetIndex(project.id, idx)}
-                                        className={`relative rounded-[9px] overflow-hidden border-[0.75px] border-black transition-all cursor-pointer shrink-0 ${
-                                          isSelected
-                                            ? 'opacity-100 ring-2 ring-[#EF6922]'
-                                            : 'opacity-60 hover:opacity-100'
-                                        }`}
+                                        onClick={() =>
+                                          setSheetIndex(
+                                            project.id,
+                                            currentIdx === 0
+                                              ? project.images.length - 1
+                                              : currentIdx - 1
+                                          )
+                                        }
+                                        aria-label="Previous sheet"
+                                        className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-[9px] bg-white hover:bg-[#CBCBCB] text-black border-[0.75px] border-black flex items-center justify-center transition-colors cursor-pointer shadow-sm"
                                       >
-                                        <img
-                                          src={thumb.src}
-                                          alt={thumb.alt}
-                                          loading="lazy"
-                                          className="w-20 sm:w-24 h-12 sm:h-14 object-cover bg-white"
-                                          referrerPolicy="no-referrer"
-                                        />
+                                        <ChevronLeft className="w-4 h-4" />
                                       </button>
-                                    );
-                                  })}
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          setSheetIndex(
+                                            project.id,
+                                            currentIdx === project.images.length - 1
+                                              ? 0
+                                              : currentIdx + 1
+                                          )
+                                        }
+                                        aria-label="Next sheet"
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-[9px] bg-white hover:bg-[#CBCBCB] text-black border-[0.75px] border-black flex items-center justify-center transition-colors cursor-pointer shadow-sm"
+                                      >
+                                        <ChevronRight className="w-4 h-4" />
+                                      </button>
+                                    </>
+                                  )}
                                 </div>
-                                <span className="text-[0.82rem] font-normal text-black">
-                                  {currentImg.sheetNumber} — {currentImg.label}
-                                </span>
+
+                                {/* Open Thumbnail Strip (No Outer Box Outline) */}
+                                {project.images.length > 1 && (
+                                  <div className="w-full pt-0.5 flex flex-wrap items-center justify-between gap-4">
+                                    <div className="flex items-center gap-3 overflow-x-auto py-0.5">
+                                      {project.images.map((thumb, idx) => {
+                                        const isSelected = currentIdx === idx;
+                                        return (
+                                          <button
+                                            key={`${thumb.sheetNumber}-${idx}`}
+                                            type="button"
+                                            onClick={() => setSheetIndex(project.id, idx)}
+                                            className={`relative rounded-[9px] overflow-hidden border-[0.75px] border-black transition-all cursor-pointer shrink-0 ${
+                                              isSelected
+                                                ? 'opacity-100 ring-2 ring-[#EF6922]'
+                                                : 'opacity-60 hover:opacity-100'
+                                            }`}
+                                          >
+                                            <img
+                                              src={thumb.src}
+                                              alt={thumb.alt}
+                                              loading="lazy"
+                                              className="w-20 sm:w-24 h-12 sm:h-14 object-cover bg-white"
+                                              referrerPolicy="no-referrer"
+                                            />
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                    <span className="text-[0.82rem] font-normal text-black">
+                                      {currentImg.sheetNumber} — {currentImg.label}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              /* Spec Schedule View */
+                              <div className="border border-black rounded-[9px] overflow-hidden bg-white">
+                                <div
+                                  className={`${project.pillarBg} text-black border-b border-black px-5 py-3 text-[0.76rem] tracking-cad uppercase font-medium flex flex-wrap items-center justify-between gap-2`}
+                                >
+                                  <span>
+                                    ARCHITECTURAL MATERIAL &amp; JOINERY SCHEDULE — {project.code}
+                                  </span>
+                                  <span>{project.dimensions}</span>
+                                </div>
+                                <div className="divide-y divide-black bg-white">
+                                  {project.specs.map((item, idx) => (
+                                    <div
+                                      key={idx}
+                                      className="p-4 sm:px-6 grid grid-cols-1 sm:grid-cols-3 gap-2 text-left"
+                                    >
+                                      <span className="text-[0.74rem] tracking-cad uppercase font-medium text-black">
+                                        {item.label}
+                                      </span>
+                                      <span className="sm:col-span-2 text-[0.92rem] font-light text-black">
+                                        {item.value}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
                               </div>
                             )}
-                          </div>
-                        ) : (
-                          /* Spec Schedule View */
-                          <div className="border border-black rounded-[9px] overflow-hidden bg-white">
-                            <div
-                              className={`${project.pillarBg} text-black border-b border-black px-5 py-3 text-[0.76rem] tracking-cad uppercase font-medium flex flex-wrap items-center justify-between gap-2`}
-                            >
-                              <span>
-                                ARCHITECTURAL MATERIAL &amp; JOINERY SCHEDULE — {project.code}
-                              </span>
-                              <span>{project.dimensions}</span>
-                            </div>
-                            <div className="divide-y divide-black bg-white">
-                              {project.specs.map((item, idx) => (
-                                <div
-                                  key={idx}
-                                  className="p-4 sm:px-6 grid grid-cols-1 sm:grid-cols-3 gap-2 text-left"
-                                >
-                                  <span className="text-[0.74rem] tracking-cad uppercase font-medium text-black">
-                                    {item.label}
-                                  </span>
-                                  <span className="sm:col-span-2 text-[0.92rem] font-light text-black">
-                                    {item.value}
-                                  </span>
+
+                            {/* Open Bottom Project Notes & Action Row (No Outer Box Outline) */}
+                            <div className="w-full border-t border-black/20 pt-5 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5 text-left">
+                              <div className="space-y-1">
+                                <div className="text-[0.70rem] tracking-cad uppercase font-medium text-black">
+                                  PROJECT NOTES · {project.dimensions} · {project.tolerance}
                                 </div>
-                              ))}
+                                <p className="text-[0.94rem] font-light text-black leading-relaxed max-w-[65ch]">
+                                  {project.description}
+                                </p>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() => navigateToPage('inquire')}
+                                className={`shrink-0 ${project.pillarBg} text-black hover:bg-black hover:text-white text-[0.74rem] tracking-cad uppercase py-3 px-5 rounded-[9px] border-[0.75px] border-black transition-colors cursor-pointer font-medium whitespace-nowrap`}
+                              >
+                                INQUIRE ABOUT THIS BUILD →
+                              </button>
                             </div>
                           </div>
-                        )}
-
-                        {/* Bottom CAD Title-Block Description & Action Box */}
-                        <div className="w-full rounded-[9px] border border-black bg-white p-5 sm:p-6 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5 text-left">
-                          <div className="space-y-1">
-                            <div className="text-[0.70rem] tracking-cad uppercase font-medium text-black">
-                              PROJECT NOTES · {project.dimensions} · {project.tolerance}
-                            </div>
-                            <p className="text-[0.94rem] font-light text-black leading-relaxed max-w-[65ch]">
-                              {project.description}
-                            </p>
-                          </div>
-
-                          <button
-                            type="button"
-                            onClick={() => navigateToPage('inquire')}
-                            className={`shrink-0 ${project.pillarBg} text-black hover:bg-black hover:text-white text-[0.74rem] tracking-cad uppercase py-3 px-5 rounded-[9px] border-[0.75px] border-black transition-colors cursor-pointer font-medium whitespace-nowrap`}
-                          >
-                            INQUIRE ABOUT THIS BUILD →
-                          </button>
-                        </div>
-                      </div>
-                    </article>
-                  );
-                })}
+                        </article>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
             </section>
           )}
@@ -1283,107 +1212,113 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
           =================================================================== */}
           {activePage === 'capabilities' && (
             <section id="capabilities" aria-label="03 Studio Capabilities and Specifications">
-              {/* Standalone Section Title Block Bar — Flex Yellow (#FDCB33) + Black Ink */}
-              <div className="w-full bg-[#FDCB33] text-black border-[1.5px] border-black rounded-[9px] px-5 py-3 mb-3.5 flex flex-wrap items-center justify-between gap-2 select-none">
-                <span className="text-[0.82rem] sm:text-[0.88rem] tracking-cad uppercase font-medium">
-                  03 / STUDIO CAPABILITIES, MATERIALS &amp; JOINERY
-                </span>
-                <span className="text-[0.72rem] tracking-cad uppercase font-medium">
-                  SPEC-CG-003 · OMAHA STUDIO
-                </span>
-              </div>
-
-              {/* Outer Black Sheet Frame with Intro Overview + 4 Symmetric Inner rounded-[9px] Cards */}
-              <div className="w-full bg-white border-[1.5px] border-black rounded-[9px] p-5 sm:p-7 space-y-6">
-                {/* Introductory Specification Overview Box */}
-                <div className="border border-black rounded-[9px] p-5 sm:p-6 bg-white flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 text-left">
-                  <div className="space-y-1.5">
-                    <div className="inline-block bg-[#FDCB33] text-black border-[0.75px] border-black rounded-[9px] px-3.5 py-1 text-[0.68rem] tracking-cad uppercase font-medium">
-                      MATERIAL &amp; FABRICATION STANDARDS
-                    </div>
-                    <p className="text-[0.94rem] sm:text-[1.0rem] font-light text-black leading-relaxed max-w-[66ch]">
-                      From single heirloom furniture commissions to full-room architectural millwork,
-                      every project is engineered in 3D Rhino CAD and fabricated in-house from select
-                      domestic hardwoods in Omaha, Nebraska.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => navigateToPage('work')}
-                    className="shrink-0 bg-black text-white hover:bg-[#FDCB33] hover:text-black text-[0.72rem] tracking-cad uppercase py-3 px-5 rounded-[9px] border border-black transition-colors cursor-pointer font-medium whitespace-nowrap"
-                  >
-                    VIEW COMPLETED WORK (02) →
-                  </button>
+              {/* Unified Sheet Container with Incorporated Flex Yellow Header */}
+              <div className="w-full bg-white border-[1.5px] border-black rounded-[9px] overflow-hidden">
+                {/* Incorporated Section Title Block Bar — Flex Yellow (#FDCB33) + Black Ink */}
+                <div className="w-full bg-[#FDCB33] text-black border-b-[1.5px] border-black px-5 py-3 flex flex-wrap items-center justify-between gap-2 select-none">
+                  <span className="text-[0.82rem] sm:text-[0.88rem] tracking-cad uppercase font-medium">
+                    03 / STUDIO CAPABILITIES, MATERIALS &amp; JOINERY
+                  </span>
+                  <span className="text-[0.72rem] tracking-cad uppercase font-medium">
+                    SPEC-CG-003 · OMAHA STUDIO
+                  </span>
                 </div>
 
-                {/* 4-Column Capabilities Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-                  {[
-                    {
-                      code: '01 / ARCHITECTURAL',
-                      headerBg: 'bg-[#EF6922]',
-                      items: [
-                        'Custom alcove & living room cabinetry',
-                        'Integrated window benches & drawers',
-                        'Wet bars & fluted tambour islands',
-                        'Library walls, pole wraps & mouldings',
-                      ],
-                    },
-                    {
-                      code: '02 / HEIRLOOM FURNITURE',
-                      headerBg: 'bg-[#27AAE0]',
-                      items: [
-                        'Solid hardwood dining & conference tables',
-                        'Credenzas, consoles & sideboards',
-                        'Custom lathe-turned legs & profiles',
-                        'One-of-a-kind heirloom commissions',
-                      ],
-                    },
-                    {
-                      code: '03 / COMMERCIAL & SPATIAL',
-                      headerBg: 'bg-[#FDCB33]',
-                      items: [
-                        'Reception desks & lobby installations',
-                        'Acoustic slatted hardwood partitions',
-                        'Hospitality, bar & restaurant millwork',
-                        'Custom retail displays & fixtures',
-                      ],
-                    },
-                    {
-                      code: '04 / MATERIALS & JOINERY',
-                      headerBg: 'bg-[#CBCBCB]',
-                      items: [
-                        'Select Black Walnut & Rift White Oak',
-                        'Exposed finger-joint & dovetail casework',
-                        'Custom fluted & tambour millwork',
-                        'Bauhaus color-blocking & natural oils',
-                      ],
-                    },
-                  ].map((pillar) => (
-                    <div key={pillar.code} className="flex flex-col gap-3">
-                      {/* Standalone rounded-[9px] Pillar Header Bar */}
-                      <div
-                        className={`w-full ${pillar.headerBg} text-black border border-black rounded-[9px] py-2.5 px-4 text-[0.74rem] tracking-cad uppercase font-medium text-center select-none`}
-                      >
-                        {pillar.code}
+                {/* Inner Sheet Body */}
+                <div className="p-5 sm:p-7 space-y-6">
+                  {/* Open Introductory Specification Overview (No Outer Box Outline) */}
+                  <div className="border-b border-black/20 pb-6 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5 text-left">
+                    <div className="space-y-2">
+                      <div className="inline-block bg-[#FDCB33] text-black border-[0.75px] border-black rounded-[9px] px-3.5 py-1 text-[0.68rem] tracking-cad uppercase font-medium">
+                        MATERIAL &amp; FABRICATION STANDARDS
                       </div>
-
-                      {/* Matching rounded-[9px] border border-black Spec Card */}
-                      <div className="flex-1 bg-white border border-black rounded-[9px] p-5 flex flex-col justify-center text-left">
-                        <ul className="space-y-3">
-                          {pillar.items.map((item) => (
-                            <li
-                              key={item}
-                              className="text-[0.88rem] font-light leading-relaxed text-black flex items-start gap-2.5"
-                            >
-                              <span className="text-black font-medium select-none">•</span>
-                              <span>{item}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
+                      <p className="text-[0.94rem] sm:text-[1.0rem] font-light text-black leading-relaxed max-w-[66ch]">
+                        From single heirloom furniture commissions to full-room architectural
+                        millwork, every project is engineered in 3D Rhino CAD and fabricated
+                        in-house from select domestic hardwoods in Omaha, Nebraska.
+                      </p>
                     </div>
-                  ))}
+                    <button
+                      type="button"
+                      onClick={() => navigateToPage('work')}
+                      className="shrink-0 bg-black text-white hover:bg-[#FDCB33] hover:text-black text-[0.72rem] tracking-cad uppercase py-3 px-5 rounded-[9px] border border-black transition-colors cursor-pointer font-medium whitespace-nowrap"
+                    >
+                      VIEW COMPLETED WORK (02) →
+                    </button>
+                  </div>
+
+                  {/* 4-Column Flush-Header Capabilities Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 items-stretch">
+                    {[
+                      {
+                        code: '01 / ARCHITECTURAL',
+                        headerBg: 'bg-[#EF6922]',
+                        items: [
+                          'Custom alcove & living room cabinetry',
+                          'Integrated window benches & drawers',
+                          'Wet bars & fluted tambour islands',
+                          'Library walls, pole wraps & mouldings',
+                        ],
+                      },
+                      {
+                        code: '02 / HEIRLOOM FURNITURE',
+                        headerBg: 'bg-[#27AAE0]',
+                        items: [
+                          'Solid hardwood dining & conference tables',
+                          'Credenzas, consoles & sideboards',
+                          'Custom lathe-turned legs & profiles',
+                          'One-of-a-kind heirloom commissions',
+                        ],
+                      },
+                      {
+                        code: '03 / COMMERCIAL & SPATIAL',
+                        headerBg: 'bg-[#FDCB33]',
+                        items: [
+                          'Reception desks & lobby installations',
+                          'Acoustic slatted hardwood partitions',
+                          'Hospitality, bar & restaurant millwork',
+                          'Custom retail displays & fixtures',
+                        ],
+                      },
+                      {
+                        code: '04 / MATERIALS & JOINERY',
+                        headerBg: 'bg-[#CBCBCB]',
+                        items: [
+                          'Select Black Walnut & Rift White Oak',
+                          'Exposed finger-joint & dovetail casework',
+                          'Custom fluted & tambour millwork',
+                          'Bauhaus color-blocking & natural oils',
+                        ],
+                      },
+                    ].map((pillar) => (
+                      <div
+                        key={pillar.code}
+                        className="border border-black rounded-[9px] bg-white overflow-hidden flex flex-col"
+                      >
+                        {/* Flush Pillar Header Bar */}
+                        <div
+                          className={`w-full ${pillar.headerBg} text-black border-b border-black py-2.5 px-4 text-[0.74rem] tracking-cad uppercase font-medium text-center select-none`}
+                        >
+                          {pillar.code}
+                        </div>
+
+                        {/* Spec List Body */}
+                        <div className="flex-1 p-5 flex flex-col justify-center text-left">
+                          <ul className="space-y-3">
+                            {pillar.items.map((item) => (
+                              <li
+                                key={item}
+                                className="text-[0.88rem] font-light leading-relaxed text-black flex items-start gap-2.5"
+                              >
+                                <span className="text-black font-medium select-none">•</span>
+                                <span>{item}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             </section>
@@ -1394,116 +1329,123 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
           =================================================================== */}
           {activePage === 'process' && (
             <section id="process" aria-label="04 Process and Trade Partners">
-              {/* Standalone Section Title Block Bar — CAD Grey (#CBCBCB) + Black Ink */}
-              <div className="w-full bg-[#CBCBCB] text-black border-[1.5px] border-black rounded-[9px] px-5 py-3 mb-3.5 flex flex-wrap items-center justify-between gap-2 select-none">
-                <span className="text-[0.82rem] sm:text-[0.88rem] tracking-cad uppercase font-medium">
-                  04 / CUSTOM DESIGN PROCESS &amp; ARCHITECTURAL TRADE SUBMITTALS
-                </span>
-                <span className="text-[0.72rem] tracking-cad uppercase font-medium">
-                  HOMEOWNERS · ARCHITECTS · BUILDERS
-                </span>
-              </div>
-
-              {/* Sheet Container */}
-              <div className="w-full bg-white border-[1.5px] border-black rounded-[9px] p-5 sm:p-7 space-y-6">
-                {/* 4-Step Process Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-                  {[
-                    {
-                      step: '01 / CONSULTATION',
-                      headerBg: 'bg-[#CBCBCB]',
-                      description:
-                        'Bring your space, floor plans, or a custom concept. We collaborate across residential, commercial, and architectural builds.',
-                    },
-                    {
-                      step: '02 / 3D CAD & DRAWINGS',
-                      headerBg: 'bg-[#EF6922]',
-                      description:
-                        'Your idea is translated into photorealistic 3D renderings and dimensioned 2D Rhino shop drawings before a board is cut.',
-                    },
-                    {
-                      step: '03 / FABRICATION',
-                      headerBg: 'bg-[#27AAE0]',
-                      description:
-                        'Handcrafted in our Omaha studio using select domestic hardwoods, precision CNC & traditional joinery, and natural oil finishes.',
-                    },
-                    {
-                      step: '04 / INSTALLATION',
-                      headerBg: 'bg-[#FDCB33]',
-                      description:
-                        'Careful transport and meticulous on-site installation, scribed and fitted seamlessly to your home or commercial space.',
-                    },
-                  ].map((item) => (
-                    <div key={item.step} className="flex flex-col gap-3">
-                      <div
-                        className={`w-full ${item.headerBg} text-black border border-black rounded-[9px] py-2.5 px-4 text-[0.74rem] tracking-cad uppercase font-medium text-center select-none`}
-                      >
-                        {item.step}
-                      </div>
-                      <div className="flex-1 bg-white border border-black rounded-[9px] p-5 text-left">
-                        <p className="text-[0.88rem] font-light leading-relaxed text-black">
-                          {item.description}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
+              {/* Unified Sheet Container with Incorporated CAD Grey Header */}
+              <div className="w-full bg-white border-[1.5px] border-black rounded-[9px] overflow-hidden">
+                {/* Incorporated Section Title Block Bar — CAD Grey (#CBCBCB) + Black Ink */}
+                <div className="w-full bg-[#CBCBCB] text-black border-b-[1.5px] border-black px-5 py-3 flex flex-wrap items-center justify-between gap-2 select-none">
+                  <span className="text-[0.82rem] sm:text-[0.88rem] tracking-cad uppercase font-medium">
+                    04 / CUSTOM DESIGN PROCESS &amp; ARCHITECTURAL TRADE SUBMITTALS
+                  </span>
+                  <span className="text-[0.72rem] tracking-cad uppercase font-medium">
+                    HOMEOWNERS · ARCHITECTS · BUILDERS
+                  </span>
                 </div>
 
-                {/* Trade Partner Submittal Callout Card */}
-                <div
-                  id="trade"
-                  className="border border-black rounded-[9px] p-5 sm:p-6 bg-white grid grid-cols-1 lg:grid-cols-12 gap-6 items-center"
-                >
-                  <div className="lg:col-span-7 space-y-4 text-left">
-                    <div className="inline-block bg-[#CBCBCB] text-black border-[0.75px] border-black rounded-[9px] px-4 py-1.5 text-[0.72rem] tracking-cad uppercase font-medium">
-                      FOR ARCHITECTS, INTERIOR DESIGNERS &amp; CUSTOM BUILDERS
-                    </div>
-                    <h2 className="text-[1.15rem] sm:text-[1.3rem] font-normal text-black leading-snug">
-                      Partner with an Omaha fabricator who speaks architectural CAD.
-                    </h2>
-                    <p className="text-[0.92rem] font-light text-black leading-relaxed max-w-[60ch]">
-                      We provide complete 2D Rhino elevation, section, and plan submittals with
-                      fractional callouts, photorealistic 3D client renders, and direct on-site
-                      coordination with your electrical, plumbing, and general contracting teams.
-                    </p>
-                    <div className="flex flex-wrap items-center gap-3 pt-1">
-                      <button
-                        type="button"
-                        onClick={() => navigateToPage('inquire')}
-                        className="bg-[#FDCB33] text-black hover:bg-black hover:text-white text-[0.74rem] tracking-cad uppercase py-3 px-5 rounded-[9px] border border-black transition-colors cursor-pointer font-medium"
+                {/* Inner Sheet Body */}
+                <div className="p-5 sm:p-7 space-y-7">
+                  {/* 4-Step Flush-Header Process Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 items-stretch">
+                    {[
+                      {
+                        step: '01 / CONSULTATION',
+                        headerBg: 'bg-[#CBCBCB]',
+                        description:
+                          'Bring your space, floor plans, or a custom concept. We collaborate across residential, commercial, and architectural builds.',
+                      },
+                      {
+                        step: '02 / 3D CAD & DRAWINGS',
+                        headerBg: 'bg-[#EF6922]',
+                        description:
+                          'Your idea is translated into photorealistic 3D renderings and dimensioned 2D Rhino shop drawings before a board is cut.',
+                      },
+                      {
+                        step: '03 / FABRICATION',
+                        headerBg: 'bg-[#27AAE0]',
+                        description:
+                          'Handcrafted in our Omaha studio using select domestic hardwoods, precision CNC & traditional joinery, and natural oil finishes.',
+                      },
+                      {
+                        step: '04 / INSTALLATION',
+                        headerBg: 'bg-[#FDCB33]',
+                        description:
+                          'Careful transport and meticulous on-site installation, scribed and fitted seamlessly to your home or commercial space.',
+                      },
+                    ].map((item) => (
+                      <div
+                        key={item.step}
+                        className="border border-black rounded-[9px] bg-white overflow-hidden flex flex-col"
                       >
-                        SUBMIT FLOOR PLANS OR DRAWINGS →
-                      </button>
-                      <a
-                        href="mailto:josh@casegoodsomaha.com?subject=Trade%20%2F%20Architectural%20Collaboration%20Inquiry"
-                        className="bg-white text-black hover:bg-[#CBCBCB] text-[0.74rem] tracking-cad uppercase py-3 px-5 rounded-[9px] border border-black transition-colors font-medium"
-                      >
-                        EMAIL JOSH@CASEGOODSOMAHA.COM
-                      </a>
-                    </div>
+                        <div
+                          className={`w-full ${item.headerBg} text-black border-b border-black py-2.5 px-4 text-[0.74rem] tracking-cad uppercase font-medium text-center select-none`}
+                        >
+                          {item.step}
+                        </div>
+                        <div className="flex-1 p-5 text-left">
+                          <p className="text-[0.88rem] font-light leading-relaxed text-black">
+                            {item.description}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
                   </div>
 
-                  <div className="lg:col-span-5 border border-black rounded-[9px] p-4 bg-white space-y-3">
-                    <div className="bg-[#CBCBCB] text-black border-[0.75px] border-black rounded-[9px] px-4 py-2 text-[0.70rem] tracking-cad uppercase font-medium flex items-center justify-between">
-                      <span>SAMPLE SUBMITTAL — 1070MCG</span>
-                      <span>SECTION B1</span>
+                  {/* Open Trade Partner Submittal Section (No Outer Box Outline) */}
+                  <div
+                    id="trade"
+                    className="border-t border-black/20 pt-6 grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-center"
+                  >
+                    <div className="lg:col-span-7 space-y-4 text-left">
+                      <div className="inline-block bg-[#CBCBCB] text-black border-[0.75px] border-black rounded-[9px] px-4 py-1.5 text-[0.72rem] tracking-cad uppercase font-medium">
+                        FOR ARCHITECTS, INTERIOR DESIGNERS &amp; CUSTOM BUILDERS
+                      </div>
+                      <h2 className="text-[1.15rem] sm:text-[1.3rem] font-normal text-black leading-snug">
+                        Partner with an Omaha fabricator who speaks architectural CAD.
+                      </h2>
+                      <p className="text-[0.92rem] font-light text-black leading-relaxed max-w-[60ch]">
+                        We provide complete 2D Rhino elevation, section, and plan submittals with
+                        fractional callouts, photorealistic 3D client renders, and direct on-site
+                        coordination with your electrical, plumbing, and general contracting teams.
+                      </p>
+                      <div className="flex flex-wrap items-center gap-3 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => navigateToPage('inquire')}
+                          className="bg-[#FDCB33] text-black hover:bg-black hover:text-white text-[0.74rem] tracking-cad uppercase py-3 px-5 rounded-[9px] border border-black transition-colors cursor-pointer font-medium"
+                        >
+                          SUBMIT FLOOR PLANS OR DRAWINGS →
+                        </button>
+                        <a
+                          href="mailto:josh@casegoodsomaha.com?subject=Trade%20%2F%20Architectural%20Collaboration%20Inquiry"
+                          className="bg-white text-black hover:bg-[#CBCBCB] text-[0.74rem] tracking-cad uppercase py-3 px-5 rounded-[9px] border border-black transition-colors font-medium"
+                        >
+                          EMAIL JOSH@CASEGOODSOMAHA.COM
+                        </a>
+                      </div>
                     </div>
-                    <div
-                      onClick={() =>
-                        setLightboxState({
-                          project: projects[2],
-                          imageIndex: 1,
-                        })
-                      }
-                      className="cad-grid-bg border-[0.75px] border-black rounded-[9px] p-4 flex items-center justify-center cursor-zoom-in h-[220px]"
-                    >
-                      <img
-                        src={ASSETS.kidsKitchen.sectionB1}
-                        alt="Sample Rhino 2D CAD Section & Plumbing Submittal"
-                        loading="lazy"
-                        className="w-full h-full object-contain select-none"
-                        referrerPolicy="no-referrer"
-                      />
+
+                    {/* Flush-Header Submittal Sheet Card (Matching Sheet A1 Style) */}
+                    <div className="lg:col-span-5 border border-black rounded-[9px] bg-white overflow-hidden flex flex-col">
+                      <div className="bg-[#CBCBCB] text-black border-b border-black px-4 py-2.5 text-[0.70rem] tracking-cad uppercase font-medium flex items-center justify-between select-none">
+                        <span>SAMPLE SUBMITTAL — 1070MCG</span>
+                        <span>SECTION B1</span>
+                      </div>
+                      <div
+                        onClick={() =>
+                          setLightboxState({
+                            project: projects[2],
+                            imageIndex: 1,
+                          })
+                        }
+                        className="cad-grid-bg p-4 flex items-center justify-center cursor-zoom-in h-[240px]"
+                      >
+                        <img
+                          src={ASSETS.kidsKitchen.sectionB1}
+                          alt="Sample Rhino 2D CAD Section & Plumbing Submittal"
+                          loading="lazy"
+                          className="w-full h-full object-contain select-none"
+                          referrerPolicy="no-referrer"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1516,289 +1458,297 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
           =================================================================== */}
           {activePage === 'inquire' && (
             <section id="inquire" aria-label="05 Commission Inquiry">
-              {/* Standalone Section Title Block Bar — Drafting Black (#000000) + White Ink */}
-              <div className="w-full bg-black text-white border-[1.5px] border-black rounded-[9px] px-5 py-3 mb-3.5 flex flex-wrap items-center justify-between gap-2 select-none">
-                <span className="text-[0.82rem] sm:text-[0.88rem] tracking-cad uppercase font-normal">
-                  05 / COMMISSION A BUILD — PROJECT INQUIRY SCHEDULE
-                </span>
-                <span className="text-[0.72rem] tracking-cad uppercase text-[#FDCB33] font-medium">
-                  DIRECT: {OWNER_PHONE_DISPLAY}
-                </span>
-              </div>
-
-              {/* Unified Black-Framed Inquiry Sheet */}
-              <div className="w-full bg-white border-[1.5px] border-black rounded-[9px] p-5 sm:p-7 space-y-6">
-                <div className="border border-black rounded-[9px] p-5 bg-white flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 text-left">
-                  <p className="text-[0.95rem] sm:text-[1.0rem] font-light text-black leading-relaxed max-w-[64ch]">
-                    Have a custom furniture piece, architectural built-in, or commercial build in
-                    mind? Enter your project details below to text Josh directly at{' '}
-                    <strong className="font-medium">{OWNER_PHONE_DISPLAY}</strong> or email{' '}
-                    <strong className="font-medium">{OWNER_EMAIL}</strong>.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => navigateToPage('visualizer')}
-                    className="shrink-0 bg-[#EF6922] text-black hover:bg-black hover:text-white text-[0.72rem] tracking-cad uppercase py-3 px-5 rounded-[9px] border border-black transition-colors cursor-pointer font-medium inline-flex items-center gap-2 whitespace-nowrap"
-                  >
-                    <span>VISUALIZE YOUR IDEA FIRST (PAGE 06)</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </button>
+              {/* Unified Sheet Container with Incorporated Drafting Black Header */}
+              <div className="w-full bg-white border-[1.5px] border-black rounded-[9px] overflow-hidden">
+                {/* Incorporated Section Title Block Bar — Drafting Black (#000000) + White Ink */}
+                <div className="w-full bg-black text-white border-b-[1.5px] border-black px-5 py-3 flex flex-wrap items-center justify-between gap-2 select-none">
+                  <span className="text-[0.82rem] sm:text-[0.88rem] tracking-cad uppercase font-normal">
+                    05 / COMMISSION A BUILD — PROJECT INQUIRY SCHEDULE
+                  </span>
+                  <span className="text-[0.72rem] tracking-cad uppercase text-[#FDCB33] font-medium">
+                    DIRECT: {OWNER_PHONE_DISPLAY}
+                  </span>
                 </div>
 
-                {visualizerState.history.length > 0 && (
-                  <div className="border border-black rounded-[9px] p-4 bg-[#FDCB33]/20 flex flex-col sm:flex-row items-center justify-between gap-4 text-left">
-                    <div className="flex items-center gap-3.5 min-w-0">
-                      <img
-                        src={
-                          (
-                            visualizerState.history.find(
-                              (c) => c.id === visualizerState.activeConceptId
-                            ) || visualizerState.history[0]
-                          ).imageUrl
-                        }
-                        alt="Generated Custom Concept"
-                        className="w-20 h-12 object-cover rounded-[6px] border-[0.75px] border-black bg-white shrink-0"
-                      />
-                      <div className="min-w-0">
-                        <span className="block text-[0.68rem] tracking-cad uppercase font-medium text-black">
-                          ATTACHED CONCEPT FROM PAGE 06 VISUALIZER
-                        </span>
-                        <p className="text-[0.82rem] font-light text-black truncate">
-                          {
+                {/* Inner Sheet Body */}
+                <div className="p-5 sm:p-7 space-y-6">
+                  {/* Open Intro Lead Row (No Outer Box Outline) */}
+                  <div className="border-b border-black/20 pb-6 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5 text-left">
+                    <p className="text-[0.95rem] sm:text-[1.0rem] font-light text-black leading-relaxed max-w-[64ch]">
+                      Have a custom furniture piece, architectural built-in, or commercial build in
+                      mind? Enter your project details below to text Josh directly at{' '}
+                      <strong className="font-medium">{OWNER_PHONE_DISPLAY}</strong> or email{' '}
+                      <strong className="font-medium">{OWNER_EMAIL}</strong>.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => navigateToPage('visualizer')}
+                      className="shrink-0 bg-[#EF6922] text-black hover:bg-black hover:text-white text-[0.72rem] tracking-cad uppercase py-3 px-5 rounded-[9px] border border-black transition-colors cursor-pointer font-medium inline-flex items-center gap-2 whitespace-nowrap"
+                    >
+                      <span>VISUALIZE YOUR IDEA FIRST (PAGE 06)</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  {visualizerState.history.length > 0 && (
+                    <div className="border border-black rounded-[9px] p-4 bg-[#FDCB33]/20 flex flex-col sm:flex-row items-center justify-between gap-4 text-left">
+                      <div className="flex items-center gap-3.5 min-w-0">
+                        <img
+                          src={
                             (
                               visualizerState.history.find(
                                 (c) => c.id === visualizerState.activeConceptId
                               ) || visualizerState.history[0]
-                            ).summarySpec
+                            ).imageUrl
                           }
-                        </p>
+                          alt="Generated Custom Concept"
+                          className="w-20 h-12 object-cover rounded-[6px] border-[0.75px] border-black bg-white shrink-0"
+                        />
+                        <div className="min-w-0">
+                          <span className="block text-[0.68rem] tracking-cad uppercase font-medium text-black">
+                            ATTACHED CONCEPT FROM PAGE 06 VISUALIZER
+                          </span>
+                          <p className="text-[0.82rem] font-light text-black truncate">
+                            {
+                              (
+                                visualizerState.history.find(
+                                  (c) => c.id === visualizerState.activeConceptId
+                                ) || visualizerState.history[0]
+                              ).summarySpec
+                            }
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => navigateToPage('visualizer')}
-                      className="shrink-0 bg-[#EF6922] text-black hover:bg-black hover:text-white text-[0.68rem] tracking-cad uppercase py-2 px-3.5 rounded-[9px] border-[0.75px] border-black font-medium cursor-pointer"
-                    >
-                      EDIT ON PAGE 06 →
-                    </button>
-                  </div>
-                )}
-
-                <form onSubmit={(e) => handleSubmit(e, submitMode)} className="space-y-5">
-                  {/* Row 1: Name, Contact, Category */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                    <div className="flex flex-col gap-2 text-left">
-                      <label
-                        htmlFor="prop-inquiry-name"
-                        className="bg-[#CBCBCB] text-black border border-black rounded-[9px] py-2 px-4 text-[0.72rem] tracking-cad uppercase font-medium cursor-pointer"
-                      >
-                        01 / YOUR NAME *
-                      </label>
-                      <input
-                        id="prop-inquiry-name"
-                        type="text"
-                        required
-                        value={formData.name}
-                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                        placeholder="First & last name"
-                        className="w-full h-[48px] bg-white text-black text-[0.92rem] px-4 rounded-[9px] border border-black font-light focus:outline-none focus:bg-[#FDCB33]/10 placeholder:text-black/45"
-                      />
-                    </div>
-
-                    <div className="flex flex-col gap-2 text-left">
-                      <label
-                        htmlFor="prop-inquiry-contact"
-                        className="bg-[#CBCBCB] text-black border border-black rounded-[9px] py-2 px-4 text-[0.72rem] tracking-cad uppercase font-medium cursor-pointer"
-                      >
-                        02 / PHONE OR EMAIL *
-                      </label>
-                      <input
-                        id="prop-inquiry-contact"
-                        type="text"
-                        required
-                        value={formData.contact}
-                        onChange={(e) => setFormData({ ...formData, contact: e.target.value })}
-                        placeholder="Best number or email"
-                        className="w-full h-[48px] bg-white text-black text-[0.92rem] px-4 rounded-[9px] border border-black font-light focus:outline-none focus:bg-[#FDCB33]/10 placeholder:text-black/45"
-                      />
-                    </div>
-
-                    <div className="flex flex-col gap-2 text-left">
-                      <label
-                        htmlFor="prop-inquiry-category"
-                        className="bg-[#CBCBCB] text-black border border-black rounded-[9px] py-2 px-4 text-[0.72rem] tracking-cad uppercase font-medium cursor-pointer"
-                      >
-                        03 / PROJECT CATEGORY
-                      </label>
-                      <select
-                        id="prop-inquiry-category"
-                        value={formData.projectType}
-                        onChange={(e) => setFormData({ ...formData, projectType: e.target.value })}
-                        className="w-full h-[48px] bg-white text-black text-[0.92rem] px-4 rounded-[9px] border border-black font-normal focus:outline-none cursor-pointer"
-                      >
-                        <option value="Custom Furniture">Custom Furniture</option>
-                        <option value="Architectural Built-In / Cabinetry">
-                          Architectural Built-In / Cabinetry
-                        </option>
-                        <option value="Commercial Millwork">Commercial Millwork</option>
-                        <option value="Architect / Designer Submittal">
-                          Architect / Designer Submittal
-                        </option>
-                        <option value="One-of-a-Kind Design Challenge">
-                          One-of-a-Kind Design Challenge
-                        </option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Row 2: Location & Timeline */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <div className="flex flex-col gap-2 text-left">
-                      <label
-                        htmlFor="prop-inquiry-location"
-                        className="bg-[#CBCBCB] text-black border border-black rounded-[9px] py-2 px-4 text-[0.72rem] tracking-cad uppercase font-medium cursor-pointer"
-                      >
-                        04 / LOCATION
-                      </label>
-                      <input
-                        id="prop-inquiry-location"
-                        type="text"
-                        value={formData.location}
-                        onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                        placeholder="Omaha, NE or surrounding area"
-                        className="w-full h-[48px] bg-white text-black text-[0.92rem] px-4 rounded-[9px] border border-black font-light focus:outline-none placeholder:text-black/45"
-                      />
-                    </div>
-
-                    <div className="flex flex-col gap-2 text-left">
-                      <label
-                        htmlFor="prop-inquiry-timeline"
-                        className="bg-[#CBCBCB] text-black border border-black rounded-[9px] py-2 px-4 text-[0.72rem] tracking-cad uppercase font-medium cursor-pointer"
-                      >
-                        05 / TARGET TIMELINE
-                      </label>
-                      <input
-                        id="prop-inquiry-timeline"
-                        type="text"
-                        value={formData.timeline}
-                        onChange={(e) => setFormData({ ...formData, timeline: e.target.value })}
-                        placeholder="e.g., Next 1–3 months or flexible"
-                        className="w-full h-[48px] bg-white text-black text-[0.92rem] px-4 rounded-[9px] border border-black font-light focus:outline-none placeholder:text-black/45"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Row 3: Attachments & Link */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <div className="flex flex-col gap-2 text-left">
-                      <label
-                        htmlFor="prop-inquiry-attachments"
-                        className="bg-[#27AAE0] text-black border border-black rounded-[9px] py-2 px-4 text-[0.72rem] tracking-cad uppercase font-medium cursor-pointer"
-                      >
-                        06 / SPACE PHOTOS, SKETCHES OR PLANS (OPTIONAL)
-                      </label>
-                      <input
-                        id="prop-inquiry-attachments"
-                        ref={fileInputRef}
-                        type="file"
-                        multiple
-                        accept="image/*,.pdf,.dwg,.dxf"
-                        onChange={handleFileChange}
-                        className="hidden"
-                      />
                       <button
                         type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        className="w-full h-[48px] px-4 rounded-[9px] border border-black bg-white hover:bg-[#CBCBCB] text-[0.86rem] text-black flex items-center justify-center gap-2 transition-colors cursor-pointer font-normal"
+                        onClick={() => navigateToPage('visualizer')}
+                        className="shrink-0 bg-[#EF6922] text-black hover:bg-black hover:text-white text-[0.68rem] tracking-cad uppercase py-2 px-3.5 rounded-[9px] border-[0.75px] border-black font-medium cursor-pointer"
                       >
-                        <Upload className="w-4 h-4 text-black" />
-                        <span>Attach photos, sketches, or PDF plans</span>
+                        EDIT ON PAGE 06 →
                       </button>
+                    </div>
+                  )}
 
-                      {attachments.length > 0 && (
-                        <div className="flex flex-wrap gap-2 pt-1">
-                          {attachments.map((file, idx) => (
-                            <div
-                              key={`${file.name}-${idx}`}
-                              className="flex items-center gap-2 bg-[#CBCBCB] border-[0.75px] border-black rounded-[9px] px-3 py-1.5 text-[0.76rem] font-medium"
-                            >
-                              <FileText className="w-3.5 h-3.5 text-black" />
-                              <span className="max-w-[150px] truncate">{file.name}</span>
-                              <span>({file.size})</span>
-                              <button
-                                type="button"
-                                onClick={() => removeAttachment(idx)}
-                                className="text-black hover:text-[#EF6922] cursor-pointer"
-                                aria-label={`Remove ${file.name}`}
-                              >
-                                <X className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                  <form onSubmit={(e) => handleSubmit(e, submitMode)} className="space-y-5">
+                    {/* Row 1: Name, Contact, Category */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                      <div className="border border-black rounded-[9px] bg-white overflow-hidden flex flex-col text-left">
+                        <label
+                          htmlFor="prop-inquiry-name"
+                          className="bg-[#CBCBCB] text-black border-b border-black py-2 px-4 text-[0.72rem] tracking-cad uppercase font-medium cursor-pointer"
+                        >
+                          01 / YOUR NAME *
+                        </label>
+                        <input
+                          id="prop-inquiry-name"
+                          type="text"
+                          required
+                          value={formData.name}
+                          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                          placeholder="First & last name"
+                          className="w-full h-[48px] bg-white text-black text-[0.92rem] px-4 font-light focus:outline-none focus:bg-[#FDCB33]/10 placeholder:text-black/45"
+                        />
+                      </div>
+
+                      <div className="border border-black rounded-[9px] bg-white overflow-hidden flex flex-col text-left">
+                        <label
+                          htmlFor="prop-inquiry-contact"
+                          className="bg-[#CBCBCB] text-black border-b border-black py-2 px-4 text-[0.72rem] tracking-cad uppercase font-medium cursor-pointer"
+                        >
+                          02 / PHONE OR EMAIL *
+                        </label>
+                        <input
+                          id="prop-inquiry-contact"
+                          type="text"
+                          required
+                          value={formData.contact}
+                          onChange={(e) => setFormData({ ...formData, contact: e.target.value })}
+                          placeholder="Best number or email"
+                          className="w-full h-[48px] bg-white text-black text-[0.92rem] px-4 font-light focus:outline-none focus:bg-[#FDCB33]/10 placeholder:text-black/45"
+                        />
+                      </div>
+
+                      <div className="border border-black rounded-[9px] bg-white overflow-hidden flex flex-col text-left">
+                        <label
+                          htmlFor="prop-inquiry-category"
+                          className="bg-[#CBCBCB] text-black border-b border-black py-2 px-4 text-[0.72rem] tracking-cad uppercase font-medium cursor-pointer"
+                        >
+                          03 / PROJECT CATEGORY
+                        </label>
+                        <select
+                          id="prop-inquiry-category"
+                          value={formData.projectType}
+                          onChange={(e) =>
+                            setFormData({ ...formData, projectType: e.target.value })
+                          }
+                          className="w-full h-[48px] bg-white text-black text-[0.92rem] px-4 font-normal focus:outline-none cursor-pointer"
+                        >
+                          <option value="Custom Furniture">Custom Furniture</option>
+                          <option value="Architectural Built-In / Cabinetry">
+                            Architectural Built-In / Cabinetry
+                          </option>
+                          <option value="Commercial Millwork">Commercial Millwork</option>
+                          <option value="Architect / Designer Submittal">
+                            Architect / Designer Submittal
+                          </option>
+                          <option value="One-of-a-Kind Design Challenge">
+                            One-of-a-Kind Design Challenge
+                          </option>
+                        </select>
+                      </div>
                     </div>
 
-                    <div className="flex flex-col gap-2 text-left">
+                    {/* Row 2: Location & Timeline */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                      <div className="border border-black rounded-[9px] bg-white overflow-hidden flex flex-col text-left">
+                        <label
+                          htmlFor="prop-inquiry-location"
+                          className="bg-[#CBCBCB] text-black border-b border-black py-2 px-4 text-[0.72rem] tracking-cad uppercase font-medium cursor-pointer"
+                        >
+                          04 / LOCATION
+                        </label>
+                        <input
+                          id="prop-inquiry-location"
+                          type="text"
+                          value={formData.location}
+                          onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                          placeholder="Omaha, NE or surrounding area"
+                          className="w-full h-[48px] bg-white text-black text-[0.92rem] px-4 font-light focus:outline-none focus:bg-[#FDCB33]/10 placeholder:text-black/45"
+                        />
+                      </div>
+
+                      <div className="border border-black rounded-[9px] bg-white overflow-hidden flex flex-col text-left">
+                        <label
+                          htmlFor="prop-inquiry-timeline"
+                          className="bg-[#CBCBCB] text-black border-b border-black py-2 px-4 text-[0.72rem] tracking-cad uppercase font-medium cursor-pointer"
+                        >
+                          05 / TARGET TIMELINE
+                        </label>
+                        <input
+                          id="prop-inquiry-timeline"
+                          type="text"
+                          value={formData.timeline}
+                          onChange={(e) => setFormData({ ...formData, timeline: e.target.value })}
+                          placeholder="e.g., Next 1–3 months or flexible"
+                          className="w-full h-[48px] bg-white text-black text-[0.92rem] px-4 font-light focus:outline-none focus:bg-[#FDCB33]/10 placeholder:text-black/45"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Row 3: Attachments & Link */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5 items-start">
+                      <div className="space-y-2 text-left">
+                        <div className="border border-black rounded-[9px] bg-white overflow-hidden flex flex-col">
+                          <label
+                            htmlFor="prop-inquiry-attachments"
+                            className="bg-[#27AAE0] text-black border-b border-black py-2 px-4 text-[0.72rem] tracking-cad uppercase font-medium cursor-pointer"
+                          >
+                            06 / SPACE PHOTOS, SKETCHES OR PLANS (OPTIONAL)
+                          </label>
+                          <input
+                            id="prop-inquiry-attachments"
+                            ref={fileInputRef}
+                            type="file"
+                            multiple
+                            accept="image/*,.pdf,.dwg,.dxf"
+                            onChange={handleFileChange}
+                            className="hidden"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            className="w-full h-[48px] px-4 bg-white hover:bg-[#CBCBCB] text-[0.86rem] text-black flex items-center justify-center gap-2 transition-colors cursor-pointer font-normal"
+                          >
+                            <Upload className="w-4 h-4 text-black" />
+                            <span>Attach photos, sketches, or PDF plans</span>
+                          </button>
+                        </div>
+
+                        {attachments.length > 0 && (
+                          <div className="flex flex-wrap gap-2 pt-1">
+                            {attachments.map((file, idx) => (
+                              <div
+                                key={`${file.name}-${idx}`}
+                                className="flex items-center gap-2 bg-[#CBCBCB] border-[0.75px] border-black rounded-[9px] px-3 py-1.5 text-[0.76rem] font-medium"
+                              >
+                                <FileText className="w-3.5 h-3.5 text-black" />
+                                <span className="max-w-[150px] truncate">{file.name}</span>
+                                <span>({file.size})</span>
+                                <button
+                                  type="button"
+                                  onClick={() => removeAttachment(idx)}
+                                  className="text-black hover:text-[#EF6922] cursor-pointer"
+                                  aria-label={`Remove ${file.name}`}
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="border border-black rounded-[9px] bg-white overflow-hidden flex flex-col text-left">
+                        <label
+                          htmlFor="prop-inquiry-link"
+                          className="bg-[#27AAE0] text-black border-b border-black py-2 px-4 text-[0.72rem] tracking-cad uppercase font-medium cursor-pointer"
+                        >
+                          07 / INSPIRATION OR SHARED FOLDER LINK (OPTIONAL)
+                        </label>
+                        <input
+                          id="prop-inquiry-link"
+                          type="url"
+                          value={formData.referenceLink}
+                          onChange={(e) =>
+                            setFormData({ ...formData, referenceLink: e.target.value })
+                          }
+                          placeholder="Pinterest, iCloud photo link, or Google Drive..."
+                          className="w-full h-[48px] bg-white text-black text-[0.92rem] px-4 font-light focus:outline-none focus:bg-[#27AAE0]/10 placeholder:text-black/45"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Row 4: Project Explanation */}
+                    <div className="border border-black rounded-[9px] bg-white overflow-hidden flex flex-col text-left">
                       <label
-                        htmlFor="prop-inquiry-link"
-                        className="bg-[#27AAE0] text-black border border-black rounded-[9px] py-2 px-4 text-[0.72rem] tracking-cad uppercase font-medium cursor-pointer"
+                        htmlFor="prop-inquiry-details"
+                        className="bg-[#EF6922] text-black border-b border-black py-2 px-4 text-[0.72rem] tracking-cad uppercase font-medium cursor-pointer"
                       >
-                        07 / INSPIRATION OR SHARED FOLDER LINK (OPTIONAL)
+                        08 / BRIEF PROJECT EXPLANATION *
                       </label>
-                      <input
-                        id="prop-inquiry-link"
-                        type="url"
-                        value={formData.referenceLink}
-                        onChange={(e) =>
-                          setFormData({ ...formData, referenceLink: e.target.value })
-                        }
-                        placeholder="Pinterest, iCloud photo link, or Google Drive..."
-                        className="w-full h-[48px] bg-white text-black text-[0.92rem] px-4 rounded-[9px] border border-black font-light focus:outline-none placeholder:text-black/45"
+                      <textarea
+                        id="prop-inquiry-details"
+                        required
+                        rows={4}
+                        value={formData.details}
+                        onChange={(e) => setFormData({ ...formData, details: e.target.value })}
+                        placeholder="Tell me briefly about the piece, room dimensions, or idea you have in mind..."
+                        className="w-full bg-white text-black text-[0.94rem] p-4 font-light focus:outline-none focus:bg-[#EF6922]/5 resize-y placeholder:text-black/45 leading-relaxed"
                       />
                     </div>
-                  </div>
 
-                  {/* Row 4: Project Explanation */}
-                  <div className="flex flex-col gap-2 text-left">
-                    <label
-                      htmlFor="prop-inquiry-details"
-                      className="bg-[#EF6922] text-black border border-black rounded-[9px] py-2 px-4 text-[0.72rem] tracking-cad uppercase font-medium cursor-pointer"
-                    >
-                      08 / BRIEF PROJECT EXPLANATION *
-                    </label>
-                    <textarea
-                      id="prop-inquiry-details"
-                      required
-                      rows={4}
-                      value={formData.details}
-                      onChange={(e) => setFormData({ ...formData, details: e.target.value })}
-                      placeholder="Tell me briefly about the piece, room dimensions, or idea you have in mind..."
-                      className="w-full bg-white text-black text-[0.94rem] p-4 rounded-[9px] border border-black font-light focus:outline-none resize-y placeholder:text-black/45 leading-relaxed"
-                    />
-                  </div>
+                    {/* Row 5: Dual Submission Triggers */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                      <button
+                        type="button"
+                        onClick={(e) => handleSubmit(e, 'sms')}
+                        className="w-full bg-[#FDCB33] text-black text-[0.78rem] tracking-cad uppercase py-3.5 px-6 rounded-[9px] border border-black hover:bg-black hover:text-white transition-colors cursor-pointer flex items-center justify-center gap-2 font-medium"
+                      >
+                        <MessageSquare className="w-4 h-4" />
+                        <span>TEXT JOSH ({OWNER_PHONE_DISPLAY})</span>
+                      </button>
 
-                  {/* Row 5: Dual Submission Triggers */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
-                    <button
-                      type="button"
-                      onClick={(e) => handleSubmit(e, 'sms')}
-                      className="w-full bg-[#FDCB33] text-black text-[0.78rem] tracking-cad uppercase py-3.5 px-6 rounded-[9px] border border-black hover:bg-black hover:text-white transition-colors cursor-pointer flex items-center justify-center gap-2 font-medium"
-                    >
-                      <MessageSquare className="w-4 h-4" />
-                      <span>TEXT JOSH ({OWNER_PHONE_DISPLAY})</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={(e) => handleSubmit(e, 'email')}
-                      className="w-full bg-black text-white text-[0.78rem] tracking-cad uppercase py-3.5 px-6 rounded-[9px] border border-black hover:bg-[#EF6922] hover:text-black transition-colors cursor-pointer flex items-center justify-center gap-2 font-medium"
-                    >
-                      <Mail className="w-4 h-4" />
-                      <span>EMAIL ({OWNER_EMAIL})</span>
-                    </button>
-                  </div>
-                </form>
+                      <button
+                        type="button"
+                        onClick={(e) => handleSubmit(e, 'email')}
+                        className="w-full bg-black text-white text-[0.78rem] tracking-cad uppercase py-3.5 px-6 rounded-[9px] border border-black hover:bg-[#EF6922] hover:text-black transition-colors cursor-pointer flex items-center justify-center gap-2 font-medium"
+                      >
+                        <Mail className="w-4 h-4" />
+                        <span>EMAIL ({OWNER_EMAIL})</span>
+                      </button>
+                    </div>
+                  </form>
+                </div>
               </div>
             </section>
           )}

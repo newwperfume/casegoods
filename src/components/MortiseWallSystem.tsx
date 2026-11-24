@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import balticBirchEdgeUrl from '../assets/images/baltic_birch_edge_1795173686278.jpg';
 
 const MAPLE_TEXTURE_URL =
@@ -201,19 +201,33 @@ export function useMortiseWallController(
     actionsRef.current = actions;
   }, []);
 
-  return {
-    activeTool,
-    setActiveTool,
-    toolSizes,
-    adjustToolSize,
-    activePillar,
-    setActivePillar,
-    motionOn,
-    toggleMotion,
-    rearrange,
-    clearWall,
-    registerActions,
-  };
+  return useMemo(
+    () => ({
+      activeTool,
+      setActiveTool,
+      toolSizes,
+      adjustToolSize,
+      activePillar,
+      setActivePillar,
+      motionOn,
+      toggleMotion,
+      rearrange,
+      clearWall,
+      registerActions,
+    }),
+    [
+      activeTool,
+      toolSizes,
+      adjustToolSize,
+      activePillar,
+      setActivePillar,
+      motionOn,
+      toggleMotion,
+      rearrange,
+      clearWall,
+      registerActions,
+    ]
+  );
 }
 
 /**
@@ -362,8 +376,57 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
     let disposed = false;
 
     // Preload real Maple grain texture & 13-ply Baltic Birch edge texture
+    // Build progressive 0.5x offscreen mipmap pyramids so small canvas strips never moiré/shimmer
     let mapleReady = false;
     let birchReady = false;
+    let mapleMips: HTMLCanvasElement[] = [];
+    let birchMips: HTMLCanvasElement[] = [];
+
+    const buildMipPyramid = (
+      img: HTMLImageElement,
+      minHeight: number
+    ): HTMLCanvasElement[] => {
+      const mips: HTMLCanvasElement[] = [];
+      let w = img.naturalWidth;
+      let h = img.naturalHeight;
+      if (w <= 0 || h <= 0) return mips;
+
+      let prev: HTMLImageElement | HTMLCanvasElement = img;
+      while (h > minHeight && mips.length < 6) {
+        const nextW = Math.max(2, Math.round(w * 0.5));
+        const nextH = Math.max(2, Math.round(h * 0.5));
+        const off = document.createElement('canvas');
+        off.width = nextW;
+        off.height = nextH;
+        const octx = off.getContext('2d');
+        if (!octx) break;
+        octx.imageSmoothingEnabled = true;
+        octx.imageSmoothingQuality = 'high';
+        octx.drawImage(prev, 0, 0, nextW, nextH);
+        mips.push(off);
+        prev = off;
+        w = nextW;
+        h = nextH;
+      }
+      return mips;
+    };
+
+    const pickMip = (
+      img: HTMLImageElement,
+      mips: HTMLCanvasElement[],
+      targetPixelHeight: number
+    ): HTMLImageElement | HTMLCanvasElement => {
+      const desired = Math.max(8, targetPixelHeight * 1.4);
+      let chosen: HTMLImageElement | HTMLCanvasElement = img;
+      for (let i = 0; i < mips.length; i++) {
+        if (mips[i].height >= desired) {
+          chosen = mips[i];
+        } else {
+          break;
+        }
+      }
+      return chosen;
+    };
 
     const onAssetLoaded = (markReady: () => void) => () => {
       markReady();
@@ -373,6 +436,7 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
     const mapleImg = new Image();
     mapleImg.decoding = 'async';
     mapleImg.onload = onAssetLoaded(() => {
+      mapleMips = buildMipPyramid(mapleImg, 64);
       mapleReady = true;
     });
     mapleImg.src = MAPLE_TEXTURE_URL;
@@ -380,6 +444,7 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
     const birchImg = new Image();
     birchImg.decoding = 'async';
     birchImg.onload = onAssetLoaded(() => {
+      birchMips = buildMipPyramid(birchImg, 16);
       birchReady = true;
     });
     birchImg.src = balticBirchEdgeUrl;
@@ -728,14 +793,17 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
         return;
       }
 
-      const iw = birchImg.naturalWidth;
-      const ih = birchImg.naturalHeight;
       const drawTiledHorizontal = (dx: number, dy: number, dw: number, dh: number) => {
+        const src = pickMip(birchImg, birchMips, dh * dpr);
+        const sw = src instanceof HTMLImageElement ? src.naturalWidth : src.width;
+        const sh = src instanceof HTMLImageElement ? src.naturalHeight : src.height;
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
         // Keep all 13 plies mapped cleanly across board thickness dh, tiling along length dw
-        const naturalTileW = Math.max(dh * (iw / ih) * 1.45, dh * 2.2);
+        const naturalTileW = Math.max(dh * (sw / Math.max(1, sh)) * 1.45, dh * 2.2);
         const shift = ((Math.abs(seed) * 19.7) % 1) * naturalTileW;
         for (let tx = dx - shift; tx < dx + dw; tx += naturalTileW) {
-          ctx.drawImage(birchImg, 0, 0, iw, ih, tx, dy, naturalTileW + 0.5, dh);
+          ctx.drawImage(src, 0, 0, sw, sh, tx, dy, naturalTileW + 0.5, dh);
         }
       };
 
@@ -775,10 +843,13 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
         ctx.fillStyle = '#EAD8BD';
         ctx.fillRect(x, y, w, h);
       } else {
-        const iw = mapleImg.naturalWidth;
-        const ih = mapleImg.naturalHeight;
         const drawCover = (dx: number, dy: number, dw: number, dh: number) => {
-          const imgRatio = iw / ih;
+          const src = pickMip(mapleImg, mapleMips, Math.max(dw, dh) * dpr);
+          const iw = src instanceof HTMLImageElement ? src.naturalWidth : src.width;
+          const ih = src instanceof HTMLImageElement ? src.naturalHeight : src.height;
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
+          const imgRatio = iw / Math.max(1, ih);
           const boxRatio = dw / Math.max(1, dh);
           let rw: number;
           let rh: number;
@@ -797,7 +868,7 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
           const extraY = Math.max(0, rh - dh);
           const offX = ((Math.abs(seed * 37.3) % 100) / 100) * extraX;
           const offY = ((Math.abs(seed * 71.9) % 100) / 100) * extraY;
-          ctx.drawImage(mapleImg, dx - offX, dy - offY, rw, rh);
+          ctx.drawImage(src, dx - offX, dy - offY, rw, rh);
         };
 
         if (orientation === 'horizontal') {
@@ -1785,12 +1856,13 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
 
           if (motionOn && dist > 0.001 && dist < influenceR) {
             const t = 1 - dist / influenceR;
-            const maxDisp = s.blocked ? 2.5 : isOccupied ? 3.2 : 10.2;
+            // Mounted hardware stays rock-solid in its mortises (0 wobble) so birch/maple never shimmer around cursor
+            const maxDisp = s.blocked ? 2.5 : isOccupied ? 0 : 10.2;
             const push = Math.pow(t, 1.35) * maxDisp;
             targetOx = (dx / dist) * push;
             targetOy = (dy / dist) * push;
             targetRot = isOccupied || s.blocked ? 0 : (dx / influenceR) * t * 0.16;
-            targetHeat = s.blocked ? 0 : Math.min(1, t * 1.3);
+            targetHeat = s.blocked || isOccupied ? 0 : Math.min(1, t * 1.3);
           }
         }
 
@@ -1899,23 +1971,12 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
         ctx.restore();
       }
 
-      // Compute gentle spring offsets & draw Pass 1 (directional 3D cast shadows) for grounded items
+      // Draw Pass 1 (directional 3D cast shadows) for grounded items — snapped to crisp device pixels
       for (let i = 0; i < placedItems.length; i++) {
         const item = placedItems[i];
         if (item.id === draggedItemId || !isItemVisible(item)) continue;
-        let avgOx = 0;
-        let avgOy = 0;
-        let count = 0;
-        for (let gx = item.gx1; gx <= item.gx2; gx++) {
-          const ks = slotByCoord(gx, item.gy1);
-          if (ks) {
-            avgOx += ks.ox;
-            avgOy += ks.oy;
-            count++;
-          }
-        }
-        const ox = count ? avgOx / count : 0;
-        const oy = count ? avgOy / count : 0;
+        const ox = 0;
+        const oy = 0;
         visibleItems.push({ item, ox, oy });
 
         if (item.type === 'hook') {
@@ -2156,14 +2217,6 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       else renderFrame(performance.now());
     };
 
-    const countVisiblePlacedItems = () => {
-      let n = 0;
-      for (let i = 0; i < placedItems.length; i++) {
-        if (isItemVisible(placedItems[i])) n++;
-      }
-      return n;
-    };
-
     const sizeCanvas = () => {
       cssW = window.innerWidth;
       cssH = window.innerHeight;
@@ -2172,10 +2225,9 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       canvas.height = Math.round(cssH * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       rebuildGrid();
+      // Arrange exactly ONCE on initial page load/reload — never auto-rearrange again unless Rearrange is pressed
       if (!hasInitializedRandom) {
         hasInitializedRandom = true;
-        applyRandomArrangement(INITIAL_RANDOM_COUNT, false);
-      } else if (!hasUserEdited && countVisiblePlacedItems() < 3) {
         applyRandomArrangement(INITIAL_RANDOM_COUNT, false);
       }
       if (!stateRef.current.motionOn) renderFrame(performance.now());
@@ -2412,9 +2464,6 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
     if (typeof ResizeObserver !== 'undefined') {
       resizeObserver = new ResizeObserver(() => {
         rebuildGrid();
-        if (!hasUserEdited && countVisiblePlacedItems() < 3) {
-          applyRandomArrangement(INITIAL_RANDOM_COUNT, false);
-        }
         if (!stateRef.current.motionOn) renderFrame(performance.now());
       });
       const heroEl = heroSelector ? document.querySelector(heroSelector) : null;
@@ -2457,7 +2506,7 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       document.removeEventListener('pointerleave', onPointerLeave);
       document.removeEventListener('click', onClick);
     };
-  }, [controller, heroSelector, headerSelector, footerSelector]);
+  }, [controller.registerActions, heroSelector, headerSelector, footerSelector]);
 
   useEffect(() => {
     syncLoopRef.current();
@@ -2573,75 +2622,77 @@ export const MortiseWallToolbar: React.FC<{
         </button>
       </div>
 
-      <div
-        className="wall-size-controls"
-        role="group"
-        aria-label={`Adjust ${activeLabel} cell width and height`}
-      >
-        <div className="wall-size-stepper">
-          <span className="wall-size-axis" title="Width in mortise cells">
-            W
-          </span>
-          <button
-            type="button"
-            className="wall-size-step-btn"
-            aria-label={`Make ${activeLabel} 1 cell narrower`}
-            disabled={currentSize.cols <= currentLimits.minCols}
-            onClick={() => adjustToolSize(activeTool, 'cols', -1)}
-          >
-            −
-          </button>
-          <span className="wall-size-val" aria-live="polite">
-            {currentSize.cols}
-          </span>
-          <button
-            type="button"
-            className="wall-size-step-btn"
-            aria-label={`Make ${activeLabel} 1 cell wider`}
-            disabled={currentSize.cols >= currentLimits.maxCols}
-            onClick={() => adjustToolSize(activeTool, 'cols', 1)}
-          >
-            +
-          </button>
-        </div>
-
-        {currentLimits.maxRows > currentLimits.minRows && (
+      <div className="wall-controls-panel">
+        <div
+          className="wall-size-controls"
+          role="group"
+          aria-label={`Adjust ${activeLabel} cell width and height`}
+        >
           <div className="wall-size-stepper">
-            <span className="wall-size-axis" title="Height in mortise cells">
-              H
+            <span className="wall-size-axis" title="Width in mortise cells">
+              W
             </span>
             <button
               type="button"
               className="wall-size-step-btn"
-              aria-label={`Make ${activeLabel} 1 cell shorter`}
-              disabled={currentSize.rows <= currentLimits.minRows}
-              onClick={() => adjustToolSize(activeTool, 'rows', -1)}
+              aria-label={`Make ${activeLabel} 1 cell narrower`}
+              disabled={currentSize.cols <= currentLimits.minCols}
+              onClick={() => adjustToolSize(activeTool, 'cols', -1)}
             >
               −
             </button>
             <span className="wall-size-val" aria-live="polite">
-              {currentSize.rows}
+              {currentSize.cols}
             </span>
             <button
               type="button"
               className="wall-size-step-btn"
-              aria-label={`Make ${activeLabel} 1 cell taller`}
-              disabled={currentSize.rows >= currentLimits.maxRows}
-              onClick={() => adjustToolSize(activeTool, 'rows', 1)}
+              aria-label={`Make ${activeLabel} 1 cell wider`}
+              disabled={currentSize.cols >= currentLimits.maxCols}
+              onClick={() => adjustToolSize(activeTool, 'cols', 1)}
             >
               +
             </button>
           </div>
-        )}
-      </div>
 
-      <div className="mortise-actions">
-        <button type="button" className="text-action-link" onClick={rearrange}>
-          Rearrange
-        </button>
-        <button type="button" className="text-action-link" onClick={clearWall}>
-          Clear
-        </button>
+          {currentLimits.maxRows > currentLimits.minRows && (
+            <div className="wall-size-stepper">
+              <span className="wall-size-axis" title="Height in mortise cells">
+                H
+              </span>
+              <button
+                type="button"
+                className="wall-size-step-btn"
+                aria-label={`Make ${activeLabel} 1 cell shorter`}
+                disabled={currentSize.rows <= currentLimits.minRows}
+                onClick={() => adjustToolSize(activeTool, 'rows', -1)}
+              >
+                −
+              </button>
+              <span className="wall-size-val" aria-live="polite">
+                {currentSize.rows}
+              </span>
+              <button
+                type="button"
+                className="wall-size-step-btn"
+                aria-label={`Make ${activeLabel} 1 cell taller`}
+                disabled={currentSize.rows >= currentLimits.maxRows}
+                onClick={() => adjustToolSize(activeTool, 'rows', 1)}
+              >
+                +
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="mortise-actions">
+          <button type="button" className="text-action-link" onClick={rearrange}>
+            Rearrange
+          </button>
+          <button type="button" className="text-action-link" onClick={clearWall}>
+            Clear
+          </button>
+        </div>
       </div>
     </div>
   );

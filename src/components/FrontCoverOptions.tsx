@@ -42,7 +42,13 @@ export const FrontCoverOptions: React.FC<FrontCoverOptionsProps> = ({
       <div className="w-full ui-surface">
         <img
           src={ASSETS.brand.logoFull}
-          alt="casegoods — handcrafted in omaha"
+          srcSet={ASSETS.brand.logoFullSrcSet}
+          sizes="(max-width: 780px) 100vw, 780px"
+          width={1560}
+          height={368}
+          decoding="sync"
+          fetchPriority="high"
+          alt="casegoods — maker of things"
           className="w-full h-auto block select-none"
           referrerPolicy="no-referrer"
         />
