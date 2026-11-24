@@ -60,6 +60,18 @@
   background-size: 24px 24px;
 }
 
+/* Architectural 45° CAD section hatch for Concept Preview Stage */
+.cad-hatch-bg {
+  background-color: #FFFFFF;
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(0, 0, 0, 0.045) 0px,
+    rgba(0, 0, 0, 0.045) 1px,
+    transparent 1px,
+    transparent 12px
+  );
+}
+
 .cad-grid-dark {
   background-color: #0d1117;
   background-image: 

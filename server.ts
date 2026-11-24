@@ -107,30 +107,75 @@ async function dispatchConceptEmailToOwner(record: LoggedConceptRecord) {
 }
 
 /**
+ * Local studio material texture swatch files attached directly as multimodal reference images to Gemini 3D renders.
+ */
+const TEXTURES_DIR = path.join(__dirname, 'public', 'assets', 'textures');
+const textureSwatchCache = new Map<string, { data: string; mimeType: string; label: string }>();
+
+function resolveMaterialTextureFile(woodSpecies: string): { filename: string; label: string } | null {
+  const key = woodSpecies.trim().toLowerCase();
+  if (key.includes('walnut')) {
+    return { filename: 'american-black-walnut.jpg', label: 'American Black Walnut' };
+  }
+  if (key.includes('white oak') || key.includes('oak')) {
+    return { filename: 'rift-white-oak.jpg', label: 'Rift White Oak' };
+  }
+  if (key.includes('maple')) {
+    return { filename: 'hard-white-maple.jpg', label: 'Hard White Maple' };
+  }
+  if (key.includes('ebonized') || key.includes('blackened') || key.includes('ash')) {
+    return { filename: 'ebonized-blackened-ash.jpg', label: 'Ebonized / Blackened Ash' };
+  }
+  if (key.includes('hpl') || key.includes('laminate') || key.includes('baltic birch')) {
+    return {
+      filename: 'matte-hpl-baltic-birch.jpg',
+      label: 'Matte HPL + Exposed Baltic Birch Ply',
+    };
+  }
+  return null;
+}
+
+function loadMaterialTextureRef(
+  woodSpecies: string
+): { data: string; mimeType: string; label: string } | null {
+  const match = resolveMaterialTextureFile(woodSpecies);
+  if (!match) return null;
+
+  const cached = textureSwatchCache.get(match.filename);
+  if (cached) return cached;
+
+  try {
+    const filePath = path.join(TEXTURES_DIR, match.filename);
+    if (!fs.existsSync(filePath)) return null;
+    const data = fs.readFileSync(filePath).toString('base64');
+    const entry = { data, mimeType: 'image/jpeg', label: match.label };
+    textureSwatchCache.set(match.filename, entry);
+    return entry;
+  } catch (err) {
+    console.warn(`Unable to load material swatch ${match.filename}:`, err);
+    return null;
+  }
+}
+
+/**
  * Strict Visual Woodworking Timber & Material Specifications (with color locks & negative exclusions)
  */
 function buildTimberConstraint(woodSpecies: string): string {
   const key = woodSpecies.trim().toLowerCase();
   if (key.includes('walnut')) {
-    return 'PRIMARY MATERIAL — AMERICAN BLACK WALNUT: Rich, dark chocolate-espresso brown FAS heartwood walnut with dramatic dark-chocolate cathedral grain and hand-rubbed satin oil sheen. STRICT COLOR LOCK: Must be unmistakably dark chocolate brown walnut — strictly NOT pale blonde oak, NOT yellow maple, NOT reddish cherry.';
+    return 'PRIMARY MATERIAL — AMERICAN BLACK WALNUT: Rich, dark chocolate-espresso brown FAS heartwood walnut matching the attached studio material swatch with dramatic dark-chocolate cathedral/straight grain and hand-rubbed satin oil sheen. STRICT COLOR LOCK: Must be unmistakably dark chocolate brown walnut — strictly NOT pale blonde oak, NOT yellow maple, NOT reddish cherry.';
   }
   if (key.includes('white oak') || key.includes('oak')) {
-    return 'PRIMARY MATERIAL — RIFT-SAWN WHITE OAK: Cool, pale raw wheat-straw / light champagne-blonde rift-sawn white oak with tight, straight vertical pencil grain and a dead-flat clear matte raw-wood finish. STRICT COLOR LOCK: Must be pale neutral blonde-straw oak — strictly NOT dark brown walnut, NOT orange-red cherry, NOT yellow honey oak.';
+    return 'PRIMARY MATERIAL — RIFT WHITE OAK: Cool, pale raw wheat-straw / light champagne-blonde rift-sawn white oak matching the attached studio material swatch with tight, straight vertical pencil grain and a dead-flat clear matte raw-wood finish. STRICT COLOR LOCK: Must be pale neutral blonde-straw oak — strictly NOT dark brown walnut, NOT orange-red cherry, NOT yellow honey oak.';
   }
   if (key.includes('maple')) {
-    return 'PRIMARY MATERIAL — HARD WHITE SUGAR MAPLE: Very bright, pale creamy ivory-blonde hard sugar maple with ultra-smooth, quiet fine grain and clear waterborne matte finish. STRICT COLOR LOCK: Must be light creamy pale blonde wood — strictly NOT dark brown walnut, NOT medium oak, NOT amber cherry.';
-  }
-  if (key.includes('cherry')) {
-    return 'PRIMARY MATERIAL — AMERICAN BLACK CHERRY: Warm reddish-cinnamon amber heartwood cherry with silky closed-pore grain and warm satin oil sheen. STRICT COLOR LOCK: Must be unmistakable warm reddish-amber cinnamon cherry — strictly NOT pale blonde oak/maple and NOT dark espresso walnut.';
-  }
-  if (key.includes('mahogany')) {
-    return 'PRIMARY MATERIAL — GENUINE HONDURAS MAHOGANY: Deep rich reddish-auburn brown mahogany with lustrous straight ribbon-stripe grain and satin architectural finish. STRICT COLOR LOCK: Deep reddish-brown auburn mahogany — strictly NOT pale blonde wood.';
+    return 'PRIMARY MATERIAL — HARD WHITE MAPLE: Very bright, pale creamy ivory-blonde hard sugar maple matching the attached studio material swatch with ultra-smooth, quiet fine grain and clear waterborne matte finish. STRICT COLOR LOCK: Must be light creamy pale blonde wood — strictly NOT dark brown walnut, NOT medium oak, NOT amber cherry.';
   }
   if (key.includes('ebonized') || key.includes('blackened') || key.includes('charred')) {
-    return 'PRIMARY MATERIAL — EBONIZED / BLACKENED ASH OR OAK: Deep matte jet-black stained open-pore solid hardwood where subtle tactile wood grain texture remains visible under raking light, finished dead-flat matte black. STRICT COLOR LOCK: True matte charcoal-black wood — strictly NOT natural brown or blonde wood.';
+    return 'PRIMARY MATERIAL — EBONIZED / BLACKENED ASH: Deep matte jet-black stained open-pore solid ash hardwood matching the attached studio material swatch where subtle tactile wood grain texture remains visible under raking light, finished dead-flat matte black. STRICT COLOR LOCK: True matte charcoal-black wood — strictly NOT natural brown or blonde wood.';
   }
-  if (key.includes('laminate')) {
-    return 'PRIMARY MATERIAL — ARCHITECTURAL MATTE LAMINATE + BALTIC BIRCH PLY EDGES: Smooth ultra-matte solid architectural high-pressure laminate (HPL) cabinet faces (crisp architectural off-white, warm putty, or matte charcoal) with clearly visible exposed multi-ply striped pale Baltic Birch plywood edges along every door and panel reveal. STRICT MATERIAL LOCK: Must show smooth matte laminate faces with exposed layered birch plywood edges — NOT solid stained timber.';
+  if (key.includes('hpl') || key.includes('laminate') || key.includes('baltic birch')) {
+    return 'PRIMARY MATERIAL — MATTE HPL + EXPOSED BALTIC BIRCH PLY: Smooth ultra-matte architectural warm off-white high-pressure laminate (HPL) cabinet faces matching the attached studio material swatch with clearly visible exposed multi-ply striped pale Baltic Birch plywood edges along every door, panel, and box reveal. STRICT MATERIAL LOCK: Must show smooth velvety matte laminate faces with crisp exposed layered Baltic Birch plywood edges — NOT solid stained timber.';
   }
   return `PRIMARY MATERIAL — ${woodSpecies.toUpperCase()}: Authentic architectural-grade ${woodSpecies} with unmistakable true-to-species color, continuous matched grain, and hand-rubbed satin finish.`;
 }
@@ -140,51 +185,42 @@ function buildTimberConstraint(woodSpecies: string): string {
  */
 function buildSingleDetailConstraint(detail: string): string {
   const key = detail.trim().toLowerCase();
-  if (!key) return '';
+  if (!key || key === 'clean architectural millwork') return '';
   if (key.includes('full overlay')) {
     return 'DOOR CONSTRUCTION — FULL OVERLAY SLAB DOORS: Completely frameless full-overlay flat slab doors and drawer fronts covering the entire front face edge-to-edge with ZERO visible face frame and razor-sharp uniform 1/16-inch black shadow reveals between panels.';
   }
   if (key.includes('flush inset')) {
-    return 'DOOR CONSTRUCTION — FLUSH INSET WITH FACE FRAME: Every cabinet door and drawer front sits recessed completely flush INSIDE a clearly visible solid 3/4-inch hardwood outer face frame (stiles and rails framing every opening) with crisp uniform 1/16-inch perimeter shadow gaps.';
+    return 'DOOR CONSTRUCTION — FLUSH INSET FRAME: Every cabinet door and drawer front sits recessed completely flush INSIDE a clearly visible solid 3/4-inch hardwood outer face frame (stiles and rails framing every opening) with crisp uniform 1/16-inch perimeter shadow gaps.';
   }
   if (key.includes('pocket') || key.includes('retracting')) {
     return 'DOOR MECHANISM — RETRACTING POCKET DOORS: Tall solid hardwood doors slid partway back into concealed vertical side pockets along the left and right edges of the cabinet, clearly showcasing the fitted hardwood interior inside.';
   }
-  if (key.includes('open cabinets') || key.includes('no doors')) {
-    return 'OPEN SHELVING — STRICTLY NO DOORS: Every single bay and cubby across the entire piece is 100% open front-facing architectural shelving with thick 1-1/4-inch solid hardwood shelves and vertical dividers. STRICT EXCLUSION: ZERO cabinet doors anywhere on the piece.';
+  if (key.includes('open architectural shelving') || key.includes('open cabinets') || key.includes('no doors')) {
+    return 'OPEN ARCHITECTURAL SHELVING — STRICTLY NO DOORS: Crisp open front-facing architectural shelving bays with thick 1-1/4-inch solid hardwood shelves and vertical dividers, keeping compartments open and sculptural.';
   }
   if (key.includes('tambour')) {
-    return 'DOOR MECHANISM — SLIDING TAMBOUR DOORS: Clearly visible narrow 1/2-inch vertical solid hardwood tambour slats wrapping smoothly around curved/radiused cabinet corners, with one tambour door slid partway open to show the curved track.';
-  }
-  if (key.includes('glass-front') || key.includes('glass')) {
-    return 'DOOR STYLE — GLASS-FRONT DISPLAY DOORS: Slim solid hardwood stile-and-rail frame doors fitted with crystal-clear low-iron transparent glass panes so the interior hardwood shelves behind the glass are clearly visible.';
+    return 'DOOR MECHANISM — CURVED SLIDING TAMBOUR: Clearly visible narrow 1/2-inch vertical solid hardwood tambour slats wrapping smoothly around curved/radiused cabinet corners, with one tambour door slid partway open to show the curved track.';
   }
   if (key.includes('fluted') || key.includes('reeded')) {
-    return 'SURFACE TEXTURE — DEEP VERTICAL FLUTED / REEDED PANELS: Every cabinet door and drawer face is covered edge-to-edge in bold, deep, CNC-carved semicircular vertical wood flutes/reeds casting crisp parallel vertical shadows across the entire front elevation — strictly NOT flat smooth slab doors.';
-  }
-  if (key.includes('louvered') || key.includes('slatted')) {
-    return 'DOOR STYLE — HORIZONTAL LOUVERED / SLATTED DOORS: Every cabinet door is built from crisp, evenly spaced horizontal solid wood slats/louvers with dark shadow air gaps between every bar — strictly NOT solid flat slab panels.';
+    return 'SURFACE TEXTURE — DEEP FLUTED / REEDED FACES: Cabinet door and drawer faces are covered edge-to-edge in bold, deep, CNC-carved semicircular vertical wood flutes/reeds casting crisp parallel vertical shadows across the elevation — strictly NOT flat smooth slab doors.';
   }
   if (key.includes('dovetail')) {
     return 'DRAWER JOINERY — EXPOSED DOVETAIL DRAWERS: Show one solid wood drawer pulled partway open (about 6 inches) so precision interlocking angled dovetail joints along the solid hardwood drawer side are prominently visible in the photograph.';
   }
-  if (key.includes('push-to-open') || key.includes('touch latch')) {
+  if (key.includes('push-to-open') || key.includes('handleless') || key.includes('touch latch')) {
     return 'HARDWARE — HANDLELESS PUSH-TO-OPEN (ZERO HARDWARE): Completely clean, unbroken door and drawer faces with ZERO knobs, ZERO pulls, ZERO metal handles, and ZERO finger-pull cutouts anywhere on the entire piece.';
   }
   if (key.includes('turned hardwood pulls') || key.includes('turned')) {
-    return 'HARDWARE — CUSTOM LATHE-TURNED SOLID WOOD PULLS: Prominent, tactile solid hardwood lathe-turned cylindrical/stacked wood pulls mounted cleanly on every door and drawer front. STRICT EXCLUSION: ZERO metal, brass, or black iron hardware pulls.';
+    return 'HARDWARE — TURNED HARDWOOD PULLS: Prominent, tactile solid hardwood lathe-turned cylindrical wood pulls mounted cleanly on every door and drawer front. STRICT EXCLUSION: ZERO metal, brass, or black iron hardware pulls.';
   }
   if (key.includes('led')) {
-    return 'LIGHTING — INTEGRATED WARM 2700K LED SHELF LIGHTING: Glowing recessed warm 2700K linear LED light strips milled flush into the underside of every upper shelf and cabinet bay, casting a clearly visible warm golden light graze downward across the hardwood back panel.';
-  }
-  if (key.includes('floating shelves')) {
-    return 'SHELVING — THICK CANTILEVERED FLOATING SHELVES: Thick 2-inch solid hardwood floating shelves projecting cleanly from the wall/back panel with completely concealed brackets — ZERO visible corbels, ZERO metal brackets, ZERO vertical side supports beneath the shelves.';
+    return 'LIGHTING — RECESSED 2700K LED LIGHTING: Glowing recessed warm 2700K linear LED light strips milled flush into the underside of upper shelves and cabinet bays, casting a clearly visible warm golden light graze downward across the hardwood back panel.';
   }
   if (key.includes('waterfall')) {
-    return 'CASE CORNERS — 45-DEGREE WATERFALL MITRED EDGES: Continuous unbroken wood grain flowing seamlessly across the horizontal top and wrapping directly over razor-sharp 45-degree mitered waterfall corners straight down both vertical side panels to the floor.';
+    return 'CASE CORNERS — 45° WATERFALL MITERS: Continuous unbroken wood grain flowing seamlessly across the horizontal top and wrapping directly over razor-sharp 45-degree mitered waterfall corners straight down both vertical side panels.';
   }
   if (key.includes('finger') || key.includes('tenon')) {
-    return 'CORNER JOINERY — EXPOSED BOX FINGER / THROUGH-TENON JOINTS: Prominent, unmistakably visible interlocking 3/4-inch square box finger-joints and exposed wedged through-tenons wrapping the outer case corners with alternating contrasting end-grain blocks as the signature architectural detail.';
+    return 'CORNER JOINERY — EXPOSED BOX FINGER-JOINTS: Prominent, unmistakably visible interlocking 3/4-inch square box finger-joints wrapping the outer case corners with alternating contrasting end-grain blocks as the signature architectural detail.';
   }
   return `CUSTOM MILLWORK DETAIL: Prominently feature "${detail.trim()}" executed with +/- 1/32-inch cabinetmaker precision so it is immediately unmistakable in the visual.`;
 }
@@ -198,47 +234,38 @@ function buildJoineryDetailConstraint(addedDetails: string): string {
     .map((s) => s.trim())
     .filter(Boolean);
   if (parts.length === 0) {
-    return buildSingleDetailConstraint('Full Overlay Doors');
+    return 'Clean, gallery-grade architectural millwork with razor-sharp 1/16-inch shadow reveals and +/- 1/32-inch cabinetmaker tolerances.';
   }
-  return parts.map((p, idx) => `${idx + 1}) ${buildSingleDetailConstraint(p)}`).join('\n');
+  return parts
+    .map((p, idx) => {
+      const text = buildSingleDetailConstraint(p);
+      return text ? `${idx + 1}) ${text}` : '';
+    })
+    .filter(Boolean)
+    .join('\n');
 }
 
 /**
- * Complete Architectural Design Movement Specifications (all 10 UI styles explicitly defined)
+ * Complete Architectural Direction Specifications (aligned with refined Casegoods palette)
  */
 function buildStyleConstraint(designStyle: string): string {
   const key = designStyle.trim().toLowerCase();
   if (key.includes('bauhaus')) {
-    return 'ARCHITECTURAL STYLE — BAUHAUS & COLOR-BLOCKED: Disciplined asymmetrical Bauhaus geometric grid divisions pairing the selected primary timber with bold, unmistakable solid-color matte drawer fronts or accent bays in Bauhaus Orange (#EF6922), Fabrication Blue (#27AAE0), and Golden Yellow (#FDCB33). Must clearly display geometric Bauhaus color-blocking integrated into the woodwork.';
-  }
-  if (key.includes('mid-century')) {
-    return 'ARCHITECTURAL STYLE — MID-CENTURY MODERN: Authentic 1950s/60s Mid-Century Modern horizontal proportions with clean low-slung casework, slender tapered or gently splayed solid hardwood legs (or recessed shadow plinth), crisp chamfered outer edges, and unbroken horizontal grain matching. Strictly NO traditional crown molding or ornate trim.';
+    return 'ARCHITECTURAL DIRECTION — BAUHAUS & COLOR-BLOCKED: Disciplined asymmetrical Bauhaus geometric grid divisions pairing the selected primary material with bold, unmistakable solid-color matte drawer fronts or accent bays in Bauhaus Orange (#EF6922), Fabrication Blue (#27AAE0), and Golden Yellow (#FDCB33). Must clearly display geometric Bauhaus color-blocking integrated into the woodwork.';
   }
   if (key.includes('minimalist') || key.includes('contemporary')) {
-    return 'ARCHITECTURAL STYLE — MINIMALIST & CONTEMPORARY: Ultra-clean monolithic architectural geometry with razor-sharp 90-degree edges, completely flat uninterrupted planes, flush recessed shadow toe-kick, zero applied molding, zero decorative trim, and strict grid alignment.';
+    return 'ARCHITECTURAL DIRECTION — ARCHITECTURAL MINIMALIST: Ultra-clean monolithic architectural geometry with razor-sharp 90-degree edges, completely flat uninterrupted planes, flush recessed shadow toe-kick, zero applied molding, zero decorative trim, and strict grid alignment.';
   }
-  if (key.includes('scandinavian') || key.includes('organic')) {
-    return 'ARCHITECTURAL STYLE — SCANDINAVIAN & ORGANIC: Light, airy Nordic furniture proportions featuring softly rounded/bullnosed wood edges, slender gently tapered round solid wood legs, gentle organic curves, and calm open negative space beneath the piece.';
+  if (key.includes('sculptural') || key.includes('radiused') || key.includes('art deco')) {
+    return 'ARCHITECTURAL DIRECTION — SCULPTURAL & RADIUSED: Bold sweeping curved ends, generous radiused outer case corners, flowing sculptural transitions, and architectural plinth balance with zero harsh boxy corners.';
   }
-  if (key.includes('japandi')) {
-    return 'ARCHITECTURAL STYLE — JAPANDI & EXPOSED JOINERY: Serene low-slung Japanese-Scandinavian architectural balance featuring delicate timber rhythm, recessed shadow reveals, visibly celebrated wood-on-wood mortise/tenon craft, and meditative calm symmetry.';
+  if (key.includes('mid-century')) {
+    return 'ARCHITECTURAL DIRECTION — MID-CENTURY LOW-SLUNG: Authentic 1950s/60s Mid-Century horizontal proportions with clean low-slung casework, slender tapered or gently splayed solid hardwood legs (or recessed shadow plinth), crisp chamfered outer edges, and unbroken horizontal grain matching.';
   }
-  if (key.includes('shaker') || key.includes('traditional') || key.includes('transitional')) {
-    return 'ARCHITECTURAL STYLE — TRADITIONAL & SHAKER: Classic crisp five-piece recessed flat-panel Shaker doors and drawer fronts with clean 2-1/4-inch stiles and rails, understated square-stepped base and crown trim, and timeless balanced symmetry — strictly NOT flat modern slab doors unless overridden.';
+  if (key.includes('modular') || key.includes('structural') || key.includes('industrial')) {
+    return 'ARCHITECTURAL DIRECTION — MODULAR & STRUCTURAL: Honest architectural system design showcasing a disciplined modular grid rhythm, cantilevered shelves or suspended volumes, clear structural joinery logic, and refined workshop precision.';
   }
-  if (key.includes('art deco')) {
-    return 'ARCHITECTURAL STYLE — ART DECO & FLUTED CURVES: Bold sculptural Art Deco geometry featuring sweeping curved/radiused waterfall ends, vertical fluted relief accents, stepped architectural symmetry, and refined dark bronze or satin brass plinth trim.';
-  }
-  if (key.includes('industrial')) {
-    return 'ARCHITECTURAL STYLE — INDUSTRIAL & ARCHITECTURAL: Bold structural contrast pairing thick solid timber slabs/casework with matte blackened hot-rolled steel frame accents, dark steel leg supports or architectural steel reveal strips, and crisp workshop honesty.';
-  }
-  if (key.includes('rustic') || key.includes('live-edge')) {
-    return 'ARCHITECTURAL STYLE — RUSTIC & LIVE-EDGE MODERN: Dramatic thick solid-wood live-edge slab top or front edge preserving natural organic waney tree contours, rich grain character, and inlaid contrasting wood butterfly/bowtie keys, grounded on clean modern architectural supports.';
-  }
-  if (key.includes('brutalist')) {
-    return 'ARCHITECTURAL STYLE — ARCHITECTURAL BRUTALIST: Monolithic thick-slab hardwood geometry, deep carved relief shadows, heavy structural massing, and bold geometric blocks.';
-  }
-  return `ARCHITECTURAL STYLE — ${designStyle.toUpperCase()}: Faithfully express unmistakable ${designStyle} proportions, silhouette, edge profiles, and structural detailing throughout the entire piece.`;
+  return `ARCHITECTURAL DIRECTION — ${designStyle.toUpperCase()}: Faithfully express unmistakable ${designStyle} proportions, silhouette, edge profiles, and structural detailing throughout the entire piece.`;
 }
 
 interface SourceImagePayload {
@@ -276,6 +303,18 @@ const CASEGOODS_GEMINI_SYSTEM_INSTRUCTION =
   'When editing a room photo, preserve the room architecture, lighting, and perspective faithfully while installing the custom piece cleanly at accurate scale. ' +
   'When generating a 2D CAD drawing, produce strictly flat pure-black technical elevation linework on stark pure white paper with zero 3D perspective and zero photorealistic shading.';
 
+const VALID_GEMINI_MODEL_RE = /^gemini-[a-z0-9.-]+$/i;
+
+function isBillingOrCreditError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err || '');
+  return (
+    msg.includes('"code":402') ||
+    msg.includes('402') ||
+    /prepayment credits are depleted/i.test(msg) ||
+    /billing/i.test(msg)
+  );
+}
+
 /**
  * Primary Multimodal Image Engine: Google Gemini (Nano Banana 2.1 / 3.1 Flash Image / 2.5 Flash Image)
  * Supports true image-to-image room-photo compositing, hand-sketch translation, iterative refinement,
@@ -285,16 +324,35 @@ async function generateWithGeminiImage(params: {
   prompt: string;
   sourceImage: SourceImagePayload | null;
   sourceImageMode: 'room-photo' | 'refine-concept';
+  textureRef: { data: string; mimeType: string; label: string } | null;
 }): Promise<{
-  base64: string;
-  mimeType: string;
-  engine: string;
-} | null> {
+  result: {
+    base64: string;
+    mimeType: string;
+    engine: string;
+  } | null;
+  billingError?: string;
+}> {
   const apiKey = getGeminiApiKey();
-  if (!apiKey) return null;
+  if (!apiKey) return { result: null };
 
-  const ai = new GoogleGenAI({ apiKey });
-  const configuredModel = (process.env.GEMINI_IMAGE_MODEL || '').trim();
+  const ai = new GoogleGenAI({
+    apiKey,
+    httpOptions: {
+      headers: {
+        'User-Agent': 'aistudio-build',
+      },
+    },
+  });
+
+  const rawConfiguredModel = (process.env.GEMINI_IMAGE_MODEL || '').trim();
+  const configuredModel = VALID_GEMINI_MODEL_RE.test(rawConfiguredModel) ? rawConfiguredModel : '';
+  if (rawConfiguredModel && !configuredModel) {
+    console.warn(
+      'Ignoring invalid GEMINI_IMAGE_MODEL environment variable (must be a valid gemini-* model name, not an API key).'
+    );
+  }
+
   const candidateModels = Array.from(
     new Set(
       [
@@ -306,17 +364,59 @@ async function generateWithGeminiImage(params: {
     )
   );
 
-  const contents = params.sourceImage
-    ? [
-        {
-          inlineData: {
-            mimeType: params.sourceImage.mimeType,
-            data: params.sourceImage.data,
-          },
+  // Build multimodal parts combining optional room/refinement image + studio material texture swatch
+  let contents: string | Array<string | { text: string } | { inlineData: { mimeType: string; data: string } }>;
+  if (params.sourceImage && params.textureRef) {
+    contents = [
+      {
+        text:
+          params.sourceImageMode === 'room-photo'
+            ? 'IMAGE 1 — ROOM PHOTO OR HAND SKETCH REFERENCE (preserve architecture/layout according to task instructions):'
+            : 'IMAGE 1 — EXISTING CONCEPT TO REFINE (preserve core layout/perspective while applying requested changes):',
+      },
+      {
+        inlineData: {
+          mimeType: params.sourceImage.mimeType,
+          data: params.sourceImage.data,
         },
-        params.prompt,
-      ]
-    : params.prompt;
+      },
+      {
+        text: `IMAGE 2 — MANDATORY PRIMARY MATERIAL TEXTURE SWATCH (${params.textureRef.label}). Match this exact wood grain pattern, color tone, sheen, and edge layering across the primary cabinetry/furniture surfaces:`,
+      },
+      {
+        inlineData: {
+          mimeType: params.textureRef.mimeType,
+          data: params.textureRef.data,
+        },
+      },
+      { text: params.prompt },
+    ];
+  } else if (params.textureRef) {
+    contents = [
+      {
+        text: `MANDATORY PRIMARY MATERIAL TEXTURE SWATCH (${params.textureRef.label}). Match this exact wood grain pattern, color tone, matte/satin finish, and edge layering strictly across all primary woodwork surfaces of the custom piece:`,
+      },
+      {
+        inlineData: {
+          mimeType: params.textureRef.mimeType,
+          data: params.textureRef.data,
+        },
+      },
+      { text: params.prompt },
+    ];
+  } else if (params.sourceImage) {
+    contents = [
+      {
+        inlineData: {
+          mimeType: params.sourceImage.mimeType,
+          data: params.sourceImage.data,
+        },
+      },
+      { text: params.prompt },
+    ];
+  } else {
+    contents = params.prompt;
+  }
 
   for (const model of candidateModels) {
     try {
@@ -337,25 +437,35 @@ async function generateWithGeminiImage(params: {
       const parts = response.candidates?.[0]?.content?.parts || [];
       for (const part of parts) {
         if (part.inlineData?.data && part.inlineData?.mimeType?.startsWith('image/')) {
-          const modeTag = params.sourceImage
+          const baseModeTag = params.sourceImage
             ? params.sourceImageMode === 'room-photo'
               ? 'Room/Sketch Edit'
               : 'Iterative Refinement'
             : 'Studio Render';
+          const modeTag = params.textureRef ? `${baseModeTag} + Swatch Ref` : baseModeTag;
           return {
-            base64: part.inlineData.data,
-            mimeType: part.inlineData.mimeType,
-            engine: `Gemini ${model} (${modeTag})`,
+            result: {
+              base64: part.inlineData.data,
+              mimeType: part.inlineData.mimeType,
+              engine: `Gemini ${model} (${modeTag})`,
+            },
           };
         }
       }
       console.warn(`Gemini model ${model} returned no image part; trying next fallback.`);
     } catch (err) {
+      if (isBillingOrCreditError(err)) {
+        return {
+          result: null,
+          billingError:
+            'Your Gemini API prepayment credits are depleted. Please select a billing-enabled API key or add credits in AI Studio (Settings > Secrets / https://ai.studio/projects).',
+        };
+      }
       console.warn(`Gemini model ${model} error:`, err instanceof Error ? err.message : err);
     }
   }
 
-  return null;
+  return { result: null };
 }
 
 function buildRefinementDiffs(
@@ -1013,7 +1123,10 @@ async function startServer() {
         sourceImageMode: safeSourceMode,
       });
 
+      const textureRef = safeVisualStyle === 'render-3d' ? loadMaterialTextureRef(cleanWood) : null;
+
       let generatedResult: { base64: string; mimeType: string; engine: string } | null = null;
+      let geminiBillingError: string | undefined;
 
       if (validatedSourceImage) {
         // True image-to-image requires Gemini multimodal API
@@ -1024,26 +1137,33 @@ async function startServer() {
           });
           return;
         }
-        generatedResult = await generateWithGeminiImage({
+        const geminiAttempt = await generateWithGeminiImage({
           prompt,
           sourceImage: validatedSourceImage,
           sourceImageMode: safeSourceMode,
+          textureRef,
         });
+        generatedResult = geminiAttempt.result;
+        geminiBillingError = geminiAttempt.billingError;
 
         if (!generatedResult) {
-          res.status(503).json({
+          res.status(geminiBillingError ? 402 : 503).json({
             error:
+              geminiBillingError ||
               'Gemini image editing is momentarily busy or could not process this photo. Please try again in a few seconds.',
           });
           return;
         }
       } else {
         // 1. Primary: Gemini Image Generation (if GEMINI_API_KEY is configured)
-        generatedResult = await generateWithGeminiImage({
+        const geminiAttempt = await generateWithGeminiImage({
           prompt,
           sourceImage: null,
           sourceImageMode: 'room-photo',
+          textureRef,
         });
+        generatedResult = geminiAttempt.result;
+        geminiBillingError = geminiAttempt.billingError;
 
         // 2. Fallback to Cloud Open-Source Engine: Black Forest Labs FLUX.1-schnell (8-Step HD)
         if (!generatedResult) {
@@ -1056,8 +1176,9 @@ async function startServer() {
         }
 
         if (!generatedResult) {
-          res.status(503).json({
+          res.status(geminiBillingError ? 402 : 503).json({
             error:
+              geminiBillingError ||
               'The image render queue is momentarily busy. Please click GENERATE CUSTOM CONCEPT again in a few seconds.',
           });
           return;

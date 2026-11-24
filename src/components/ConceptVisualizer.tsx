@@ -157,111 +157,139 @@ interface ConceptVisualizerProps {
 
 const WOOD_OPTIONS = [
   'American Black Walnut',
-  'White Oak',
-  'Maple',
-  'Cherry',
-  'Mahogany',
+  'Rift White Oak',
+  'Hard White Maple',
   'Ebonized / Blackened Ash',
-  'Laminate',
-  'Something Exotic',
+  'Matte HPL + Exposed Baltic Birch Ply',
+  'Custom / Exotic Material',
 ];
 
-const WOOD_SWATCH_META: Record<string, { color: string; hint: string }> = {
-  'American Black Walnut': { color: '#4A3222', hint: 'Dark chocolate brown' },
-  'White Oak': { color: '#CBB89D', hint: 'Pale raw wheat-straw' },
-  Maple: { color: '#E8D8BE', hint: 'Bright creamy blonde' },
-  Cherry: { color: '#9E4B2B', hint: 'Warm reddish-cinnamon' },
-  Mahogany: { color: '#6E2E1D', hint: 'Deep auburn-brown' },
-  'Ebonized / Blackened Ash': { color: '#1E1E1E', hint: 'Matte jet-black grain' },
-  Laminate: { color: '#D9D6D0', hint: 'Matte HPL + birch ply edge' },
-  'Something Exotic': { color: '#EF6922', hint: 'Custom timber / finish' },
+const WOOD_SWATCH_META: Record<
+  string,
+  { color: string; hint: string; textureUrl?: string }
+> = {
+  'American Black Walnut': {
+    color: '#4A3222',
+    hint: 'Dark chocolate heartwood',
+    textureUrl: '/assets/textures/american-black-walnut.jpg',
+  },
+  'Rift White Oak': {
+    color: '#CBB89D',
+    hint: 'Pale raw wheat-straw',
+    textureUrl: '/assets/textures/rift-white-oak.jpg',
+  },
+  'Hard White Maple': {
+    color: '#E8D8BE',
+    hint: 'Bright creamy blonde',
+    textureUrl: '/assets/textures/hard-white-maple.jpg',
+  },
+  'Ebonized / Blackened Ash': {
+    color: '#1E1E1E',
+    hint: 'Matte jet-black open grain',
+    textureUrl: '/assets/textures/ebonized-blackened-ash.jpg',
+  },
+  'Matte HPL + Exposed Baltic Birch Ply': {
+    color: '#E5E1D8',
+    hint: 'Matte laminate + ply edges',
+    textureUrl: '/assets/textures/matte-hpl-baltic-birch.jpg',
+  },
+  'Custom / Exotic Material': {
+    color: '#EF6922',
+    hint: 'Custom timber, metal or stone',
+  },
 };
 
 const DESIGN_STYLE_OPTIONS = [
-  'Mid-Century Modern',
-  'Minimalist & Contemporary',
   'Bauhaus & Color-Blocked',
-  'Scandinavian & Organic',
-  'Japandi & Exposed Joinery',
-  'Traditional & Shaker',
-  'Art Deco & Fluted Curves',
-  'Industrial & Architectural',
-  'Rustic & Live-Edge Modern',
-  'Custom Style',
+  'Architectural Minimalist',
+  'Sculptural & Radiused',
+  'Mid-Century Low-Slung',
+  'Modular & Structural',
+  'Custom Direction',
 ];
 
-const ADDED_DETAILS_OPTIONS = [
-  'Full Overlay Doors',
-  'Flush Inset Doors & Drawers',
-  'Pocket / Retracting Doors',
-  'Open Cabinets (No Doors)',
-  'Sliding Tambour Doors',
-  'Glass-Front Display Doors',
-  'Vertical Fluted / Reeded Door Panels',
-  'Louvered / Slatted Doors',
-  'Soft-Close Dovetail Drawers',
-  'Push-to-Open (Touch Latch, No Hardware)',
-  'Custom Turned Hardwood Pulls',
-  'Integrated LED Shelf & Cabinet Lighting',
-  'Adjustable Floating Shelves',
-  'Waterfall Mitred Edges',
-  'Exposed Finger / Through-Tenon Joinery',
-  'Custom Detail',
+const ADDED_DETAILS_GROUPS: { group: string; options: string[] }[] = [
+  {
+    group: 'DOORS & ACCESS',
+    options: [
+      'Curved Sliding Tambour',
+      'Retracting Pocket Doors',
+      'Flush Inset Frame',
+      'Open Architectural Shelving',
+    ],
+  },
+  {
+    group: 'TEXTURE & JOINERY',
+    options: [
+      'Deep Fluted / Reeded Faces',
+      'Exposed Box Finger-Joints',
+      'Exposed Dovetail Drawers',
+      '45° Waterfall Miters',
+    ],
+  },
+  {
+    group: 'HARDWARE & LIGHTING',
+    options: [
+      'Turned Hardwood Pulls',
+      'Handleless Push-to-Open',
+      'Recessed 2700K LED Lighting',
+      'Custom Detail',
+    ],
+  },
 ];
 
 /**
- * Mutually exclusive detail groups so the user never sends contradictory instructions to Gemini
- * (e.g., "Open Cabinets (No Doors)" vs "Full Overlay Doors", or "No Hardware" vs "Turned Pulls").
+ * Mutually exclusive detail groups so the user never sends contradictory instructions to Gemini.
  */
 const EXCLUSIVE_DETAIL_GROUPS: string[][] = [
-  ['Full Overlay Doors', 'Flush Inset Doors & Drawers', 'Open Cabinets (No Doors)'],
-  ['Push-to-Open (Touch Latch, No Hardware)', 'Custom Turned Hardwood Pulls'],
   [
-    'Open Cabinets (No Doors)',
-    'Pocket / Retracting Doors',
-    'Sliding Tambour Doors',
-    'Glass-Front Display Doors',
-    'Louvered / Slatted Doors',
+    'Open Architectural Shelving',
+    'Curved Sliding Tambour',
+    'Retracting Pocket Doors',
+    'Flush Inset Frame',
   ],
+  ['Handleless Push-to-Open', 'Turned Hardwood Pulls'],
 ];
 
 const MAX_SELECTED_DETAILS = 3;
 
 /**
- * 4 Very Different, Basic Project Concept Templates
+ * 4 Signature Casegoods Project Concept Templates
  */
 const QUICK_IDEA_PRESETS = [
   {
-    label: '01 / DINING TABLE',
+    label: '01 / SCULPTURAL WET BAR',
     prompt:
-      'A solid wood dining table that seats 8 people with clean lines and sturdy legs.',
+      'A curved, freestanding wet bar island with wraparound fluted tambour paneling, a cantilevered solid-wood bartop, hidden bottle storage, and unexpected Bauhaus color-blocked interior drawers.',
+    wood: 'Rift White Oak',
+    style: 'Sculptural & Radiused',
+    details: 'Curved Sliding Tambour + Recessed 2700K LED Lighting',
+  },
+  {
+    label: '02 / MODULAR MORTISE WALL',
+    prompt:
+      'A floor-to-ceiling architectural peg-and-mortise hardwood wall system with reconfigurable cantilevered shelves, a drop-down writing desk, hidden cable channels, and suspended credenza modules.',
+    wood: 'Hard White Maple',
+    style: 'Modular & Structural',
+    details: 'Exposed Box Finger-Joints + Open Architectural Shelving',
+  },
+  {
+    label: '03 / HI-FI LISTENING CONSOLE',
+    prompt:
+      'A statement audiophile credenza engineered for a turntable, tube amp, and vinyl archive—featuring deep-fluted solid walnut doors, acoustic slatted speaker bays, exposed box-jointed corners, and lathe-turned hardwood pulls.',
     wood: 'American Black Walnut',
-    style: 'Mid-Century Modern',
-    details: 'Exposed Finger / Through-Tenon Joinery',
+    style: 'Mid-Century Low-Slung',
+    details:
+      'Deep Fluted / Reeded Faces + Exposed Box Finger-Joints + Turned Hardwood Pulls',
   },
   {
-    label: '02 / BUILT-IN BOOKCASE',
+    label: '04 / HIDDEN-FUNCTION BUILT-IN',
     prompt:
-      'A floor-to-ceiling built-in living room bookcase with lower storage cabinets and open shelving above.',
-    wood: 'White Oak',
-    style: 'Minimalist & Contemporary',
-    details: 'Full Overlay Doors',
-  },
-  {
-    label: '03 / MEDIA CREDENZA',
-    prompt:
-      'A low media console and vinyl record cabinet with sliding doors and adjustable interior shelves.',
-    wood: 'Cherry',
-    style: 'Bauhaus & Color-Blocked',
-    details: 'Pocket / Retracting Doors',
-  },
-  {
-    label: '04 / RECEPTION DESK',
-    prompt:
-      'A commercial office reception desk with a raised transaction counter and clean wood paneling.',
-    wood: 'Maple',
-    style: 'Industrial & Architectural',
-    details: 'Waterfall Mitred Edges',
+      'A full-wall architectural built-in wrapping an awkward alcove—combining a deep window bench, retracting pocket doors that conceal a full home bar or workspace, and asymmetrical display cubbies.',
+    wood: 'Ebonized / Blackened Ash',
+    style: 'Architectural Minimalist',
+    details:
+      'Retracting Pocket Doors + Recessed 2700K LED Lighting + Handleless Push-to-Open',
   },
 ];
 
@@ -308,7 +336,7 @@ export const ConceptVisualizer: React.FC<ConceptVisualizerProps> = ({
     null;
 
   const resolvedWoodSpecies =
-    state.woodSpecies === 'Something Exotic'
+    state.woodSpecies === 'Custom / Exotic Material'
       ? state.customWoodText.trim() || 'Exotic Hardwood'
       : state.woodSpecies;
 
@@ -330,7 +358,7 @@ export const ConceptVisualizer: React.FC<ConceptVisualizerProps> = ({
         const next = current.filter((d) => d !== detailOpt);
         return {
           ...prev,
-          addedDetails: next.length > 0 ? next.join(' + ') : 'Full Overlay Doors',
+          addedDetails: next.join(' + '),
         };
       }
 
@@ -356,8 +384,8 @@ export const ConceptVisualizer: React.FC<ConceptVisualizerProps> = ({
   };
 
   const resolvedDesignStyle =
-    state.designStyle === 'Custom Style'
-      ? state.customStyleText.trim() || 'Custom Studio Style'
+    state.designStyle === 'Custom Direction'
+      ? state.customStyleText.trim() || 'Custom Studio Direction'
       : state.designStyle;
 
   const resolvedAddedDetails =
@@ -366,7 +394,7 @@ export const ConceptVisualizer: React.FC<ConceptVisualizerProps> = ({
         d === 'Custom Detail' ? state.customDetailsText.trim() || 'Custom Millwork Detail' : d
       )
       .filter(Boolean)
-      .join(' + ') || 'Full Overlay Doors';
+      .join(' + ') || 'Clean Architectural Millwork';
 
   const hasSettingsChanged = Boolean(
     activeConcept &&
@@ -479,11 +507,11 @@ export const ConceptVisualizer: React.FC<ConceptVisualizerProps> = ({
     }
 
     if (
-      state.woodSpecies === 'Something Exotic' &&
+      state.woodSpecies === 'Custom / Exotic Material' &&
       !state.customWoodText.trim() &&
       mode === 'new'
     ) {
-      setErrorMsg('Please enter the exotic timber or custom material you have in mind.');
+      setErrorMsg('Please enter the custom timber, metal, or material you have in mind.');
       return;
     }
 
@@ -760,8 +788,8 @@ Concept Image Link: ${imageLink}`;
                 DESCRIBE A PIECE OR UPLOAD A ROOM PHOTO / HAND SKETCH
               </p>
               <p className="text-[0.90rem] font-light text-black max-w-[68ch]">
-                Choose a basic starter idea or write your own, pick your primary timber, design
-                style, and added cabinetry details, and generate a visual concept that is shared with Josh.
+                Choose a signature studio template or write your own idea, pick your primary timber,
+                design style, and added cabinetry details, and generate a visual concept that is shared with Josh.
               </p>
             </div>
 
@@ -812,10 +840,10 @@ Concept Image Link: ${imageLink}`;
 
           {/* Full-Width Customization Workbench + Full-Width Concept Preview Stage Below */}
           <div className="w-full space-y-5 text-left">
-            {/* Row 1: 4 Basic Quick Concept Templates (Full-Width 4-Column Strip) */}
+            {/* Row 1: 4 Signature Quick Concept Templates (Full-Width 4-Column Strip) */}
             <div className="space-y-2">
               <span className="block text-[0.68rem] tracking-cad uppercase font-medium text-black">
-                QUICK CONCEPT TEMPLATES (4 BASIC STARTING IDEAS):
+                QUICK CONCEPT TEMPLATES (4 SIGNATURE STARTING IDEAS):
               </span>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 {QUICK_IDEA_PRESETS.map((preset) => (
@@ -859,62 +887,87 @@ Concept Image Link: ${imageLink}`;
               />
             </div>
 
-            {/* Row 3: 2-Column Bauhaus Selectors (02 Primary Timber with Swatch · 03 Design Style) */}
+            {/* Row 3: 2-Column Bauhaus Selectors (02 Primary Material with Real Swatch · 03 Architectural Direction) */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
-              {/* 02 / PRIMARY TIMBER */}
+              {/* 02 / PRIMARY MATERIAL */}
               <div className="border border-black rounded-[9px] bg-white overflow-hidden flex flex-col">
                 <label
                   htmlFor={`visualizer-wood-${placement}`}
                   className="flex items-center justify-between gap-2 bg-[#27AAE0] text-black border-b border-black py-2 px-3.5 text-[0.70rem] tracking-cad uppercase font-medium cursor-pointer"
                 >
-                  <span>02 / PRIMARY TIMBER</span>
+                  <span>02 / PRIMARY MATERIAL</span>
                   {WOOD_SWATCH_META[state.woodSpecies] && (
-                    <span className="inline-flex items-center gap-1.5 text-[0.62rem] tracking-normal normal-case font-medium bg-white/90 px-2 py-0.5 rounded-[5px] border border-black">
-                      <span
-                        className="w-2.5 h-2.5 rounded-full border border-black shrink-0"
-                        style={{ backgroundColor: WOOD_SWATCH_META[state.woodSpecies].color }}
-                      />
+                    <span className="inline-flex items-center gap-1.5 text-[0.62rem] tracking-normal normal-case font-medium bg-white/95 px-2 py-0.5 rounded-[5px] border border-black">
+                      {WOOD_SWATCH_META[state.woodSpecies].textureUrl ? (
+                        <img
+                          src={WOOD_SWATCH_META[state.woodSpecies].textureUrl}
+                          alt=""
+                          className="w-3.5 h-3.5 rounded-[3px] border border-black object-cover shrink-0"
+                          referrerPolicy="no-referrer"
+                        />
+                      ) : (
+                        <span
+                          className="w-2.5 h-2.5 rounded-full border border-black shrink-0"
+                          style={{ backgroundColor: WOOD_SWATCH_META[state.woodSpecies].color }}
+                        />
+                      )}
                       <span>{WOOD_SWATCH_META[state.woodSpecies].hint}</span>
                     </span>
                   )}
                 </label>
-                <select
-                  id={`visualizer-wood-${placement}`}
-                  value={state.woodSpecies}
-                  onChange={(e) =>
-                    onChangeState((prev) => ({ ...prev, woodSpecies: e.target.value }))
-                  }
-                  className="w-full h-[44px] bg-white text-black text-[0.86rem] px-3 font-normal focus:outline-none cursor-pointer"
-                >
-                  {WOOD_OPTIONS.map((wood) => (
-                    <option key={wood} value={wood}>
-                      {wood === 'Something Exotic'
-                        ? 'Something Exotic (Enter Own Text)'
-                        : wood}
-                    </option>
-                  ))}
-                </select>
 
-                {state.woodSpecies === 'Something Exotic' && (
+                <div className="flex items-stretch">
+                  {WOOD_SWATCH_META[state.woodSpecies]?.textureUrl && (
+                    <div
+                      className="w-[46px] h-[44px] border-r border-black shrink-0 overflow-hidden bg-white"
+                      title={`Linked studio texture swatch: ${state.woodSpecies}`}
+                    >
+                      <img
+                        src={WOOD_SWATCH_META[state.woodSpecies].textureUrl}
+                        alt={`${state.woodSpecies} studio texture swatch`}
+                        className="w-full h-full object-cover select-none"
+                        referrerPolicy="no-referrer"
+                      />
+                    </div>
+                  )}
+                  <select
+                    id={`visualizer-wood-${placement}`}
+                    value={state.woodSpecies}
+                    onChange={(e) =>
+                      onChangeState((prev) => ({ ...prev, woodSpecies: e.target.value }))
+                    }
+                    className="w-full h-[44px] bg-white text-black text-[0.86rem] px-3 font-normal focus:outline-none cursor-pointer"
+                  >
+                    {WOOD_OPTIONS.map((wood) => (
+                      <option key={wood} value={wood}>
+                        {wood === 'Custom / Exotic Material'
+                          ? 'Custom / Exotic Material (Enter Own Text)'
+                          : wood}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {state.woodSpecies === 'Custom / Exotic Material' && (
                   <input
                     type="text"
                     value={state.customWoodText}
                     onChange={(e) =>
                       onChangeState((prev) => ({ ...prev, customWoodText: e.target.value }))
                     }
-                    placeholder="Enter exotic wood or custom material..."
+                    placeholder="Enter custom timber, metal, stone, or finish..."
                     className="w-full h-[42px] bg-white text-black text-[0.86rem] px-3.5 border-t border-black/20 font-light focus:outline-none focus:bg-[#27AAE0]/10 placeholder:text-black/45"
                   />
                 )}
               </div>
 
-              {/* 03 / DESIGN STYLE */}
+              {/* 03 / ARCHITECTURAL DIRECTION */}
               <div className="border border-black rounded-[9px] bg-white overflow-hidden flex flex-col">
                 <label
                   htmlFor={`visualizer-style-${placement}`}
                   className="block bg-[#FDCB33] text-black border-b border-black py-2 px-3.5 text-[0.70rem] tracking-cad uppercase font-medium cursor-pointer"
                 >
-                  03 / DESIGN STYLE
+                  03 / ARCHITECTURAL DIRECTION
                 </label>
                 <select
                   id={`visualizer-style-${placement}`}
@@ -926,60 +979,72 @@ Concept Image Link: ${imageLink}`;
                 >
                   {DESIGN_STYLE_OPTIONS.map((styleOpt) => (
                     <option key={styleOpt} value={styleOpt}>
-                      {styleOpt === 'Custom Style'
-                        ? 'Custom Style (Enter Own Text)'
+                      {styleOpt === 'Custom Direction'
+                        ? 'Custom Direction (Enter Own Text)'
                         : styleOpt}
                     </option>
                   ))}
                 </select>
 
-                {state.designStyle === 'Custom Style' && (
+                {state.designStyle === 'Custom Direction' && (
                   <input
                     type="text"
                     value={state.customStyleText}
                     onChange={(e) =>
                       onChangeState((prev) => ({ ...prev, customStyleText: e.target.value }))
                     }
-                    placeholder="Describe your preferred design style..."
+                    placeholder="Describe your preferred architectural direction..."
                     className="w-full h-[42px] bg-white text-black text-[0.86rem] px-3.5 border-t border-black/20 font-light focus:outline-none focus:bg-[#FDCB33]/10 placeholder:text-black/45"
                   />
                 )}
               </div>
             </div>
 
-            {/* Row 3B: Full-Width Multi-Select 04 / ADDED DETAILS (Unified Flush-Header Card) */}
+            {/* Row 3B: Full-Width Grouped Multi-Select 04 / SIGNATURE MILLWORK & JOINERY */}
             <div className="border border-black rounded-[9px] bg-white overflow-hidden">
               <div className="flex flex-wrap items-center justify-between gap-2 bg-[#EF6922] text-black border-b border-black py-2 px-3.5 text-[0.70rem] tracking-cad uppercase font-medium select-none">
-                <span>04 / ADDED DETAILS — PICK UP TO {MAX_SELECTED_DETAILS}</span>
+                <span>04 / SIGNATURE MILLWORK &amp; JOINERY — PICK UP TO {MAX_SELECTED_DETAILS}</span>
                 <span className="bg-white text-black border border-black rounded-[5px] px-2 py-0.5 text-[0.62rem]">
                   {selectedDetailsList.length} / {MAX_SELECTED_DETAILS} SELECTED
                 </span>
               </div>
 
               <div
-                className="flex flex-wrap gap-2 p-3 bg-white"
+                className="p-3.5 bg-white space-y-3"
                 role="group"
-                aria-label="Added cabinetry and joinery details"
+                aria-label="Signature millwork and joinery details"
               >
-                {ADDED_DETAILS_OPTIONS.map((detailOpt) => {
-                  const isSelected = selectedDetailsList.includes(detailOpt);
-                  return (
-                    <button
-                      key={detailOpt}
-                      type="button"
-                      aria-pressed={isSelected}
-                      onClick={() => toggleAddedDetail(detailOpt)}
-                      className={`px-3 py-1.5 rounded-[7px] border border-black text-[0.76rem] transition-colors cursor-pointer inline-flex items-center gap-1.5 ${
-                        isSelected
-                          ? 'bg-[#EF6922] text-black font-medium shadow-[2px_2px_0_#000]'
-                          : 'bg-white text-black hover:bg-[#CBCBCB]/60 font-light'
-                      }`}
-                    >
-                      {isSelected && <Check className="w-3.5 h-3.5 shrink-0" />}
-                      <span>{detailOpt}</span>
-                    </button>
-                  );
-                })}
+                {ADDED_DETAILS_GROUPS.map((section) => (
+                  <div
+                    key={section.group}
+                    className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3"
+                  >
+                    <span className="text-[0.62rem] tracking-cad uppercase font-medium text-black/70 sm:w-[148px] shrink-0">
+                      {section.group}
+                    </span>
+                    <div className="flex flex-wrap gap-2">
+                      {section.options.map((detailOpt) => {
+                        const isSelected = selectedDetailsList.includes(detailOpt);
+                        return (
+                          <button
+                            key={detailOpt}
+                            type="button"
+                            aria-pressed={isSelected}
+                            onClick={() => toggleAddedDetail(detailOpt)}
+                            className={`px-3 py-1.5 rounded-[7px] border border-black text-[0.76rem] transition-colors cursor-pointer inline-flex items-center gap-1.5 ${
+                              isSelected
+                                ? 'bg-[#EF6922] text-black font-medium'
+                                : 'bg-white text-black hover:bg-[#CBCBCB]/60 font-light'
+                            }`}
+                          >
+                            {isSelected && <Check className="w-3.5 h-3.5 shrink-0" />}
+                            <span>{detailOpt}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
               </div>
 
               {hasCustomDetailSelected && (
@@ -1102,7 +1167,7 @@ Concept Image Link: ${imageLink}`;
               </div>
 
               {/* Flush Full-Width Visual Canvas */}
-              <div className="w-full cad-grid-bg overflow-hidden min-h-[320px] sm:min-h-[440px] flex items-center justify-center relative">
+              <div className="w-full cad-hatch-bg overflow-hidden min-h-[320px] sm:min-h-[440px] flex items-center justify-center relative">
                 {isGenerating ? (
                   <div className="p-8 text-center space-y-3">
                     <div className="w-12 h-12 mx-auto rounded-[9px] border-[0.75px] border-black bg-[#EF6922] flex items-center justify-center animate-pulse">
@@ -1158,7 +1223,7 @@ Concept Image Link: ${imageLink}`;
                       YOUR GENERATED 3D REALISTIC RENDERING OR 2D ELEVATION SKETCH WILL APPEAR HERE
                     </p>
                     <p className="text-[0.84rem] font-light text-black max-w-md mx-auto">
-                      Click any of the 4 basic starter ideas above or describe your custom
+                      Click any of the 4 signature templates above or describe your custom
                       piece and click GENERATE CUSTOM CONCEPT.
                     </p>
                   </div>
