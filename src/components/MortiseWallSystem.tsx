@@ -9,7 +9,14 @@ const LIGHT_KX = 0.54;
 const LIGHT_KY = 0.64;
 
 export type PillarColorKey = '01' | '02' | '06';
-export type WallTool = 'hook' | 'shelf' | 'cabinet';
+export type WallTool =
+  | 'hook'
+  | 'shelf'
+  | 'cabinet'
+  | 'cubby'
+  | 'wallShelf'
+  | 'cradle'
+  | 'sconce';
 
 const COLORS = {
   white: '#FFFFFF',
@@ -39,6 +46,16 @@ export interface PieceSize {
   rows: number;
 }
 
+export const TOOL_LABELS: Record<WallTool, string> = {
+  hook: 'Hook',
+  shelf: 'Shelf + Rod',
+  cabinet: 'Cabinet',
+  cubby: 'Open Cube',
+  wallShelf: 'Wall Shelf',
+  cradle: 'Vinyl Box',
+  sconce: 'Wall Sconce',
+};
+
 export const TOOL_SIZE_LIMITS: Record<
   WallTool,
   { minCols: number; maxCols: number; minRows: number; maxRows: number; defaultSize: PieceSize }
@@ -64,9 +81,37 @@ export const TOOL_SIZE_LIMITS: Record<
     maxRows: 4,
     defaultSize: { cols: 4, rows: 2 },
   },
+  cubby: {
+    minCols: 3,
+    maxCols: 5,
+    minRows: 3,
+    maxRows: 4,
+    defaultSize: { cols: 3, rows: 3 },
+  },
+  wallShelf: {
+    minCols: 3,
+    maxCols: 5,
+    minRows: 2,
+    maxRows: 2,
+    defaultSize: { cols: 4, rows: 2 },
+  },
+  cradle: {
+    minCols: 4,
+    maxCols: 6,
+    minRows: 2,
+    maxRows: 2,
+    defaultSize: { cols: 5, rows: 2 },
+  },
+  sconce: {
+    minCols: 2,
+    maxCols: 6,
+    minRows: 1,
+    maxRows: 1,
+    defaultSize: { cols: 4, rows: 1 },
+  },
 };
 
-const INITIAL_RANDOM_COUNT = 7;
+const INITIAL_RANDOM_COUNT = 8;
 
 interface SlotNode {
   gx: number;
@@ -92,6 +137,8 @@ interface PlacedItem {
   gy2: number;
   lift: number;
   seed: number;
+  lit?: boolean;
+  hasProps?: boolean;
 }
 
 interface GridMeta {
@@ -117,12 +164,15 @@ export interface MortiseWallController {
   setActivePillar: (pillar: PillarColorKey, rippleOrigin?: { x: number; y: number }) => void;
   motionOn: boolean;
   toggleMotion: () => void;
+  showProps: boolean;
+  toggleProps: () => void;
   rearrange: () => void;
   clearWall: () => void;
   registerActions: (actions: {
     rearrange: () => void;
     clearWall: () => void;
     triggerRipple: (nx: number, ny: number) => void;
+    setAllProps: (show: boolean) => void;
   }) => void;
 }
 
@@ -142,18 +192,26 @@ export function useMortiseWallController(
     hook: { ...TOOL_SIZE_LIMITS.hook.defaultSize },
     shelf: { ...TOOL_SIZE_LIMITS.shelf.defaultSize },
     cabinet: { ...TOOL_SIZE_LIMITS.cabinet.defaultSize },
+    cubby: { ...TOOL_SIZE_LIMITS.cubby.defaultSize },
+    wallShelf: { ...TOOL_SIZE_LIMITS.wallShelf.defaultSize },
+    cradle: { ...TOOL_SIZE_LIMITS.cradle.defaultSize },
+    sconce: { ...TOOL_SIZE_LIMITS.sconce.defaultSize },
   });
   const [activePillar, setActivePillarState] = useState<PillarColorKey>(initialPillar);
   const [motionOn, setMotionOn] = useState<boolean>(!prefersReduced);
+  const [showProps, setShowProps] = useState<boolean>(true);
+  const showPropsRef = useRef<boolean>(true);
 
   const actionsRef = useRef<{
     rearrange: () => void;
     clearWall: () => void;
     triggerRipple: (nx: number, ny: number) => void;
+    setAllProps: (show: boolean) => void;
   }>({
     rearrange: () => {},
     clearWall: () => {},
     triggerRipple: () => {},
+    setAllProps: () => {},
   });
 
   useEffect(() => {
@@ -195,6 +253,12 @@ export function useMortiseWallController(
   );
 
   const toggleMotion = useCallback(() => setMotionOn((v) => !v), []);
+  const toggleProps = useCallback(() => {
+    const next = !showPropsRef.current;
+    showPropsRef.current = next;
+    setShowProps(next);
+    actionsRef.current.setAllProps(next);
+  }, []);
   const rearrange = useCallback(() => actionsRef.current.rearrange(), []);
   const clearWall = useCallback(() => actionsRef.current.clearWall(), []);
   const registerActions = useCallback((actions: typeof actionsRef.current) => {
@@ -211,6 +275,8 @@ export function useMortiseWallController(
       setActivePillar,
       motionOn,
       toggleMotion,
+      showProps,
+      toggleProps,
       rearrange,
       clearWall,
       registerActions,
@@ -223,6 +289,8 @@ export function useMortiseWallController(
       setActivePillar,
       motionOn,
       toggleMotion,
+      showProps,
+      toggleProps,
       rearrange,
       clearWall,
       registerActions,
@@ -294,6 +362,7 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
     toolSizes: controller.toolSizes,
     activePillar: controller.activePillar,
     motionOn: controller.motionOn,
+    showProps: controller.showProps,
     isModalOpen,
     canInteract,
   });
@@ -303,6 +372,7 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
     toolSizes: controller.toolSizes,
     activePillar: controller.activePillar,
     motionOn: controller.motionOn,
+    showProps: controller.showProps,
     isModalOpen,
     canInteract,
   };
@@ -375,7 +445,7 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
     let rafId = 0;
     let disposed = false;
 
-    // Preload real Maple grain texture & 13-ply Baltic Birch edge texture
+    // Preload real Baltic Birch face ply & 13-ply exposed edge textures
     // Build progressive 0.5x offscreen mipmap pyramids so small canvas strips never moiré/shimmer
     let mapleReady = false;
     let birchReady = false;
@@ -577,11 +647,16 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
         gy2,
         lift: withAnim ? 0.08 : 1,
         seed: id * 17 + gx1 * 7 + gx2 * 11 + gy1 * 13 + gy2 * 19,
+        lit: type === 'sconce' ? true : undefined,
+        hasProps:
+          type === 'wallShelf' || type === 'cradle'
+            ? stateRef.current.showProps
+            : undefined,
       });
     };
 
     /**
-     * Hit-tests placed hardware top-most first so users can grab and drag any piece to move it.
+     * Hit-tests placed hardware top-most first so users can grab and drag (or right-click remove) any piece.
      */
     const findItemAtPoint = (px: number, py: number): PlacedItem | null => {
       const m = gridMeta;
@@ -637,6 +712,45 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
           const topY = upperCy + m.slotH * 0.04;
           const botY = lowerCy + m.slotH * 0.11;
           if (px >= leftX - 5 && px <= rightX + 5 && py >= topY - 5 && py <= botY + 5) {
+            return item;
+          }
+        } else if (item.type === 'cradle') {
+          const itemHasProps = item.hasProps ?? stateRef.current.showProps;
+          const t = m.slotW * 0.857;
+          const leftX = leftCx - t * 0.5;
+          const rightX = rightCx + t * 0.5;
+          const topY = itemHasProps ? upperCy - m.slotH * 0.34 : upperCy + m.slotH * 0.04;
+          const botY = lowerCy + m.slotH * 0.11;
+          if (px >= leftX - 5 && px <= rightX + 5 && py >= topY - 5 && py <= botY + 5) {
+            return item;
+          }
+        } else if (item.type === 'cubby') {
+          const t = Math.max(7.5, Math.min(11.5, m.pitchX * 0.145));
+          const leftX = leftCx - t * 0.5;
+          const rightX = rightCx + t * 0.5;
+          const topY = upperCy - m.slotH * 0.62;
+          const botY = lowerCy + m.slotH * 0.62;
+          if (px >= leftX - 4 && px <= rightX + 4 && py >= topY - 4 && py <= botY + 4) {
+            return item;
+          }
+        } else if (item.type === 'wallShelf') {
+          const itemHasProps = item.hasProps ?? stateRef.current.showProps;
+          const t = m.slotW * 0.857;
+          const leftX = leftCx - t * 1.1;
+          const rightX = rightCx + t * 1.1;
+          const topY = itemHasProps ? upperCy - m.slotH * 0.45 : lowerCy - m.slotH * 0.65;
+          const botY = lowerCy + m.slotH * 0.92;
+          if (px >= leftX - 6 && px <= rightX + 6 && py >= topY - 5 && py <= botY + 5) {
+            return item;
+          }
+        } else if (item.type === 'sconce') {
+          const t = m.slotW * 0.857;
+          const leftX = leftCx - t * 0.85;
+          const rightX = rightCx + t * 0.85;
+          const barH = Math.max(15, Math.min(21, m.slotH * 0.54));
+          const topY = upperCy - barH * 0.5;
+          const botY = upperCy + barH * 0.5;
+          if (px >= leftX - 6 && px <= rightX + 6 && py >= topY - 7 && py <= botY + 7) {
             return item;
           }
         } else {
@@ -697,11 +811,11 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
     const rebuildGrid = () => {
       measureClearanceZones();
       const sideMargin = Math.max(0, heroRect.left);
-      // Scale mortise grid so desktop flanks comfortably fit 4-slot-wide cabinets & shelves
+      // Scale mortise grid so desktop flanks comfortably fit 5-hook-wide vinyl boxes, cabinets & shelves
       const baseScale = Math.max(0.22, Math.min(0.295, cssW / 4800));
       const scale =
         sideMargin >= 200
-          ? Math.max(0.18, Math.min(baseScale, (sideMargin - 20) / (4.35 * SVG_PITCH_X)))
+          ? Math.max(0.18, Math.min(baseScale, (sideMargin - 20) / (4.55 * SVG_PITCH_X)))
           : baseScale;
       const slotW = SVG_SLOT_W * scale;
       const slotH = SVG_SLOT_H * scale;
@@ -1577,6 +1691,1351 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       ctx.restore();
     };
 
+    /**
+     * Shared geometry helper for the Pure 2D Baltic Birch Open Cube (min 3×3 hooks).
+     * Uses the exact same outer carcass geometry & 3/4" birch thickness as the Sliding-Door Cabinet.
+     */
+    const getOpenCubeMetrics = (
+      gx1: number,
+      gx2: number,
+      gy1: number,
+      gy2: number,
+      m: GridMeta,
+      lift: number,
+      ox: number,
+      oy: number
+    ) => {
+      const leftCx = m.centerX + gx1 * m.pitchX + ox;
+      const rightCx = m.centerX + gx2 * m.pitchX + ox;
+      const upperCy = m.centerY + gy1 * m.pitchY + oy;
+      const lowerCy = m.centerY + gy2 * m.pitchY + oy;
+      const t = Math.max(7.5, Math.min(11.5, m.pitchX * 0.145));
+      const liftOffset = (1 - lift) * 7;
+
+      const leftX = leftCx - t * 0.5;
+      const rightX = rightCx + t * 0.5;
+      const boxW = rightX - leftX;
+      const topY = upperCy - m.slotH * 0.62 - liftOffset;
+      const botY = lowerCy + m.slotH * 0.62 - liftOffset;
+      const boxH = botY - topY;
+
+      return { t, leftX, rightX, topY, botY, boxW, boxH };
+    };
+
+    /**
+     * 4. OPEN CUBE — Directional Hollow-Frame Cast Shadow
+     * Extrudes all 4 individual carcass walls so light passes naturally through the open hollow center
+     * while the top and left walls cast subtle directional shadows into the opening.
+     */
+    const drawOpenCubeIsoShadow = (
+      gx1: number,
+      gx2: number,
+      gy1: number,
+      gy2: number,
+      m: GridMeta,
+      lift: number,
+      ox: number,
+      oy: number
+    ) => {
+      if (lift <= 0.02) return;
+      const c = getOpenCubeMetrics(gx1, gx2, gy1, gy2, m, lift, ox, oy);
+      const innerX = c.leftX + c.t;
+      const innerW = Math.max(8, c.boxW - c.t * 2);
+      const depth = Math.min(c.boxH, m.pitchY * 1.45) * 0.44 * lift;
+      const dx = depth * LIGHT_KX;
+      const dy = depth * LIGHT_KY;
+
+      ctx.save();
+      ctx.beginPath();
+      // Left vertical wall shadow
+      appendExtrudedBoxShadowPath(c.leftX, c.topY, c.t, c.boxH, dx, dy, 0);
+      // Right vertical wall shadow
+      appendExtrudedBoxShadowPath(c.rightX - c.t, c.topY, c.t, c.boxH, dx, dy, 0);
+      // Top horizontal board shadow (casts softly into upper interior cavity)
+      appendExtrudedBoxShadowPath(innerX, c.topY, innerW, c.t, dx, dy, 0);
+      // Bottom horizontal board shadow
+      appendExtrudedBoxShadowPath(innerX, c.botY - c.t, innerW, c.t, dx, dy, 0);
+
+      fillDirectionalCastShadow(
+        c.leftX + c.t * 0.5,
+        c.topY + c.t * 0.5,
+        c.rightX + dx,
+        c.botY + dy,
+        lift,
+        8
+      );
+      ctx.restore();
+    };
+
+    /**
+     * 4. OPEN CUBE — Strict Pure 2D Orthographic Front Elevation (min 3×3 hooks)
+     * Matches Cabinet carcass geometry exactly: pure 100% 13-ply Baltic Birch 4-sided frame with
+     * butt-joint vertical sides and a completely open hollow back revealing the mortise wall behind it.
+     */
+    const drawOpenCube = (
+      gx1: number,
+      gx2: number,
+      gy1: number,
+      gy2: number,
+      m: GridMeta,
+      lift: number,
+      ox: number,
+      oy: number,
+      isGhost: boolean,
+      seed = 0
+    ) => {
+      const grainSeed = seed || gx1 * 13 + gx2 * 19 + gy1 * 23 + gy2 * 31;
+      const c = getOpenCubeMetrics(gx1, gx2, gy1, gy2, m, lift, ox, oy);
+      const innerX = c.leftX + c.t;
+      const innerY = c.topY + c.t;
+      const innerW = Math.max(18, c.boxW - c.t * 2);
+      const innerH = Math.max(18, c.boxH - c.t * 2);
+
+      ctx.save();
+      if (isGhost) {
+        ctx.globalAlpha = 0.45;
+        ctx.setLineDash([4, 3]);
+        // Hollow 2D frame ghost fill (even-odd cutout keeps center transparent)
+        ctx.beginPath();
+        ctx.rect(c.leftX, c.topY, c.boxW, c.boxH);
+        ctx.rect(innerX, innerY, innerW, innerH);
+        ctx.fillStyle = '#EAD8BD';
+        ctx.fill('evenodd');
+      } else {
+        // Exposed 13-Ply Baltic Birch 4-Sided Outer Carcass (Full-Height Vertical Sides + Inset Top/Bottom)
+        drawBirchEdge(c.leftX, c.topY, c.t, c.boxH, 'vertical', grainSeed + 1);
+        drawBirchEdge(c.rightX - c.t, c.topY, c.t, c.boxH, 'vertical', grainSeed + 2);
+        drawBirchEdge(innerX, c.topY, innerW, c.t, 'horizontal', grainSeed + 3);
+        drawBirchEdge(innerX, innerY + innerH, innerW, c.t, 'horizontal', grainSeed + 4);
+      }
+
+      // Crisp Architectural CAD Ink Outlines (Outer Frame)
+      ctx.strokeStyle = COLORS.black;
+      ctx.lineWidth = isGhost ? 1.4 : 1.9;
+      ctx.strokeRect(c.leftX, c.topY, c.boxW, c.boxH);
+
+      ctx.setLineDash([]);
+      // Butt-joint vertical side seams
+      ctx.beginPath();
+      ctx.moveTo(innerX, c.topY);
+      ctx.lineTo(innerX, c.botY);
+      ctx.moveTo(innerX + innerW, c.topY);
+      ctx.lineTo(innerX + innerW, c.botY);
+      ctx.strokeStyle = COLORS.black;
+      ctx.lineWidth = isGhost ? 1.05 : 1.45;
+      ctx.stroke();
+
+      // Crisp open-cavity inner frame outline
+      ctx.strokeStyle = COLORS.black;
+      ctx.lineWidth = isGhost ? 1.15 : 1.7;
+      ctx.strokeRect(innerX, innerY, innerW, innerH);
+
+      ctx.restore();
+    };
+
+    /**
+     * Shared geometry helper for the Baltic Birch Wall Shelf (Image 2) + Architectural Potted Plant.
+     */
+    const getWallShelfMetrics = (
+      gx1: number,
+      gx2: number,
+      gy1: number,
+      gy2: number,
+      m: GridMeta,
+      lift: number,
+      ox: number,
+      oy: number,
+      seed: number
+    ) => {
+      const t = m.slotW * 0.857;
+      const r = m.slotW * 0.143;
+      const leftCx = m.centerX + gx1 * m.pitchX + ox;
+      const rightCx = m.centerX + gx2 * m.pitchX + ox;
+      const upperCy = m.centerY + gy1 * m.pitchY + oy;
+      const lowerCy = m.centerY + gy2 * m.pitchY + oy;
+      const liftOffset = (1 - lift) * 6;
+
+      // Flat cantilevered shelf sits cleanly on lower row gy2, leaving gy1 clear for the potted plant
+      const shelfTopY = lowerCy - m.slotH * 0.2 - liftOffset;
+      const shelfH = Math.max(8, t * 0.96);
+      const shelfBotY = shelfTopY + shelfH;
+      const shelfLeftX = leftCx - t * 1.1;
+      const shelfRightX = rightCx + t * 1.1;
+      const shelfW = shelfRightX - shelfLeftX;
+
+      // Twin CNC hook ears rising slightly above shelf & tapered under-shelf brackets below
+      const earW = t * 0.86;
+      const earH = m.slotH * 0.42;
+      const earTopY = shelfTopY - earH;
+      const corbelW = t * 0.88;
+      const corbelH = m.slotH * 0.86;
+
+      // Architectural potted plant resting directly on shelfTopY
+      const spanInner = Math.max(36, rightCx - leftCx - earW * 2);
+      const plantSideBias = Math.abs(seed) % 2 === 0 ? 0.38 : 0.62;
+      const plantCx = leftCx + earW + spanInner * plantSideBias;
+      const potW = Math.max(24, Math.min(44, m.pitchX * 0.56));
+      const potH = Math.max(22, Math.min(38, m.pitchY * 0.36));
+      const saucerH = 3.6;
+      const potBotY = shelfTopY - saucerH;
+      const potTopY = potBotY - potH;
+      const foliageTopLimitY = upperCy - m.slotH * 0.38 - liftOffset;
+      const plantVariant = Math.abs(seed) % 2;
+
+      return {
+        t,
+        r,
+        leftCx,
+        rightCx,
+        upperCy,
+        lowerCy,
+        shelfTopY,
+        shelfH,
+        shelfBotY,
+        shelfLeftX,
+        shelfRightX,
+        shelfW,
+        earW,
+        earH,
+        earTopY,
+        corbelW,
+        corbelH,
+        plantCx,
+        potW,
+        potH,
+        saucerH,
+        potBotY,
+        potTopY,
+        foliageTopLimitY,
+        plantVariant,
+      };
+    };
+
+    /**
+     * Traces clean architectural CAD-style plant foliage blades/leaves for both body and cast-shadow paths.
+     */
+    const getPlantLeaves = (
+      plantCx: number,
+      potTopY: number,
+      potW: number,
+      foliageTopLimitY: number,
+      variant: number
+    ) => {
+      const availH = Math.max(32, potTopY - foliageTopLimitY);
+      if (variant === 0) {
+        // Variant A: Sculptural architectural Rubber / Fiddle-Leaf plant (stems + broad oval CAD leaves)
+        const baseY = potTopY + 1;
+        return {
+          kind: 'broad' as const,
+          leaves: [
+            {
+              sx: plantCx - potW * 0.12,
+              sy: baseY,
+              ex: plantCx - potW * 0.62,
+              ey: baseY - availH * 0.44,
+              rx: potW * 0.34,
+              ry: availH * 0.16,
+              ang: -0.58,
+              fill: '#4C7357',
+            },
+            {
+              sx: plantCx + potW * 0.12,
+              sy: baseY,
+              ex: plantCx + potW * 0.64,
+              ey: baseY - availH * 0.48,
+              rx: potW * 0.33,
+              ry: availH * 0.16,
+              ang: 0.56,
+              fill: '#43684E',
+            },
+            {
+              sx: plantCx - potW * 0.06,
+              sy: baseY,
+              ex: plantCx - potW * 0.42,
+              ey: baseY - availH * 0.78,
+              rx: potW * 0.32,
+              ry: availH * 0.17,
+              ang: -0.34,
+              fill: '#5E8A6A',
+            },
+            {
+              sx: plantCx + potW * 0.08,
+              sy: baseY,
+              ex: plantCx + potW * 0.4,
+              ey: baseY - availH * 0.76,
+              rx: potW * 0.3,
+              ry: availH * 0.16,
+              ang: 0.34,
+              fill: '#6E9979',
+            },
+            {
+              sx: plantCx,
+              sy: baseY,
+              ex: plantCx - potW * 0.02,
+              ey: baseY - availH * 0.96,
+              rx: potW * 0.29,
+              ry: availH * 0.18,
+              ang: -0.05,
+              fill: '#578263',
+            },
+          ],
+        };
+      }
+
+      // Variant B: Architectural Snake Plant (Sansevieria) — crisp overlapping tapered sword blades
+      const baseY = potTopY + 1;
+      return {
+        kind: 'sword' as const,
+        blades: [
+          {
+            bx: plantCx - potW * 0.24,
+            tx: plantCx - potW * 0.44,
+            ty: baseY - availH * 0.66,
+            w: potW * 0.2,
+            fill: '#466D52',
+          },
+          {
+            bx: plantCx + potW * 0.24,
+            tx: plantCx + potW * 0.44,
+            ty: baseY - availH * 0.62,
+            w: potW * 0.2,
+            fill: '#4A7256',
+          },
+          {
+            bx: plantCx - potW * 0.12,
+            tx: plantCx - potW * 0.19,
+            ty: baseY - availH * 0.92,
+            w: potW * 0.22,
+            fill: '#5D8969',
+          },
+          {
+            bx: plantCx + potW * 0.12,
+            tx: plantCx + potW * 0.21,
+            ty: baseY - availH * 0.84,
+            w: potW * 0.21,
+            fill: '#6D9878',
+          },
+          {
+            bx: plantCx,
+            tx: plantCx + potW * 0.02,
+            ty: baseY - availH * 1.02,
+            w: potW * 0.23,
+            fill: '#527C5E',
+          },
+        ],
+      };
+    };
+
+    /**
+     * 5. WALL SHELF — Cast Shadow
+     * Flat cantilevered Baltic Birch shelf board + rear hook ears + under-shelf corbel brackets + potted plant shadow.
+     */
+    const drawWallShelfIsoShadow = (
+      gx1: number,
+      gx2: number,
+      gy1: number,
+      gy2: number,
+      m: GridMeta,
+      lift: number,
+      ox: number,
+      oy: number,
+      seed = 0,
+      showProps = true
+    ) => {
+      if (lift <= 0.02) return;
+      const grainSeed = seed || gx1 * 11 + gx2 * 17 + gy1 * 23;
+      const s = getWallShelfMetrics(gx1, gx2, gy1, gy2, m, lift, ox, oy, grainSeed);
+      const shelfDepth = m.pitchY * 0.56 * lift;
+      const dx = shelfDepth * LIGHT_KX;
+      const dy = shelfDepth * LIGHT_KY;
+
+      const corbelDepth = shelfDepth * 0.72;
+      const cdx = corbelDepth * LIGHT_KX;
+      const cdy = corbelDepth * LIGHT_KY;
+
+      const plantDepth = shelfDepth * 0.52;
+      const pdx = plantDepth * LIGHT_KX;
+      const pdy = plantDepth * LIGHT_KY;
+
+      ctx.save();
+      ctx.beginPath();
+
+      // Rear mounting ears shadow
+      appendExtrudedBoxShadowPath(
+        s.leftCx - s.earW * 0.5,
+        s.earTopY,
+        s.earW,
+        s.earH,
+        dx * 0.22,
+        dy * 0.22,
+        s.r
+      );
+      appendExtrudedBoxShadowPath(
+        s.rightCx - s.earW * 0.5,
+        s.earTopY,
+        s.earW,
+        s.earH,
+        dx * 0.22,
+        dy * 0.22,
+        s.r
+      );
+
+      // Under-shelf corbel brackets shadow
+      appendExtrudedBoxShadowPath(
+        s.leftCx - s.corbelW * 0.5,
+        s.shelfBotY,
+        s.corbelW,
+        s.corbelH,
+        cdx,
+        cdy,
+        s.r
+      );
+      appendExtrudedBoxShadowPath(
+        s.rightCx - s.corbelW * 0.5,
+        s.shelfBotY,
+        s.corbelW,
+        s.corbelH,
+        cdx,
+        cdy,
+        s.r
+      );
+
+      // Main cantilevered horizontal shelf board shadow
+      appendExtrudedBoxShadowPath(s.shelfLeftX, s.shelfTopY, s.shelfW, s.shelfH, dx, dy, 0);
+
+      // Architectural potted plant cast shadow (when props enabled)
+      if (showProps) {
+        const potHalfTop = s.potW * 0.5;
+        const potHalfBot = s.potW * 0.42;
+        ctx.moveTo(s.plantCx - potHalfTop + pdx, s.potTopY + pdy);
+        ctx.lineTo(s.plantCx + potHalfTop + pdx, s.potTopY + pdy);
+        ctx.lineTo(s.plantCx + potHalfBot + pdx, s.shelfTopY + pdy);
+        ctx.lineTo(s.plantCx - potHalfBot + pdx, s.shelfTopY + pdy);
+        ctx.closePath();
+
+        const foliage = getPlantLeaves(
+          s.plantCx,
+          s.potTopY,
+          s.potW,
+          s.foliageTopLimitY,
+          s.plantVariant
+        );
+        if (foliage.kind === 'broad') {
+          for (const lf of foliage.leaves) {
+            ctx.moveTo(lf.ex + pdx + lf.rx, lf.ey + pdy);
+            ctx.ellipse(lf.ex + pdx, lf.ey + pdy, lf.rx, lf.ry, lf.ang, 0, Math.PI * 2);
+            ctx.closePath();
+          }
+        } else {
+          for (const bl of foliage.blades) {
+            ctx.moveTo(bl.bx - bl.w * 0.5 + pdx, s.potTopY + pdy);
+            ctx.lineTo(bl.tx + pdx, bl.ty + pdy);
+            ctx.lineTo(bl.bx + bl.w * 0.5 + pdx, s.potTopY + pdy);
+            ctx.closePath();
+          }
+        }
+      }
+
+      fillDirectionalCastShadow(
+        s.shelfLeftX,
+        showProps ? s.foliageTopLimitY : s.earTopY,
+        s.shelfRightX + dx,
+        s.shelfBotY + s.corbelH + cdy,
+        lift,
+        7
+      );
+      ctx.restore();
+    };
+
+    /**
+     * 5. WALL SHELF — Pure 2D Architectural Elevation (100% Baltic Birch + Architectural Potted Plant)
+     * Matches uploaded Reference Image 2: horizontal cantilevered 13-ply Baltic Birch shelf,
+     * twin rounded rear CNC hook ears peeking above, twin under-shelf CNC Baltic Birch corbel brackets,
+     * and a clean CAD/Bauhaus-styled architectural potted plant resting on top of the shelf.
+     */
+    const drawWallShelf = (
+      gx1: number,
+      gx2: number,
+      gy1: number,
+      gy2: number,
+      m: GridMeta,
+      lift: number,
+      ox: number,
+      oy: number,
+      isGhost: boolean,
+      seed = 0,
+      showProps = true
+    ) => {
+      const grainSeed = seed || gx1 * 11 + gx2 * 17 + gy1 * 23;
+      const s = getWallShelfMetrics(gx1, gx2, gy1, gy2, m, lift, ox, oy, grainSeed);
+
+      ctx.save();
+      if (isGhost) {
+        ctx.globalAlpha = 0.45;
+        ctx.setLineDash([4, 3]);
+      }
+
+      // 1. Twin Rear Rounded-Top CNC Baltic Birch Mounting Ears Peeking Above the Shelf (per Image 2)
+      const drawEar = (cx: number, bSeed: number) => {
+        const ex = cx - s.earW * 0.5;
+        const topR = Math.min(s.earW * 0.48, s.earH * 0.48);
+        ctx.beginPath();
+        ctx.moveTo(ex, s.shelfTopY + 0.5);
+        ctx.lineTo(ex, s.earTopY + topR);
+        ctx.quadraticCurveTo(ex, s.earTopY, ex + topR, s.earTopY);
+        ctx.lineTo(ex + s.earW - topR, s.earTopY);
+        ctx.quadraticCurveTo(ex + s.earW, s.earTopY, ex + s.earW, s.earTopY + topR);
+        ctx.lineTo(ex + s.earW, s.shelfTopY + 0.5);
+        ctx.closePath();
+
+        if (isGhost) {
+          ctx.fillStyle = '#E8D5B5';
+          ctx.fill();
+        } else {
+          ctx.save();
+          ctx.clip();
+          drawBirchEdge(ex, s.earTopY, s.earW, s.earH + 1, 'vertical', bSeed);
+          // Subtle shadow where ear meets back of shelf
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.14)';
+          ctx.fillRect(ex, s.shelfTopY - 2.5, s.earW, 3);
+          ctx.restore();
+        }
+
+        ctx.beginPath();
+        ctx.moveTo(ex, s.shelfTopY);
+        ctx.lineTo(ex, s.earTopY + topR);
+        ctx.quadraticCurveTo(ex, s.earTopY, ex + topR, s.earTopY);
+        ctx.lineTo(ex + s.earW - topR, s.earTopY);
+        ctx.quadraticCurveTo(ex + s.earW, s.earTopY, ex + s.earW, s.earTopY + topR);
+        ctx.lineTo(ex + s.earW, s.shelfTopY);
+        ctx.strokeStyle = COLORS.black;
+        ctx.lineWidth = isGhost ? 1.25 : 1.7;
+        ctx.stroke();
+      };
+      drawEar(s.leftCx, grainSeed + 3);
+      drawEar(s.rightCx, grainSeed + 7);
+
+      // 2. Twin Under-Shelf CNC Baltic Birch Corbel Brackets Directly Below the Shelf Board
+      const drawCorbel = (cx: number, bSeed: number) => {
+        const bx = cx - s.corbelW * 0.5;
+        const botR = Math.min(s.corbelW * 0.32, s.corbelH * 0.25);
+        ctx.beginPath();
+        ctx.moveTo(bx, s.shelfBotY - 0.5);
+        ctx.lineTo(bx + s.corbelW, s.shelfBotY - 0.5);
+        ctx.lineTo(bx + s.corbelW, s.shelfBotY + s.corbelH - botR);
+        ctx.quadraticCurveTo(
+          bx + s.corbelW,
+          s.shelfBotY + s.corbelH,
+          bx + s.corbelW - botR,
+          s.shelfBotY + s.corbelH
+        );
+        ctx.lineTo(bx + botR, s.shelfBotY + s.corbelH);
+        ctx.quadraticCurveTo(
+          bx,
+          s.shelfBotY + s.corbelH,
+          bx,
+          s.shelfBotY + s.corbelH - botR
+        );
+        ctx.closePath();
+
+        if (isGhost) {
+          ctx.fillStyle = '#E8D5B5';
+          ctx.fill();
+        } else {
+          ctx.save();
+          ctx.clip();
+          drawBirchEdge(bx, s.shelfBotY, s.corbelW, s.corbelH, 'vertical', bSeed);
+          // Crisp contact shadow cast directly under the cantilevered shelf lip
+          const underAO = ctx.createLinearGradient(0, s.shelfBotY, 0, s.shelfBotY + 8);
+          underAO.addColorStop(0, 'rgba(0, 0, 0, 0.24)');
+          underAO.addColorStop(1, 'rgba(0, 0, 0, 0)');
+          ctx.fillStyle = underAO;
+          ctx.fillRect(bx, s.shelfBotY, s.corbelW, 8);
+          ctx.restore();
+        }
+
+        ctx.strokeStyle = COLORS.black;
+        ctx.lineWidth = isGhost ? 1.25 : 1.7;
+        ctx.stroke();
+      };
+      drawCorbel(s.leftCx, grainSeed + 11);
+      drawCorbel(s.rightCx, grainSeed + 15);
+
+      // 3. Architectural Potted Plant Sitting Flush on Top of the Wall Shelf (Optional Prop)
+      if (showProps) {
+      const foliage = getPlantLeaves(
+        s.plantCx,
+        s.potTopY,
+        s.potW,
+        s.foliageTopLimitY,
+        s.plantVariant
+      );
+
+      // 3A. Foliage (drawn cleanly behind pot rim)
+      if (foliage.kind === 'broad') {
+        // Crisp stems
+        for (const lf of foliage.leaves) {
+          ctx.beginPath();
+          ctx.moveTo(lf.sx, lf.sy);
+          ctx.quadraticCurveTo(
+            (lf.sx + lf.ex) * 0.5,
+            (lf.sy + lf.ey) * 0.5 + 4,
+            lf.ex,
+            lf.ey
+          );
+          ctx.strokeStyle = COLORS.black;
+          ctx.lineWidth = isGhost ? 1.1 : 1.55;
+          ctx.stroke();
+        }
+
+        // Crisp sculptural architectural leaves with midrib vein & subtle studio shading
+        for (const lf of foliage.leaves) {
+          ctx.save();
+          ctx.translate(lf.ex, lf.ey);
+          ctx.rotate(lf.ang);
+
+          ctx.beginPath();
+          ctx.ellipse(0, 0, lf.rx, lf.ry, 0, 0, Math.PI * 2);
+          ctx.fillStyle = isGhost ? '#B8CBB9' : lf.fill;
+          ctx.fill();
+
+          if (!isGhost) {
+            ctx.save();
+            ctx.clip();
+            const leafGrad = ctx.createLinearGradient(-lf.rx, -lf.ry, lf.rx, lf.ry);
+            leafGrad.addColorStop(0, 'rgba(255, 255, 255, 0.16)');
+            leafGrad.addColorStop(0.55, 'rgba(0, 0, 0, 0)');
+            leafGrad.addColorStop(1, 'rgba(0, 0, 0, 0.16)');
+            ctx.fillStyle = leafGrad;
+            ctx.fillRect(-lf.rx, -lf.ry, lf.rx * 2, lf.ry * 2);
+            ctx.restore();
+
+            // Delicate CAD central leaf vein
+            ctx.beginPath();
+            ctx.moveTo(-lf.rx * 0.72, 0);
+            ctx.lineTo(lf.rx * 0.62, 0);
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.34)';
+            ctx.lineWidth = 0.85;
+            ctx.stroke();
+          }
+
+          ctx.beginPath();
+          ctx.ellipse(0, 0, lf.rx, lf.ry, 0, 0, Math.PI * 2);
+          ctx.strokeStyle = COLORS.black;
+          ctx.lineWidth = isGhost ? 1.05 : 1.45;
+          ctx.stroke();
+          ctx.restore();
+        }
+      } else {
+        // Architectural Snake Plant (Sansevieria) upright tapered blades
+        for (const bl of foliage.blades) {
+          const midX = (bl.bx + bl.tx) * 0.5;
+          const midY = (s.potTopY + bl.ty) * 0.5;
+          ctx.beginPath();
+          ctx.moveTo(bl.bx - bl.w * 0.52, s.potTopY + 1);
+          ctx.quadraticCurveTo(midX - bl.w * 0.62, midY, bl.tx, bl.ty);
+          ctx.quadraticCurveTo(midX + bl.w * 0.62, midY, bl.bx + bl.w * 0.52, s.potTopY + 1);
+          ctx.closePath();
+
+          ctx.fillStyle = isGhost ? '#B8CBB9' : bl.fill;
+          ctx.fill();
+
+          if (!isGhost) {
+            ctx.save();
+            ctx.clip();
+            const blGrad = ctx.createLinearGradient(
+              bl.bx - bl.w,
+              bl.ty,
+              bl.bx + bl.w,
+              s.potTopY
+            );
+            blGrad.addColorStop(0, 'rgba(255, 255, 255, 0.14)');
+            blGrad.addColorStop(0.55, 'rgba(0, 0, 0, 0)');
+            blGrad.addColorStop(1, 'rgba(0, 0, 0, 0.16)');
+            ctx.fillStyle = blGrad;
+            ctx.fillRect(
+              Math.min(bl.bx, bl.tx) - bl.w,
+              bl.ty,
+              Math.abs(bl.bx - bl.tx) + bl.w * 2.5,
+              s.potTopY - bl.ty + 2
+            );
+            ctx.restore();
+          }
+
+          ctx.strokeStyle = COLORS.black;
+          ctx.lineWidth = isGhost ? 1.05 : 1.45;
+          ctx.stroke();
+        }
+      }
+
+      // 3B. Modern Cylindrical Matte Ceramic Planter Pot + Matching Slim Saucer
+      const potHalfTop = s.potW * 0.5;
+      const potHalfBot = s.potW * 0.42;
+      const isTerracotta = Math.abs(grainSeed) % 3 === 0;
+      const potBaseFill = isGhost ? '#EFECE6' : isTerracotta ? '#D2794B' : '#F3F1EB';
+
+      // Slim ceramic saucer sitting flush on shelfTopY
+      const saucerW = s.potW * 0.94;
+      const saucerX = s.plantCx - saucerW * 0.5;
+      const saucerY = s.shelfTopY - s.saucerH;
+      drawRoundRect(saucerX, saucerY, saucerW, s.saucerH, 1.4);
+      ctx.fillStyle = potBaseFill;
+      ctx.fill();
+      if (!isGhost) {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+        ctx.fillRect(saucerX + saucerW * 0.52, saucerY, saucerW * 0.48, s.saucerH);
+      }
+      ctx.strokeStyle = COLORS.black;
+      ctx.lineWidth = isGhost ? 1.05 : 1.45;
+      ctx.stroke();
+
+      // Tapered architectural ceramic vessel body
+      const tracePotPath = () => {
+        ctx.beginPath();
+        ctx.moveTo(s.plantCx - potHalfTop, s.potTopY);
+        ctx.lineTo(s.plantCx + potHalfTop, s.potTopY);
+        ctx.lineTo(s.plantCx + potHalfBot, s.potBotY);
+        ctx.lineTo(s.plantCx - potHalfBot, s.potBotY);
+        ctx.closePath();
+      };
+
+      tracePotPath();
+      ctx.fillStyle = potBaseFill;
+      ctx.fill();
+
+      if (!isGhost) {
+        ctx.save();
+        tracePotPath();
+        ctx.clip();
+        // Clean upper-left cylindrical gallery shading
+        const potGrad = ctx.createLinearGradient(
+          s.plantCx - potHalfTop,
+          0,
+          s.plantCx + potHalfTop,
+          0
+        );
+        potGrad.addColorStop(0.0, 'rgba(255, 255, 255, 0.22)');
+        potGrad.addColorStop(0.32, 'rgba(255, 255, 255, 0.06)');
+        potGrad.addColorStop(0.72, 'rgba(0, 0, 0, 0.04)');
+        potGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0.18)');
+        ctx.fillStyle = potGrad;
+        ctx.fillRect(s.plantCx - potHalfTop, s.potTopY, s.potW, s.potH);
+
+        // Subtle architectural grooved collar band near top rim
+        const collarY = s.potTopY + Math.max(4.5, s.potH * 0.22);
+        ctx.beginPath();
+        ctx.moveTo(s.plantCx - potHalfTop, collarY);
+        ctx.lineTo(s.plantCx + potHalfTop, collarY);
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.35)';
+        ctx.lineWidth = 1.0;
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      tracePotPath();
+      ctx.strokeStyle = COLORS.black;
+      ctx.lineWidth = isGhost ? 1.15 : 1.6;
+      ctx.stroke();
+      }
+
+      // 4. Main Horizontal Cantilevered 13-Ply Baltic Birch Shelf Board (Front Edge)
+      ctx.setLineDash([]);
+      if (isGhost) {
+        ctx.fillStyle = '#E8D5B5';
+        ctx.fillRect(s.shelfLeftX, s.shelfTopY, s.shelfW, s.shelfH);
+      } else {
+        drawBirchEdge(s.shelfLeftX, s.shelfTopY, s.shelfW, s.shelfH, 'horizontal', grainSeed + 1);
+        // Subtle crisp top sheen & bottom edge depth
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.22)';
+        ctx.fillRect(s.shelfLeftX + 1, s.shelfTopY + 0.8, Math.max(0, s.shelfW - 2), 1.4);
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.12)';
+        ctx.fillRect(s.shelfLeftX + 1, s.shelfBotY - 1.8, Math.max(0, s.shelfW - 2), 1.4);
+      }
+      ctx.strokeStyle = COLORS.black;
+      ctx.lineWidth = isGhost ? 1.4 : 1.85;
+      ctx.strokeRect(s.shelfLeftX, s.shelfTopY, s.shelfW, s.shelfH);
+
+      ctx.restore();
+    };
+
+    /**
+     * 6. VINYL BOX — Cast Shadow
+     * 3-sided open-top Baltic Birch plywood U-box (left wall, right wall, bottom floor — exact Shelf + Rod height)
+     * + cast shadow of the properly scaled edge-on 12" vinyl records standing inside.
+     */
+    const drawVinylBoxIsoShadow = (
+      gx1: number,
+      gx2: number,
+      gy1: number,
+      gy2: number,
+      m: GridMeta,
+      lift: number,
+      ox: number,
+      oy: number,
+      showProps = true
+    ) => {
+      if (lift <= 0.02) return;
+      const t = m.slotW * 0.857;
+      const leftCx = m.centerX + gx1 * m.pitchX + ox;
+      const rightCx = m.centerX + gx2 * m.pitchX + ox;
+      const upperCy = m.centerY + gy1 * m.pitchY + oy;
+      const lowerCy = m.centerY + gy2 * m.pitchY + oy;
+      const liftOffset = (1 - lift) * 6;
+
+      // Exact same topY and botY as Shelf + Rod
+      const topY = upperCy + m.slotH * 0.04 - liftOffset;
+      const botY = lowerCy + m.slotH * 0.11 - liftOffset;
+      const boxH = botY - topY;
+      const leftX = leftCx - t * 0.5;
+      const rightX = rightCx + t * 0.5;
+      const innerLeft = leftX + t;
+      const innerRight = rightX - t;
+      const innerBot = botY - t;
+      const innerSpan = Math.max(0, innerRight - innerLeft);
+
+      // 12" records peek cleanly above the open-top 3-sided U-box
+      const recordTopY = upperCy - m.slotH * 0.32 - liftOffset;
+      const recordH = Math.max(20, innerBot - recordTopY);
+      const packedW = Math.max(0, innerSpan * 0.78);
+
+      const boxDepth = Math.min(boxH, m.pitchY * 1.15) * 0.62 * lift;
+      const dx = boxDepth * LIGHT_KX;
+      const dy = boxDepth * LIGHT_KY;
+
+      ctx.save();
+      ctx.beginPath();
+      // Left & right vertical birch side walls
+      appendExtrudedBoxShadowPath(leftX, topY, t, boxH, dx, dy, 0);
+      appendExtrudedBoxShadowPath(rightX - t, topY, t, boxH, dx, dy, 0);
+      // Bottom horizontal birch floor board
+      appendExtrudedBoxShadowPath(innerLeft, innerBot, innerSpan, t, dx, dy, 0);
+      // Standing edge-on 12" vinyl record stack shadow (when props enabled)
+      if (showProps && packedW > 6) {
+        appendExtrudedBoxShadowPath(innerLeft + 1, recordTopY, packedW, recordH, dx * 0.88, dy * 0.88, 0);
+      }
+      fillDirectionalCastShadow(leftX, showProps ? recordTopY : topY, rightX + dx, botY + dy, lift, 8);
+      ctx.restore();
+    };
+
+    /**
+     * 6. VINYL BOX — Pure 2D Architectural Elevation (3-Sided Open-Top Baltic Birch Box + Monotone 12" LPs)
+     * 5 hooks wide by default, exact same height as Shelf + Rod. Three exposed 13-ply Baltic Birch boards only
+     * (left wall, right wall, bottom floor — open top, no center divider) holding calm, monotone edge-on
+     * 12" vinyl record sleeves side-by-side when props are enabled.
+     */
+    const drawVinylBox = (
+      gx1: number,
+      gx2: number,
+      gy1: number,
+      gy2: number,
+      m: GridMeta,
+      lift: number,
+      ox: number,
+      oy: number,
+      isGhost: boolean,
+      seed = 0,
+      showProps = true
+    ) => {
+      const t = m.slotW * 0.857;
+      const leftCx = m.centerX + gx1 * m.pitchX + ox;
+      const rightCx = m.centerX + gx2 * m.pitchX + ox;
+      const upperCy = m.centerY + gy1 * m.pitchY + oy;
+      const lowerCy = m.centerY + gy2 * m.pitchY + oy;
+      const liftOffset = (1 - lift) * 6;
+      const grainSeed = seed || gx1 * 7 + gx2 * 13 + gy1 * 19 + gy2 * 23;
+
+      // Exact same height (topY..botY) as Shelf + Rod
+      const topY = upperCy + m.slotH * 0.04 - liftOffset;
+      const botY = lowerCy + m.slotH * 0.11 - liftOffset;
+      const boxH = botY - topY;
+      const leftX = leftCx - t * 0.5;
+      const rightX = rightCx + t * 0.5;
+
+      const innerLeft = leftX + t;
+      const innerRight = rightX - t;
+      const innerBot = botY - t;
+      const innerSpan = Math.max(0, innerRight - innerLeft);
+
+      // Properly scaled 12" LP record height resting on bottom floor, rising cleanly proud through the open top
+      const recordTopY = upperCy - m.slotH * 0.32 - liftOffset;
+      const baseRecordH = Math.max(24, innerBot - recordTopY);
+
+      ctx.save();
+      if (isGhost) {
+        ctx.globalAlpha = 0.45;
+        ctx.setLineDash([4, 3]);
+      }
+
+      // 1. Calm Monotone Edge-On 12" Vinyl Record Sleeves Side-by-Side (Optional Prop)
+      if (showProps && innerSpan > 22 && baseRecordH > 16) {
+        // Understated architectural monotone paper & concrete-gray sleeve palette
+        const spinePalette = [
+          '#F5F4F0', // gallery white
+          '#ECEBE6', // soft chalk
+          '#E2E1DC', // warm light gray
+          '#D8D7D2', // pale concrete
+          '#F1F0EC', // bone white
+          '#CECDC8', // stone gray
+          '#E7E6E1', // parchment gray
+          '#DCDBD6', // light architectural gray
+        ] as const;
+
+        const hash = (n: number) => {
+          const v = Math.sin(n * 127.1 + grainSeed * 311.7) * 43758.5453;
+          return v - Math.floor(v);
+        };
+
+        // Calm, steady edge-on LP spine thicknesses scaled cleanly to 3/4" birch thickness t
+        const minSpineW = Math.max(3.2, t * 0.24);
+        const spineRangeW = Math.max(1.3, t * 0.11);
+
+        const drawSpineRect = (
+          x: number,
+          y: number,
+          w: number,
+          h: number,
+          idx: number
+        ) => {
+          const fill = isGhost
+            ? idx % 2 === 0
+              ? '#ECEBE6'
+              : '#DFDED9'
+            : spinePalette[Math.abs(grainSeed + idx * 3) % spinePalette.length];
+          ctx.fillStyle = fill;
+          ctx.fillRect(x, y, w, h);
+
+          if (!isGhost) {
+            // Whisper-subtle upper-left paper edge highlight for crisp 2D depth
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.34)';
+            ctx.fillRect(x + 0.5, y + 0.5, Math.max(0.75, w * 0.22), Math.max(0, h - 1));
+          }
+
+          ctx.strokeStyle = isGhost ? 'rgba(0, 0, 0, 0.75)' : 'rgba(0, 0, 0, 0.72)';
+          ctx.lineWidth = isGhost ? 0.7 : 0.85;
+          ctx.strokeRect(x, y, w, h);
+        };
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(innerLeft + 0.5, recordTopY - 6, innerSpan - 1, innerBot - (recordTopY - 6));
+        ctx.clip();
+
+        // Pack tidy upright edge-on LP spines side-by-side from left wall across ~76% of open span
+        const openGap = Math.max(24, innerSpan * 0.23);
+        const limitX = innerRight - openGap;
+        let cursor = innerLeft + 0.6;
+        let idx = 0;
+
+        while (cursor < limitX - minSpineW) {
+          const rw = minSpineW + hash(idx * 7 + 11) * spineRangeW;
+          const w = Math.min(rw, limitX - cursor);
+          if (w < minSpineW * 0.85) break;
+          const hJitter = (hash(idx * 13 + 5) - 0.5) * 0.9;
+          const rh = Math.max(22, baseRecordH + hJitter);
+          const ry = innerBot - rh;
+          drawSpineRect(cursor, ry, w, rh, idx);
+          cursor += w;
+          idx++;
+        }
+
+        // 2 gently leaning edge-on 12" sleeves resting naturally against the upright stack
+        let leanBaseX = cursor + 1.4;
+        for (let li = 0; li < 2; li++) {
+          const lw = minSpineW + hash((idx + li) * 11) * (spineRangeW * 0.7);
+          const lh = baseRecordH - 0.6;
+          const tiltRad = 0.14 + li * 0.06;
+          const topShiftX = Math.sin(tiltRad) * lh;
+          if (leanBaseX + lw + topShiftX > innerRight - 2.5) break;
+
+          ctx.save();
+          const bottomPivotX = leanBaseX + topShiftX;
+          ctx.translate(bottomPivotX, innerBot);
+          ctx.rotate(-tiltRad);
+          drawSpineRect(0, -lh, lw, lh, idx + 5 + li);
+          ctx.restore();
+
+          leanBaseX += lw + 2.0;
+        }
+
+        // Subtle resting AO line right where the records sit on the bottom Baltic Birch shelf
+        if (!isGhost) {
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+          ctx.fillRect(innerLeft, innerBot - 2.0, innerSpan, 2.0);
+        }
+        ctx.restore();
+      }
+
+      // 2. Bottom Horizontal Exposed 13-Ply Baltic Birch Floor Board (Open Top — No Top Board, No Divider)
+      if (innerSpan > 2) {
+        if (isGhost) {
+          ctx.fillStyle = '#E8D5B5';
+          ctx.fillRect(innerLeft, innerBot, innerSpan, t);
+        } else {
+          drawBirchEdge(innerLeft, innerBot, innerSpan, t, 'horizontal', grainSeed + 17);
+        }
+        ctx.strokeStyle = COLORS.black;
+        ctx.lineWidth = isGhost ? 1.3 : 1.75;
+        ctx.strokeRect(innerLeft, innerBot, innerSpan, t);
+      }
+
+      // 3. Full-Height Left & Right Vertical Exposed 13-Ply Baltic Birch Side Walls (3-Sided U-Profile)
+      const drawSideWall = (bx: number, bSeed: number) => {
+        if (isGhost) {
+          ctx.fillStyle = '#E8D5B5';
+          ctx.fillRect(bx, topY, t, boxH);
+        } else {
+          drawBirchEdge(bx, topY, t, boxH, 'vertical', bSeed);
+        }
+        ctx.strokeStyle = COLORS.black;
+        ctx.lineWidth = isGhost ? 1.4 : 1.85;
+        ctx.strokeRect(bx, topY, t, boxH);
+      };
+      drawSideWall(leftX, grainSeed + 5);
+      drawSideWall(rightX - t, grainSeed + 9);
+
+      ctx.restore();
+    };
+
+    /**
+     * Shared geometry helper for the Sleek Linear Baltic Birch Wall Sconce (2..6 cols × 1 row, wire-free).
+     * Thin architectural horizontal piece of wood with a full-length recessed LED light channel across the face.
+     */
+    const getWallSconceMetrics = (
+      gx1: number,
+      gx2: number,
+      gy1: number,
+      _gy2: number,
+      m: GridMeta,
+      lift: number,
+      ox: number,
+      oy: number
+    ) => {
+      const t = m.slotW * 0.857;
+      const leftCx = m.centerX + gx1 * m.pitchX + ox;
+      const rightCx = m.centerX + gx2 * m.pitchX + ox;
+      const upperCy = m.centerY + gy1 * m.pitchY + oy;
+      const liftOffset = (1 - lift) * 5;
+
+      const leftX = leftCx - t * 0.85;
+      const rightX = rightCx + t * 0.85;
+      const barW = Math.max(48, rightX - leftX);
+      const barH = Math.max(15, Math.min(21, m.slotH * 0.54));
+      const barTopY = upperCy - barH * 0.5 - liftOffset;
+      const barBotY = barTopY + barH;
+
+      // Full-length recessed frosted LED channel milled cleanly across the thin wood bar
+      const endCap = Math.max(4.5, Math.min(7, barH * 0.34));
+      const ledX = leftX + endCap;
+      const ledW = Math.max(16, barW - endCap * 2);
+      const ledH = Math.max(5.2, Math.min(7.5, barH * 0.36));
+      const ledY = barTopY + (barH - ledH) * 0.5;
+
+      return {
+        leftCx,
+        rightCx,
+        upperCy,
+        leftX,
+        rightX,
+        barW,
+        barH,
+        barTopY,
+        barBotY,
+        ledX,
+        ledY,
+        ledW,
+        ledH,
+      };
+    };
+
+    /**
+     * 7A. WALL SCONCE — Sleek Linear Architectural Up & Down Grazing Wall Light Wash (Pass 0)
+     * Casts a generous, unmistakable warm-white/soft-gold wash upward and downward across the full length
+     * of the thin wood sconce bar when lit; turns completely off when clicked.
+     */
+    const drawWallSconceLightWash = (
+      gx1: number,
+      gx2: number,
+      gy1: number,
+      gy2: number,
+      m: GridMeta,
+      lift: number,
+      ox: number,
+      oy: number,
+      lit: boolean
+    ) => {
+      if (!lit || lift <= 0.05) return;
+      const sc = getWallSconceMetrics(gx1, gx2, gy1, gy2, m, lift, ox, oy);
+      const upReach = Math.max(m.pitchY * 0.96, 78);
+      const downReach = Math.max(m.pitchY * 1.18, 96);
+      const flareUp = Math.min(26, sc.barW * 0.14);
+      const flareDown = Math.min(32, sc.barW * 0.16);
+      const midX = (sc.leftX + sc.rightX) * 0.5;
+
+      ctx.save();
+
+      // 1. Wide Architectural Upward Wall Grazing Wash
+      ctx.beginPath();
+      ctx.moveTo(sc.ledX - 3, sc.barTopY + 2);
+      ctx.lineTo(sc.ledX + sc.ledW + 3, sc.barTopY + 2);
+      ctx.lineTo(sc.ledX + sc.ledW + flareUp, sc.barTopY - upReach);
+      ctx.quadraticCurveTo(midX, sc.barTopY - upReach - 14, sc.ledX - flareUp, sc.barTopY - upReach);
+      ctx.closePath();
+
+      const upGrad = ctx.createLinearGradient(0, sc.barTopY, 0, sc.barTopY - upReach - 10);
+      upGrad.addColorStop(0.0, `rgba(253, 203, 51, ${(0.38 * lift).toFixed(3)})`);
+      upGrad.addColorStop(0.28, `rgba(253, 203, 51, ${(0.2 * lift).toFixed(3)})`);
+      upGrad.addColorStop(0.65, `rgba(253, 203, 51, ${(0.065 * lift).toFixed(3)})`);
+      upGrad.addColorStop(1.0, 'rgba(253, 203, 51, 0)');
+      ctx.fillStyle = upGrad;
+      ctx.fill();
+
+      // 2. Wide Architectural Downward Wall Grazing Wash
+      ctx.beginPath();
+      ctx.moveTo(sc.ledX - 3, sc.barBotY - 2);
+      ctx.lineTo(sc.ledX + sc.ledW + 3, sc.barBotY - 2);
+      ctx.lineTo(sc.ledX + sc.ledW + flareDown, sc.barBotY + downReach);
+      ctx.quadraticCurveTo(midX, sc.barBotY + downReach + 16, sc.ledX - flareDown, sc.barBotY + downReach);
+      ctx.closePath();
+
+      const downGrad = ctx.createLinearGradient(0, sc.barBotY, 0, sc.barBotY + downReach + 12);
+      downGrad.addColorStop(0.0, `rgba(253, 203, 51, ${(0.42 * lift).toFixed(3)})`);
+      downGrad.addColorStop(0.26, `rgba(253, 203, 51, ${(0.22 * lift).toFixed(3)})`);
+      downGrad.addColorStop(0.64, `rgba(253, 203, 51, ${(0.075 * lift).toFixed(3)})`);
+      downGrad.addColorStop(1.0, 'rgba(253, 203, 51, 0)');
+      ctx.fillStyle = downGrad;
+      ctx.fill();
+
+      // 3. Soft Tight Luminous Warm-White Halo Hugging the Full Linear Bar
+      const haloPadY = sc.barH * 1.35;
+      const haloGrad = ctx.createLinearGradient(0, sc.barTopY - haloPadY, 0, sc.barBotY + haloPadY);
+      haloGrad.addColorStop(0.0, 'rgba(255, 244, 196, 0)');
+      haloGrad.addColorStop(0.42, `rgba(255, 242, 180, ${(0.46 * lift).toFixed(3)})`);
+      haloGrad.addColorStop(0.58, `rgba(255, 242, 180, ${(0.46 * lift).toFixed(3)})`);
+      haloGrad.addColorStop(1.0, 'rgba(255, 244, 196, 0)');
+      ctx.fillStyle = haloGrad;
+      drawRoundRect(
+        sc.leftX - 10,
+        sc.barTopY - haloPadY,
+        sc.barW + 20,
+        sc.barH + haloPadY * 2,
+        haloPadY
+      );
+      ctx.fill();
+
+      ctx.restore();
+    };
+
+    /**
+     * 7B. WALL SCONCE — Subtle Floating Linear Cast Shadow
+     * Clean thin extruded directional cast shadow projecting the sleek Baltic Birch bar off the mortise wall.
+     */
+    const drawWallSconceIsoShadow = (
+      gx1: number,
+      gx2: number,
+      gy1: number,
+      gy2: number,
+      m: GridMeta,
+      lift: number,
+      ox: number,
+      oy: number
+    ) => {
+      if (lift <= 0.02) return;
+      const sc = getWallSconceMetrics(gx1, gx2, gy1, gy2, m, lift, ox, oy);
+      const depth = sc.barH * 0.72 * lift;
+      const dx = depth * LIGHT_KX;
+      const dy = depth * LIGHT_KY;
+
+      ctx.save();
+      ctx.beginPath();
+      appendExtrudedBoxShadowPath(sc.leftX, sc.barTopY, sc.barW, sc.barH, dx, dy, 1.5);
+      fillDirectionalCastShadow(sc.leftX, sc.barTopY, sc.rightX + dx, sc.barBotY + dy, lift, 6);
+      ctx.restore();
+    };
+
+    /**
+     * 7C. WALL SCONCE — Pure 2D Architectural Elevation (Sleek Wire-Free Baltic Birch Bar + Full-Length Recessed LED)
+     * Ultra-clean thin linear piece of Baltic Birch wood with a continuous recessed frosted LED strip
+     * running all the way across the front face; zero wires visible; click anywhere on the bar to toggle light.
+     */
+    const drawWallSconce = (
+      gx1: number,
+      gx2: number,
+      gy1: number,
+      gy2: number,
+      m: GridMeta,
+      lift: number,
+      ox: number,
+      oy: number,
+      isGhost: boolean,
+      seed = 0,
+      lit = true
+    ) => {
+      const grainSeed = seed || gx1 * 17 + gx2 * 23 + gy1 * 31;
+      const sc = getWallSconceMetrics(gx1, gx2, gy1, gy2, m, lift, ox, oy);
+      const isLit = !isGhost && lit;
+      const r = 1.6;
+
+      ctx.save();
+      if (isGhost) {
+        ctx.globalAlpha = 0.45;
+        ctx.setLineDash([4, 3]);
+      }
+
+      // 1. Sleek Thin Horizontal Baltic Birch Wood Bar
+      if (isGhost) {
+        drawRoundRect(sc.leftX, sc.barTopY, sc.barW, sc.barH, r);
+        ctx.fillStyle = '#EAD8BD';
+        ctx.fill();
+      } else {
+        ctx.save();
+        drawRoundRect(sc.leftX, sc.barTopY, sc.barW, sc.barH, r);
+        ctx.clip();
+
+        // Warm natural pale Baltic Birch horizontal wood grain
+        drawMapleFace(sc.leftX, sc.barTopY, sc.barW, sc.barH, 'horizontal', undefined, 0, grainSeed + 3);
+
+        // Subtle architectural gallery bevel highlight along top edge & crisp bottom depth shadow
+        const bevelGrad = ctx.createLinearGradient(0, sc.barTopY, 0, sc.barBotY);
+        bevelGrad.addColorStop(0.0, 'rgba(255, 255, 255, 0.28)');
+        bevelGrad.addColorStop(0.24, 'rgba(255, 255, 255, 0.04)');
+        bevelGrad.addColorStop(0.76, 'rgba(0, 0, 0, 0.03)');
+        bevelGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0.16)');
+        ctx.fillStyle = bevelGrad;
+        ctx.fillRect(sc.leftX, sc.barTopY, sc.barW, sc.barH);
+
+        // Warm subtle spill along milled wood bezel directly hugging the recessed LED channel when ON
+        if (isLit) {
+          const bezelGlow = ctx.createLinearGradient(0, sc.barTopY, 0, sc.barBotY);
+          bezelGlow.addColorStop(0.0, 'rgba(253, 203, 51, 0)');
+          bezelGlow.addColorStop(0.32, 'rgba(253, 203, 51, 0.26)');
+          bezelGlow.addColorStop(0.68, 'rgba(253, 203, 51, 0.26)');
+          bezelGlow.addColorStop(1.0, 'rgba(253, 203, 51, 0)');
+          ctx.fillStyle = bezelGlow;
+          ctx.fillRect(sc.ledX - 2, sc.barTopY, sc.ledW + 4, sc.barH);
+        }
+
+        ctx.restore();
+      }
+
+      // Crisp Black CAD Outer Frame
+      drawRoundRect(sc.leftX, sc.barTopY, sc.barW, sc.barH, r);
+      ctx.strokeStyle = COLORS.black;
+      ctx.lineWidth = isGhost ? 1.35 : 1.85;
+      ctx.stroke();
+
+      // 2. Full-Length Recessed Frosted Acrylic LED Strip Channel
+      const ledR = Math.min(1.2, sc.ledH * 0.25);
+      ctx.setLineDash([]);
+      drawRoundRect(sc.ledX, sc.ledY, sc.ledW, sc.ledH, ledR);
+
+      if (isGhost) {
+        ctx.fillStyle = '#FFF7D6';
+        ctx.fill();
+      } else if (isLit) {
+        const ledGrad = ctx.createLinearGradient(0, sc.ledY, 0, sc.ledY + sc.ledH);
+        ledGrad.addColorStop(0.0, '#FFE47E');
+        ledGrad.addColorStop(0.3, '#FFFBE6');
+        ledGrad.addColorStop(0.5, '#FFFFFF');
+        ledGrad.addColorStop(0.7, '#FFFBE6');
+        ledGrad.addColorStop(1.0, '#FFE06B');
+        ctx.fillStyle = ledGrad;
+        ctx.fill();
+      } else {
+        // Unlit matte frosted diffuser sitting recessed inside milled birch groove
+        const offGrad = ctx.createLinearGradient(0, sc.ledY, 0, sc.ledY + sc.ledH);
+        offGrad.addColorStop(0.0, '#C8C6C0');
+        offGrad.addColorStop(0.28, '#E6E4DF');
+        offGrad.addColorStop(1.0, '#F0EFEA');
+        ctx.fillStyle = offGrad;
+        ctx.fill();
+      }
+
+      // Crisp milled recess channel border lines
+      ctx.strokeStyle = isLit ? 'rgba(0, 0, 0, 0.72)' : COLORS.black;
+      ctx.lineWidth = isGhost ? 0.95 : 1.15;
+      ctx.stroke();
+
+      ctx.restore();
+    };
+
+    const drawItemShadow = (
+      type: WallTool,
+      gx1: number,
+      gx2: number,
+      gy1: number,
+      gy2: number,
+      m: GridMeta,
+      lift: number,
+      ox: number,
+      oy: number,
+      seed = 0,
+      showProps = true
+    ) => {
+      switch (type) {
+        case 'hook':
+          drawWallHookIsoShadow(gx1, gx2, gy1, gy2, m, lift, ox, oy);
+          break;
+        case 'shelf':
+          drawShelfIsoShadow(gx1, gx2, gy1, gy2, m, lift, ox, oy);
+          break;
+        case 'cabinet':
+          drawCabinetIsoShadow(gx1, gx2, gy1, gy2, m, lift, ox, oy);
+          break;
+        case 'cubby':
+          drawOpenCubeIsoShadow(gx1, gx2, gy1, gy2, m, lift, ox, oy);
+          break;
+        case 'wallShelf':
+          drawWallShelfIsoShadow(gx1, gx2, gy1, gy2, m, lift, ox, oy, seed, showProps);
+          break;
+        case 'cradle':
+          drawVinylBoxIsoShadow(gx1, gx2, gy1, gy2, m, lift, ox, oy, showProps);
+          break;
+        case 'sconce':
+          drawWallSconceIsoShadow(gx1, gx2, gy1, gy2, m, lift, ox, oy);
+          break;
+      }
+    };
+
+    const drawItemBody = (
+      type: WallTool,
+      gx1: number,
+      gx2: number,
+      gy1: number,
+      gy2: number,
+      m: GridMeta,
+      lift: number,
+      ox: number,
+      oy: number,
+      isGhost: boolean,
+      seed = 0,
+      lit = true,
+      showProps = true
+    ) => {
+      switch (type) {
+        case 'hook':
+          drawWallHook(gx1, gx2, gy1, gy2, m, lift, ox, oy, isGhost, seed);
+          break;
+        case 'shelf':
+          drawShelfWithRod(gx1, gx2, gy1, gy2, m, lift, ox, oy, isGhost, seed);
+          break;
+        case 'cabinet':
+          drawSlidingDoorCabinet(gx1, gx2, gy1, gy2, m, lift, ox, oy, isGhost, seed);
+          break;
+        case 'cubby':
+          drawOpenCube(gx1, gx2, gy1, gy2, m, lift, ox, oy, isGhost, seed);
+          break;
+        case 'wallShelf':
+          drawWallShelf(gx1, gx2, gy1, gy2, m, lift, ox, oy, isGhost, seed, showProps);
+          break;
+        case 'cradle':
+          drawVinylBox(gx1, gx2, gy1, gy2, m, lift, ox, oy, isGhost, seed, showProps);
+          break;
+        case 'sconce':
+          drawWallSconce(gx1, gx2, gy1, gy2, m, lift, ox, oy, isGhost, seed, lit);
+          break;
+      }
+    };
+
     const triggerRipple = (nx: number, ny: number) => {
       rippleX = nx;
       rippleY = ny;
@@ -1585,7 +3044,7 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
     };
 
     /**
-     * Generates a fresh randomized composition of `targetCount` (default 7) varied modular items
+     * Generates a fresh randomized composition of `targetCount` (default 7) restrained Baltic Birch modular items
      * across available open mortise wall cells on every page reload or Rearrange click.
      */
     const applyRandomArrangement = (
@@ -1618,6 +3077,9 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
           }
         }
       };
+
+      const mMidX = (gx1: number, gx2: number) =>
+        gridMeta.centerX + ((gx1 + gx2) * 0.5) * gridMeta.pitchX;
 
       const tryPlaceRandomOfSize = (
         type: WallTool,
@@ -1656,61 +3118,58 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
         return true;
       };
 
-      const mMidX = (gx1: number, gx2: number) =>
-        gridMeta.centerX + ((gx1 + gx2) * 0.5) * gridMeta.pitchX;
-
-      // Build a balanced, genuinely randomized 7-item recipe (cabinets + shelves + varied hooks)
-      const cabCount = Math.random() < 0.55 ? 2 : 1;
-      const shelfCount = Math.random() < 0.55 ? 2 : 1;
-      const hookCount = Math.max(1, targetCount - cabCount - shelfCount);
-
-      const largeSpecs: Array<{
-        type: WallTool;
-        sizes: Array<{ cols: number; rows: number }>;
-      }> = [];
-
-      // Cabinet: grows in both width and height, never less than 4 mortises wide x 2 tall
-      const cabinetSizePool: Array<{ cols: number; rows: number }> = [
+      // Balanced Baltic Birch architectural composition: Shelf + Rod, Cabinet, Open Cube, Wall Shelf w/ Plant, 5-Hook Vinyl Box & Hooks
+      const cabinetSizePool: PieceSize[] = [
         { cols: 4, rows: 2 },
         { cols: 5, rows: 2 },
-        { cols: 6, rows: 2 },
         { cols: 4, rows: 3 },
-        { cols: 5, rows: 3 },
-        { cols: 4, rows: 4 },
       ];
-      // Shelf + Rod: grows in width only (fixed at 2 mortises tall, min 4 wide)
-      const shelfSizePool: Array<{ cols: number; rows: number }> = [
+      const shelfSizePool: PieceSize[] = [
         { cols: 4, rows: 2 },
         { cols: 5, rows: 2 },
-        { cols: 6, rows: 2 },
       ];
-      // Hook: grows in width only (fixed at 1 mortise tall)
-      const hookSizePool: Array<{ cols: number; rows: number }> = [
-        { cols: 1, rows: 1 },
+      const cubbySizePool: PieceSize[] = [
+        { cols: 3, rows: 3 },
+        { cols: 3, rows: 3 },
+        { cols: 4, rows: 3 },
+      ];
+      const wallShelfSizePool: PieceSize[] = [
+        { cols: 4, rows: 2 },
+        { cols: 3, rows: 2 },
+        { cols: 5, rows: 2 },
+      ];
+      const cradleSizePool: PieceSize[] = [
+        { cols: 5, rows: 2 },
+        { cols: 5, rows: 2 },
+        { cols: 4, rows: 2 },
+      ];
+      const sconceSizePool: PieceSize[] = [
+        { cols: 4, rows: 1 },
+        { cols: 3, rows: 1 },
+        { cols: 5, rows: 1 },
+      ];
+      const hookSizePool: PieceSize[] = [
         { cols: 1, rows: 1 },
         { cols: 2, rows: 1 },
         { cols: 3, rows: 1 },
       ];
 
-      for (let i = 0; i < cabCount; i++) {
-        const primary = pickRandom(cabinetSizePool);
-        largeSpecs.push({
-          type: 'cabinet',
-          sizes: [primary, { cols: 4, rows: 2 }],
-        });
-      }
-      for (let i = 0; i < shelfCount; i++) {
-        const primary = pickRandom(shelfSizePool);
-        largeSpecs.push({
-          type: 'shelf',
-          sizes: [primary, { cols: 4, rows: 2 }],
-        });
-      }
+      const recipeSpecs: Array<{
+        type: WallTool;
+        sizes: PieceSize[];
+      }> = [
+        { type: 'cabinet', sizes: [pickRandom(cabinetSizePool), { cols: 4, rows: 2 }] },
+        { type: 'shelf', sizes: [pickRandom(shelfSizePool), { cols: 4, rows: 2 }] },
+        { type: 'cradle', sizes: [pickRandom(cradleSizePool), { cols: 5, rows: 2 }, { cols: 4, rows: 2 }] },
+        { type: 'cubby', sizes: [pickRandom(cubbySizePool), { cols: 3, rows: 3 }] },
+        { type: 'wallShelf', sizes: [pickRandom(wallShelfSizePool), { cols: 3, rows: 2 }] },
+        { type: 'sconce', sizes: [pickRandom(sconceSizePool), { cols: 3, rows: 1 }, { cols: 2, rows: 1 }] },
+      ];
 
-      // Shuffle order of large pieces and alternate preferred left/right flanks for visual balance
-      for (let i = largeSpecs.length - 1; i > 0; i--) {
+      // Shuffle order so left/right distribution feels organic on every Rearrange
+      for (let i = recipeSpecs.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
-        [largeSpecs[i], largeSpecs[j]] = [largeSpecs[j], largeSpecs[i]];
+        [recipeSpecs[i], recipeSpecs[j]] = [recipeSpecs[j], recipeSpecs[i]];
       }
 
       let leftCount = 0;
@@ -1728,9 +3187,11 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
         else rightCount++;
       };
 
-      for (const spec of largeSpecs) {
+      for (const spec of recipeSpecs) {
+        if (placedItems.length >= targetCount) break;
         let placed = false;
         const side = nextSide();
+
         for (const sz of spec.sizes) {
           if (tryPlaceRandomOfSize(spec.type, sz.cols, sz.rows, side)) {
             placed = true;
@@ -1739,7 +3200,6 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
           }
         }
         if (!placed) {
-          // Graceful fallback on narrow screens so we still reach 7 total items
           const fallbackSize = pickRandom(hookSizePool);
           if (
             tryPlaceRandomOfSize('hook', fallbackSize.cols, fallbackSize.rows, side) ||
@@ -1750,10 +3210,9 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
         }
       }
 
-      // Place remaining varied hooks up to targetCount (7)
-      let remaining = Math.max(hookCount, targetCount - placedItems.length);
+      // Fill remaining slots up to targetCount with varied CNC J-Hooks
       let guard = 0;
-      while (placedItems.length < targetCount && remaining > 0 && guard < 24) {
+      while (placedItems.length < targetCount && guard < 24) {
         guard++;
         const side = nextSide();
         const sz = pickRandom(hookSizePool);
@@ -1763,7 +3222,6 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
           tryPlaceRandomOfSize('hook', 1, 1)
         ) {
           recordLastSide();
-          remaining--;
         } else {
           break;
         }
@@ -1778,6 +3236,7 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
         activeTool,
         toolSizes,
         motionOn,
+        showProps,
         isModalOpen: modalActive,
         canInteract: interactiveActive,
       } = stateRef.current;
@@ -1810,8 +3269,19 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
           for (let gx = item.gx1; gx <= item.gx2; gx++) {
             const k = keyOf(gx, gy);
             occupiedKeys.add(k);
-            if (item.type === 'shelf') {
+            if (item.type === 'shelf' || item.type === 'cradle') {
               if (gx === item.gx1 || gx === item.gx2) anchorKeys.add(k);
+            } else if (item.type === 'wallShelf') {
+              if (gy === item.gy2 && (gx === item.gx1 || gx === item.gx2)) anchorKeys.add(k);
+            } else if (item.type === 'cubby') {
+              if (
+                (gx === item.gx1 || gx === item.gx2) &&
+                (gy === item.gy1 || gy === item.gy2)
+              ) {
+                anchorKeys.add(k);
+              }
+            } else if (item.type === 'sconce') {
+              if (gy === item.gy1 && (gx === item.gx1 || gx === item.gx2)) anchorKeys.add(k);
             } else {
               anchorKeys.add(k);
             }
@@ -1921,6 +3391,23 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
           hoveredPlacementCandidate !== null
       );
 
+      // Pass 0: Draw warm architectural Wall Sconce light washes onto the white mortise wall (behind slots & hardware)
+      for (let i = 0; i < placedItems.length; i++) {
+        const item = placedItems[i];
+        if (item.id === draggedItemId || !isItemVisible(item) || item.type !== 'sconce') continue;
+        drawWallSconceLightWash(
+          item.gx1,
+          item.gx2,
+          item.gy1,
+          item.gy2,
+          m,
+          item.lift,
+          0,
+          0,
+          item.lit ?? true
+        );
+      }
+
       // Draw mortise slots (never render any slot behind text or UI clearance zones)
       for (let i = 0; i < slots.length; i++) {
         const s = slots[i];
@@ -1971,122 +3458,74 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
         ctx.restore();
       }
 
-      // Draw Pass 1 (directional 3D cast shadows) for grounded items — snapped to crisp device pixels
+      // Pass 1: Draw directional 3D cast shadows for all grounded items
       for (let i = 0; i < placedItems.length; i++) {
         const item = placedItems[i];
         if (item.id === draggedItemId || !isItemVisible(item)) continue;
         const ox = 0;
         const oy = 0;
         visibleItems.push({ item, ox, oy });
-
-        if (item.type === 'hook') {
-          drawWallHookIsoShadow(
-            item.gx1,
-            item.gx2,
-            item.gy1,
-            item.gy2,
-            m,
-            item.lift,
-            ox,
-            oy
-          );
-        } else if (item.type === 'shelf') {
-          drawShelfIsoShadow(
-            item.gx1,
-            item.gx2,
-            item.gy1,
-            item.gy2,
-            m,
-            item.lift,
-            ox,
-            oy
-          );
-        } else {
-          drawCabinetIsoShadow(
-            item.gx1,
-            item.gx2,
-            item.gy1,
-            item.gy2,
-            m,
-            item.lift,
-            ox,
-            oy
-          );
-        }
+        drawItemShadow(
+          item.type,
+          item.gx1,
+          item.gx2,
+          item.gy1,
+          item.gy2,
+          m,
+          item.lift,
+          ox,
+          oy,
+          item.seed,
+          item.hasProps ?? showProps
+        );
       }
 
-      // Pass 2: Draw grounded front-elevation hardware cleanly on top of directional cast shadows
+      // Pass 2: Draw grounded 2D front-elevation hardware cleanly on top of directional cast shadows
       for (let i = 0; i < visibleItems.length; i++) {
         const { item, ox, oy } = visibleItems[i];
-        if (item.type === 'hook') {
-          drawWallHook(
-            item.gx1,
-            item.gx2,
-            item.gy1,
-            item.gy2,
-            m,
-            item.lift,
-            ox,
-            oy,
-            false,
-            item.seed
-          );
-        } else if (item.type === 'shelf') {
-          drawShelfWithRod(
-            item.gx1,
-            item.gx2,
-            item.gy1,
-            item.gy2,
-            m,
-            item.lift,
-            ox,
-            oy,
-            false,
-            item.seed
-          );
-        } else {
-          drawSlidingDoorCabinet(
-            item.gx1,
-            item.gx2,
-            item.gy1,
-            item.gy2,
-            m,
-            item.lift,
-            ox,
-            oy,
-            false,
-            item.seed
-          );
-        }
+        drawItemBody(
+          item.type,
+          item.gx1,
+          item.gx2,
+          item.gy1,
+          item.gy2,
+          m,
+          item.lift,
+          ox,
+          oy,
+          false,
+          item.seed,
+          item.lit ?? true,
+          item.hasProps ?? showProps
+        );
       }
 
       // Pass 3: While dragging an existing item, show its magnetic snap target + lifted floating piece
       if (activeDrag && draggedItem) {
         const snap = activeDrag.snapRect;
-        if (draggedItem.type === 'hook') {
-          drawWallHook(snap.gx1, snap.gx2, snap.gy1, snap.gy2, m, 1, 0, 0, true);
-        } else if (draggedItem.type === 'shelf') {
-          drawShelfWithRod(snap.gx1, snap.gx2, snap.gy1, snap.gy2, m, 1, 0, 0, true);
-        } else {
-          drawSlidingDoorCabinet(snap.gx1, snap.gx2, snap.gy1, snap.gy2, m, 1, 0, 0, true);
-        }
+        const draggedProps = draggedItem.hasProps ?? showProps;
+        drawItemBody(
+          draggedItem.type,
+          snap.gx1,
+          snap.gx2,
+          snap.gy1,
+          snap.gy2,
+          m,
+          1,
+          0,
+          0,
+          true,
+          draggedItem.seed,
+          draggedItem.lit ?? true,
+          draggedProps
+        );
 
         const dragOx = pointerX - activeDrag.startX;
         const dragOy = pointerY - activeDrag.startY - 3;
         const elevatedLift = 1.14;
 
-        if (draggedItem.type === 'hook') {
-          drawWallHookIsoShadow(
-            draggedItem.gx1,
-            draggedItem.gx2,
-            draggedItem.gy1,
-            draggedItem.gy2,
-            m,
-            elevatedLift,
-            dragOx,
-            dragOy
-          );
-          drawWallHook(
+        if (draggedItem.type === 'sconce') {
+          drawWallSconceLightWash(
             draggedItem.gx1,
             draggedItem.gx2,
             draggedItem.gy1,
@@ -2095,56 +3534,38 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
             1,
             dragOx,
             dragOy,
-            false,
-            draggedItem.seed
-          );
-        } else if (draggedItem.type === 'shelf') {
-          drawShelfIsoShadow(
-            draggedItem.gx1,
-            draggedItem.gx2,
-            draggedItem.gy1,
-            draggedItem.gy2,
-            m,
-            elevatedLift,
-            dragOx,
-            dragOy
-          );
-          drawShelfWithRod(
-            draggedItem.gx1,
-            draggedItem.gx2,
-            draggedItem.gy1,
-            draggedItem.gy2,
-            m,
-            1,
-            dragOx,
-            dragOy,
-            false,
-            draggedItem.seed
-          );
-        } else {
-          drawCabinetIsoShadow(
-            draggedItem.gx1,
-            draggedItem.gx2,
-            draggedItem.gy1,
-            draggedItem.gy2,
-            m,
-            elevatedLift,
-            dragOx,
-            dragOy
-          );
-          drawSlidingDoorCabinet(
-            draggedItem.gx1,
-            draggedItem.gx2,
-            draggedItem.gy1,
-            draggedItem.gy2,
-            m,
-            1,
-            dragOx,
-            dragOy,
-            false,
-            draggedItem.seed
+            draggedItem.lit ?? true
           );
         }
+
+        drawItemShadow(
+          draggedItem.type,
+          draggedItem.gx1,
+          draggedItem.gx2,
+          draggedItem.gy1,
+          draggedItem.gy2,
+          m,
+          elevatedLift,
+          dragOx,
+          dragOy,
+          draggedItem.seed,
+          draggedProps
+        );
+        drawItemBody(
+          draggedItem.type,
+          draggedItem.gx1,
+          draggedItem.gx2,
+          draggedItem.gy1,
+          draggedItem.gy2,
+          m,
+          1,
+          dragOx,
+          dragOy,
+          false,
+          draggedItem.seed,
+          draggedItem.lit ?? true,
+          draggedProps
+        );
       }
 
       // Ghost hover preview showing exact adjusted (cols x rows) footprint before placing a new item
@@ -2157,43 +3578,21 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       ) {
         const hs = slots[hoveredIdx];
         const cand = hoveredPlacementCandidate;
-        if (activeTool === 'hook') {
-          drawWallHook(
-            cand.gx1,
-            cand.gx2,
-            cand.gy1,
-            cand.gy2,
-            m,
-            1,
-            hs.ox * 0.45,
-            hs.oy * 0.45,
-            true
-          );
-        } else if (activeTool === 'shelf') {
-          drawShelfWithRod(
-            cand.gx1,
-            cand.gx2,
-            cand.gy1,
-            cand.gy2,
-            m,
-            1,
-            hs.ox * 0.4,
-            hs.oy * 0.4,
-            true
-          );
-        } else if (activeTool === 'cabinet') {
-          drawSlidingDoorCabinet(
-            cand.gx1,
-            cand.gx2,
-            cand.gy1,
-            cand.gy2,
-            m,
-            1,
-            hs.ox * 0.35,
-            hs.oy * 0.35,
-            true
-          );
-        }
+        drawItemBody(
+          activeTool,
+          cand.gx1,
+          cand.gx2,
+          cand.gy1,
+          cand.gy2,
+          m,
+          1,
+          hs.ox * 0.4,
+          hs.oy * 0.4,
+          true,
+          0,
+          true,
+          showProps
+        );
       }
     };
 
@@ -2255,6 +3654,16 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
         if (!stateRef.current.motionOn) renderFrame(performance.now());
       },
       triggerRipple,
+      setAllProps: (show: boolean) => {
+        for (let i = 0; i < placedItems.length; i++) {
+          const item = placedItems[i];
+          if (item.type === 'wallShelf' || item.type === 'cradle') {
+            item.hasProps = show;
+          }
+        }
+        if (!stateRef.current.motionOn) renderFrame(performance.now());
+        else ensureLoop();
+      },
     });
 
     const onPointerDown = (e: PointerEvent) => {
@@ -2421,10 +3830,18 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       const clickX = e.clientX;
       const clickY = e.clientY;
 
-      // Clicking directly on an existing piece without dragging does NOT delete or clone it
+      // Clicking directly on an existing piece without dragging toggles Wall Sconce light or piece props
       const hitExisting = findItemAtPoint(clickX, clickY);
       if (hitExisting) {
-        hitExisting.lift = 0.84;
+        if (hitExisting.type === 'sconce') {
+          hitExisting.lit = !(hitExisting.lit ?? true);
+          hitExisting.lift = 0.88;
+        } else if (hitExisting.type === 'wallShelf' || hitExisting.type === 'cradle') {
+          hitExisting.hasProps = !(hitExisting.hasProps ?? stateRef.current.showProps);
+          hitExisting.lift = 0.88;
+        } else {
+          hitExisting.lift = 0.84;
+        }
         if (!stateRef.current.motionOn) renderFrame(performance.now());
         else ensureLoop();
         return;
@@ -2444,7 +3861,7 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       }
       if (!best) return;
 
-      // Purely additive placement — unlimited items stay on the wall until Clear is clicked
+      // Purely additive placement — unlimited items stay on the wall until removed or cleared
       const size = toolSizes[activeTool];
       const cand = getCandidateForSlot(best, size.cols, size.rows);
       if (cand) {
@@ -2453,6 +3870,26 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
         triggerRipple(clickX / Math.max(1, cssW), clickY / Math.max(1, cssH));
       }
 
+      if (!stateRef.current.motionOn) renderFrame(performance.now());
+    };
+
+    const onContextMenu = (e: MouseEvent) => {
+      if (stateRef.current.isModalOpen || !stateRef.current.canInteract) return;
+      const target = e.target as HTMLElement | null;
+      if (
+        target?.closest?.('.ui-surface, [role="dialog"], button, a, input, select, textarea')
+      ) {
+        return;
+      }
+
+      const hit = findItemAtPoint(e.clientX, e.clientY);
+      if (!hit) return;
+
+      e.preventDefault();
+      cancelActiveDrag();
+      hasUserEdited = true;
+      placedItems = placedItems.filter((it) => it.id !== hit.id);
+      triggerRipple(e.clientX / Math.max(1, cssW), e.clientY / Math.max(1, cssH));
       if (!stateRef.current.motionOn) renderFrame(performance.now());
     };
 
@@ -2490,6 +3927,7 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       document.addEventListener('pointerleave', onPointerLeave);
     }
     document.addEventListener('click', onClick);
+    document.addEventListener('contextmenu', onContextMenu);
 
     return () => {
       disposed = true;
@@ -2505,6 +3943,7 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       window.removeEventListener('touchmove', onTouchMove);
       document.removeEventListener('pointerleave', onPointerLeave);
       document.removeEventListener('click', onClick);
+      document.removeEventListener('contextmenu', onContextMenu);
     };
   }, [controller.registerActions, heroSelector, headerSelector, footerSelector]);
 
@@ -2512,6 +3951,7 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
     syncLoopRef.current();
   }, [
     controller.motionOn,
+    controller.showProps,
     controller.activePillar,
     controller.activeTool,
     controller.toolSizes,
@@ -2522,105 +3962,212 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
   return <canvas ref={canvasRef} className="mortise-wall-canvas" aria-hidden="true" />;
 };
 
+const renderToolIcon = (tool: WallTool) => {
+  switch (tool) {
+    case 'hook':
+      return (
+        <svg
+          className="wall-tool-icon"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.9"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <rect x="8.5" y="2.5" width="7" height="19" rx="1.6" />
+          <line x1="8.5" y1="10" x2="15.5" y2="10" />
+        </svg>
+      );
+    case 'shelf':
+      return (
+        <svg
+          className="wall-tool-icon"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <rect x="2.5" y="3" width="3.5" height="18" rx="1.2" />
+          <rect x="18" y="3" width="3.5" height="18" rx="1.2" />
+          <rect x="6" y="6.5" width="12" height="3.2" />
+          <line x1="6" y1="15.5" x2="18" y2="15.5" strokeWidth="2.8" />
+        </svg>
+      );
+    case 'cabinet':
+      return (
+        <svg
+          className="wall-tool-icon"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.75"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <rect x="2.5" y="4.5" width="19" height="15" rx="0.8" />
+          <line x1="12.6" y1="4.5" x2="12.6" y2="19.5" />
+          <circle cx="6.2" cy="8.5" r="1.45" />
+          <circle cx="17.8" cy="8.5" r="1.45" />
+        </svg>
+      );
+    case 'cubby':
+      return (
+        <svg
+          className="wall-tool-icon"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.75"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <rect x="3.5" y="3.5" width="17" height="17" rx="0.6" />
+          <rect x="6.8" y="6.8" width="10.4" height="10.4" strokeWidth="1.35" />
+        </svg>
+      );
+    case 'wallShelf':
+      return (
+        <svg
+          className="wall-tool-icon"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.7"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M5.5 14 V11.5 C5.5 10.6 6.8 10.6 6.8 11.5 V14" />
+          <path d="M17.2 14 V11.5 C17.2 10.6 18.5 10.6 18.5 11.5 V14" />
+          <rect x="2.5" y="14" width="19" height="3.2" rx="0.5" />
+          <line x1="6.1" y1="17.2" x2="6.1" y2="20.5" strokeWidth="2.1" />
+          <line x1="17.9" y1="17.2" x2="17.9" y2="20.5" strokeWidth="2.1" />
+          <path d="M9.6 14 L10.2 9.8 H13.8 L14.4 14" />
+          <path d="M12 9.8 V5.2" />
+          <path d="M12 8.2 C10.4 7.8 9.4 6.6 9.6 5.2 C11 5.4 11.8 6.5 12 8.2 Z" />
+          <path d="M12 7.6 C13.5 7.2 14.5 6.1 14.3 4.8 C12.9 5 12.2 6 12 7.6 Z" />
+        </svg>
+      );
+    case 'cradle':
+      return (
+        <svg
+          className="wall-tool-icon"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.65"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M2.5 7.5 V18.5 H21.5 V7.5" />
+          <line x1="5.8" y1="5" x2="5.8" y2="18.5" />
+          <line x1="8.6" y1="5" x2="8.6" y2="18.5" />
+          <line x1="11.4" y1="5" x2="11.4" y2="18.5" />
+          <line x1="14.2" y1="5" x2="14.2" y2="18.5" />
+          <line x1="16.4" y1="5.6" x2="18.4" y2="18.5" />
+        </svg>
+      );
+    case 'sconce':
+      return (
+        <svg
+          className="wall-tool-icon"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.65"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <rect x="2.5" y="9.5" width="19" height="5" rx="0.8" />
+          <line x1="5" y1="12" x2="19" y2="12" strokeWidth="1.35" />
+          <line x1="8" y1="6.2" x2="8" y2="4.4" strokeWidth="1.3" />
+          <line x1="12" y1="6.2" x2="12" y2="4" strokeWidth="1.3" />
+          <line x1="16" y1="6.2" x2="16" y2="4.4" strokeWidth="1.3" />
+          <line x1="8" y1="17.8" x2="8" y2="19.6" strokeWidth="1.3" />
+          <line x1="12" y1="17.8" x2="12" y2="20" strokeWidth="1.3" />
+          <line x1="16" y1="17.8" x2="16" y2="19.6" strokeWidth="1.3" />
+        </svg>
+      );
+  }
+};
+
+const COMPACT_ROW_1_TOOLS: WallTool[] = ['hook', 'shelf', 'cabinet'];
+const COMPACT_ROW_2_TOOLS: WallTool[] = ['cubby', 'wallShelf'];
+const COMPACT_ROW_3_TOOLS: WallTool[] = ['cradle', 'sconce'];
+const DESKTOP_ROW_1_TOOLS: WallTool[] = ['hook', 'shelf', 'cabinet'];
+const DESKTOP_ROW_2_TOOLS: WallTool[] = ['cubby', 'wallShelf', 'cradle', 'sconce'];
+
 export const MortiseWallToolbar: React.FC<{
   controller: MortiseWallController;
   variant?: 'default' | 'compact';
 }> = ({ controller, variant = 'default' }) => {
   const isDesktopInteractive = useDesktopInteractiveWall();
-  const { activeTool, setActiveTool, toolSizes, adjustToolSize, rearrange, clearWall } =
-    controller;
+  const {
+    activeTool,
+    setActiveTool,
+    toolSizes,
+    adjustToolSize,
+    showProps,
+    toggleProps,
+    rearrange,
+    clearWall,
+  } = controller;
   const currentSize = toolSizes[activeTool];
   const currentLimits = TOOL_SIZE_LIMITS[activeTool];
-  const activeLabel =
-    activeTool === 'hook' ? 'Hook' : activeTool === 'shelf' ? 'Shelf + Rod' : 'Cabinet';
+  const activeLabel = TOOL_LABELS[activeTool];
 
   if (!isDesktopInteractive) return null;
+
+  const renderToolButton = (tool: WallTool) => (
+    <button
+      key={tool}
+      type="button"
+      className="wall-tool-btn"
+      aria-pressed={activeTool === tool}
+      onClick={() => setActiveTool(tool)}
+    >
+      {renderToolIcon(tool)}
+      <span>{TOOL_LABELS[tool]}</span>
+      <span className="wall-tool-size">
+        {toolSizes[tool].cols}×{toolSizes[tool].rows}
+      </span>
+    </button>
+  );
 
   return (
     <div
       className={`wall-toolbar ui-surface${variant === 'compact' ? ' wall-toolbar--compact' : ''}`}
       aria-label="Interactive modular wall controls"
     >
-      <div className="wall-tool-group" role="group" aria-label="Select modular piece to place">
-        <button
-          type="button"
-          className="wall-tool-btn"
-          aria-pressed={activeTool === 'hook'}
-          onClick={() => setActiveTool('hook')}
+      {variant === 'compact' ? (
+        <div
+          className="wall-tool-rows"
+          role="group"
+          aria-label="Select modular piece to place"
         >
-          <svg
-            className="wall-tool-icon"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.9"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <rect x="8.5" y="2.5" width="7" height="19" rx="1.6" />
-            <line x1="8.5" y1="10" x2="15.5" y2="10" />
-          </svg>
-          <span>Hook</span>
-          <span className="wall-tool-size">
-            {toolSizes.hook.cols}×{toolSizes.hook.rows}
-          </span>
-        </button>
-
-        <button
-          type="button"
-          className="wall-tool-btn"
-          aria-pressed={activeTool === 'shelf'}
-          onClick={() => setActiveTool('shelf')}
+          <div className="wall-tool-row--3">{COMPACT_ROW_1_TOOLS.map(renderToolButton)}</div>
+          <div className="wall-tool-row--2">{COMPACT_ROW_2_TOOLS.map(renderToolButton)}</div>
+          <div className="wall-tool-row--2">{COMPACT_ROW_3_TOOLS.map(renderToolButton)}</div>
+        </div>
+      ) : (
+        <div
+          className="wall-tool-rows"
+          role="group"
+          aria-label="Select modular piece to place"
         >
-          <svg
-            className="wall-tool-icon"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <rect x="2.5" y="3" width="3.5" height="18" rx="1.2" />
-            <rect x="18" y="3" width="3.5" height="18" rx="1.2" />
-            <rect x="6" y="6.5" width="12" height="3.2" />
-            <line x1="6" y1="15.5" x2="18" y2="15.5" strokeWidth="2.8" />
-          </svg>
-          <span>Shelf + Rod</span>
-          <span className="wall-tool-size">
-            {toolSizes.shelf.cols}×{toolSizes.shelf.rows}
-          </span>
-        </button>
-
-        <button
-          type="button"
-          className="wall-tool-btn"
-          aria-pressed={activeTool === 'cabinet'}
-          onClick={() => setActiveTool('cabinet')}
-        >
-          <svg
-            className="wall-tool-icon"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.75"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <rect x="2.5" y="4.5" width="19" height="15" rx="0.8" />
-            <line x1="12.6" y1="4.5" x2="12.6" y2="19.5" />
-            <circle cx="6.2" cy="8.5" r="1.45" />
-            <circle cx="17.8" cy="8.5" r="1.45" />
-          </svg>
-          <span>Cabinet</span>
-          <span className="wall-tool-size">
-            {toolSizes.cabinet.cols}×{toolSizes.cabinet.rows}
-          </span>
-        </button>
-      </div>
+          <div className="wall-tool-row--3">{DESKTOP_ROW_1_TOOLS.map(renderToolButton)}</div>
+          <div className="wall-tool-row--4">{DESKTOP_ROW_2_TOOLS.map(renderToolButton)}</div>
+        </div>
+      )}
 
       <div className="wall-controls-panel">
         <div
@@ -2685,7 +4232,26 @@ export const MortiseWallToolbar: React.FC<{
           )}
         </div>
 
+        {variant === 'default' && (
+          <span className="wall-micro-hint">
+            {activeTool === 'sconce'
+              ? 'Click slot to add · Click sconce to toggle light · Drag to move · Right-click to remove'
+              : activeTool === 'wallShelf' || activeTool === 'cradle'
+                ? 'Click slot to add · Click piece to toggle props · Drag to move · Right-click to remove'
+                : 'Click slot to add · Drag to move · Right-click piece to remove'}
+          </span>
+        )}
+
         <div className="mortise-actions">
+          <button
+            type="button"
+            className="text-action-link"
+            aria-pressed={showProps}
+            onClick={toggleProps}
+            title="Toggle shelf plant and vinyl record props on or off"
+          >
+            Props: {showProps ? 'On' : 'Off'}
+          </button>
           <button type="button" className="text-action-link" onClick={rearrange}>
             Rearrange
           </button>
