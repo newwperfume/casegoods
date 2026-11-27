@@ -27,6 +27,65 @@ const COLORS = {
   yellow: '#FDCB33',
 } as const;
 
+export type LightKelvin = 2700 | 3000 | 4000 | 5000;
+
+export const LIGHT_KELVIN_OPTIONS: LightKelvin[] = [2700, 3000, 4000, 5000];
+
+const LIGHT_KELVIN_PRESETS: Record<
+  LightKelvin,
+  {
+    ambientRgb: string;
+    coreRgb: string;
+    midRgb: string;
+    washRgb: string;
+    rimRgb: string;
+    diffuserMid: string;
+    diffuserBot: string;
+    uiBg: string;
+  }
+> = {
+  2700: {
+    ambientRgb: '255, 232, 150',
+    coreRgb: '255, 248, 206',
+    midRgb: '255, 226, 126',
+    washRgb: '253, 198, 48',
+    rimRgb: '255, 248, 212',
+    diffuserMid: '#FFF5C4',
+    diffuserBot: '#FDCB33',
+    uiBg: '#FDCB33',
+  },
+  3000: {
+    ambientRgb: '255, 242, 194',
+    coreRgb: '255, 252, 232',
+    midRgb: '255, 238, 174',
+    washRgb: '255, 218, 118',
+    rimRgb: '255, 252, 234',
+    diffuserMid: '#FFFBE4',
+    diffuserBot: '#FFE084',
+    uiBg: '#FFE7A3',
+  },
+  4000: {
+    ambientRgb: '234, 244, 255',
+    coreRgb: '252, 254, 255',
+    midRgb: '216, 234, 252',
+    washRgb: '176, 210, 244',
+    rimRgb: '255, 255, 255',
+    diffuserMid: '#F7FBFF',
+    diffuserBot: '#C5E0FA',
+    uiBg: '#E3F0FB',
+  },
+  5000: {
+    ambientRgb: '204, 234, 255',
+    coreRgb: '240, 250, 255',
+    midRgb: '166, 216, 250',
+    washRgb: '92, 186, 240',
+    rimRgb: '232, 248, 255',
+    diffuserMid: '#E8F7FF',
+    diffuserBot: '#7DD0F6',
+    uiBg: '#8DD6F7',
+  },
+};
+
 export const PILLAR_COLORS: Record<PillarColorKey, string> = {
   '01': COLORS.orange,
   '02': COLORS.blue,
@@ -52,7 +111,7 @@ export const TOOL_LABELS: Record<WallTool, string> = {
   cabinet: 'Cabinet',
   cubby: 'Open Cube',
   wallShelf: 'Wall Shelf',
-  cradle: 'Vinyl Box',
+  cradle: 'Book Shelf',
   sconce: 'Wall Sconce',
 };
 
@@ -62,49 +121,49 @@ export const TOOL_SIZE_LIMITS: Record<
 > = {
   hook: {
     minCols: 1,
-    maxCols: 3,
+    maxCols: 6,
     minRows: 1,
     maxRows: 1,
     defaultSize: { cols: 1, rows: 1 },
   },
   shelf: {
     minCols: 4,
-    maxCols: 6,
+    maxCols: 9,
     minRows: 2,
     maxRows: 2,
-    defaultSize: { cols: 4, rows: 2 },
+    defaultSize: { cols: 5, rows: 2 },
   },
   cabinet: {
     minCols: 4,
-    maxCols: 6,
+    maxCols: 10,
     minRows: 2,
-    maxRows: 4,
-    defaultSize: { cols: 4, rows: 2 },
+    maxRows: 6,
+    defaultSize: { cols: 5, rows: 3 },
   },
   cubby: {
     minCols: 3,
-    maxCols: 5,
-    minRows: 3,
-    maxRows: 4,
-    defaultSize: { cols: 3, rows: 3 },
+    maxCols: 8,
+    minRows: 2,
+    maxRows: 5,
+    defaultSize: { cols: 4, rows: 3 },
   },
   wallShelf: {
     minCols: 3,
-    maxCols: 5,
+    maxCols: 10,
     minRows: 2,
     maxRows: 2,
-    defaultSize: { cols: 4, rows: 2 },
+    defaultSize: { cols: 5, rows: 2 },
   },
   cradle: {
     minCols: 4,
-    maxCols: 6,
+    maxCols: 10,
     minRows: 2,
     maxRows: 2,
     defaultSize: { cols: 5, rows: 2 },
   },
   sconce: {
     minCols: 2,
-    maxCols: 6,
+    maxCols: 8,
     minRows: 1,
     maxRows: 1,
     defaultSize: { cols: 4, rows: 1 },
@@ -139,6 +198,9 @@ interface PlacedItem {
   seed: number;
   lit?: boolean;
   hasProps?: boolean;
+  doorOpen?: boolean;
+  doorProgress?: number;
+  doorOpenSide?: 'left' | 'right';
 }
 
 interface GridMeta {
@@ -166,6 +228,10 @@ export interface MortiseWallController {
   toggleMotion: () => void;
   showProps: boolean;
   toggleProps: () => void;
+  warmLightingOn: boolean;
+  toggleWarmLighting: () => void;
+  lightKelvin: LightKelvin;
+  setLightKelvin: (kelvin: LightKelvin) => void;
   rearrange: () => void;
   clearWall: () => void;
   registerActions: (actions: {
@@ -173,6 +239,7 @@ export interface MortiseWallController {
     clearWall: () => void;
     triggerRipple: (nx: number, ny: number) => void;
     setAllProps: (show: boolean) => void;
+    setAllLighting: (on: boolean) => void;
   }) => void;
 }
 
@@ -201,17 +268,22 @@ export function useMortiseWallController(
   const [motionOn, setMotionOn] = useState<boolean>(!prefersReduced);
   const [showProps, setShowProps] = useState<boolean>(true);
   const showPropsRef = useRef<boolean>(true);
+  const [warmLightingOn, setWarmLightingOn] = useState<boolean>(true);
+  const warmLightingRef = useRef<boolean>(true);
+  const [lightKelvin, setLightKelvinState] = useState<LightKelvin>(2700);
 
   const actionsRef = useRef<{
     rearrange: () => void;
     clearWall: () => void;
     triggerRipple: (nx: number, ny: number) => void;
     setAllProps: (show: boolean) => void;
+    setAllLighting: (on: boolean) => void;
   }>({
     rearrange: () => {},
     clearWall: () => {},
     triggerRipple: () => {},
     setAllProps: () => {},
+    setAllLighting: () => {},
   });
 
   useEffect(() => {
@@ -259,6 +331,20 @@ export function useMortiseWallController(
     setShowProps(next);
     actionsRef.current.setAllProps(next);
   }, []);
+  const toggleWarmLighting = useCallback(() => {
+    const next = !warmLightingRef.current;
+    warmLightingRef.current = next;
+    setWarmLightingOn(next);
+    actionsRef.current.setAllLighting(next);
+  }, []);
+  const setLightKelvin = useCallback((kelvin: LightKelvin) => {
+    setLightKelvinState(kelvin);
+    if (!warmLightingRef.current) {
+      warmLightingRef.current = true;
+      setWarmLightingOn(true);
+      actionsRef.current.setAllLighting(true);
+    }
+  }, []);
   const rearrange = useCallback(() => actionsRef.current.rearrange(), []);
   const clearWall = useCallback(() => actionsRef.current.clearWall(), []);
   const registerActions = useCallback((actions: typeof actionsRef.current) => {
@@ -277,6 +363,10 @@ export function useMortiseWallController(
       toggleMotion,
       showProps,
       toggleProps,
+      warmLightingOn,
+      toggleWarmLighting,
+      lightKelvin,
+      setLightKelvin,
       rearrange,
       clearWall,
       registerActions,
@@ -291,6 +381,10 @@ export function useMortiseWallController(
       toggleMotion,
       showProps,
       toggleProps,
+      warmLightingOn,
+      toggleWarmLighting,
+      lightKelvin,
+      setLightKelvin,
       rearrange,
       clearWall,
       registerActions,
@@ -312,7 +406,7 @@ export function isDesktopInteractiveWall(): boolean {
   const hasFinePointer =
     typeof window.matchMedia === 'function' &&
     window.matchMedia('(any-hover: hover) and (any-pointer: fine)').matches;
-  const isWideViewport = window.innerWidth >= 900;
+  const isWideViewport = window.innerWidth >= 640;
 
   return !isIOSDevice && !isMobileUA && hasFinePointer && isWideViewport;
 }
@@ -363,6 +457,8 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
     activePillar: controller.activePillar,
     motionOn: controller.motionOn,
     showProps: controller.showProps,
+    warmLightingOn: controller.warmLightingOn,
+    lightKelvin: controller.lightKelvin,
     isModalOpen,
     canInteract,
   });
@@ -373,11 +469,14 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
     activePillar: controller.activePillar,
     motionOn: controller.motionOn,
     showProps: controller.showProps,
+    warmLightingOn: controller.warmLightingOn,
+    lightKelvin: controller.lightKelvin,
     isModalOpen,
     canInteract,
   };
 
   useEffect(() => {
+    if (!desktopInteractive) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -412,8 +511,17 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
     };
 
     let heroRect = { left: 0, right: 0, top: 0, bottom: 0 };
-    let topSafeY = 72;
-    let bottomSafeY = cssH - 80;
+    let heroCutout: {
+      gxMin: number;
+      gxMax: number;
+      gyMin: number;
+      gyMax: number;
+    } | null = null;
+    let heroAppliedDx = 0;
+    let heroAppliedDy = 0;
+    let topSafeY = 12;
+    let bottomSafeY = cssH - 12;
+    let edgeSafeX = 12;
 
     let pointerX = -9999;
     let pointerY = -9999;
@@ -529,15 +637,26 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       return slots[r * cols + c] || null;
     };
 
+    const TARGET_VERTICAL_ROWS = 14;
+    const MIN_VISIBLE_GY = -7;
+    const MAX_VISIBLE_GY = 6;
+
     const measureClearanceZones = () => {
-      const heroEl = heroSelector ? document.querySelector(heroSelector) : null;
+      const headerEl = headerSelector ? document.querySelector(headerSelector) : null;
+      const footerEl = footerSelector ? document.querySelector(footerSelector) : null;
+      const edgeY = Math.max(8, Math.min(14, cssH * 0.012));
+      topSafeY = headerEl ? headerEl.getBoundingClientRect().bottom + 12 : edgeY;
+      bottomSafeY = footerEl ? footerEl.getBoundingClientRect().top - 14 : cssH - edgeY;
+      edgeSafeX = Math.max(8, Math.min(14, cssW * 0.008));
+
+      const heroEl = heroSelector ? (document.querySelector(heroSelector) as HTMLElement | null) : null;
       if (heroEl) {
         const hr = heroEl.getBoundingClientRect();
         heroRect = {
-          left: hr.left - 12,
-          right: hr.right + 12,
-          top: hr.top - 12,
-          bottom: hr.bottom + 12,
+          left: hr.left - 8,
+          right: hr.right + 8,
+          top: hr.top - 8,
+          bottom: hr.bottom + 8,
         };
       } else {
         const halfW = Math.min(310, cssW * 0.34);
@@ -548,15 +667,28 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
           bottom: cssH * 0.82,
         };
       }
-      const headerEl = headerSelector ? document.querySelector(headerSelector) : null;
-      const footerEl = footerSelector ? document.querySelector(footerSelector) : null;
-      topSafeY = headerEl ? headerEl.getBoundingClientRect().bottom + 12 : 24;
-      bottomSafeY = footerEl ? footerEl.getBoundingClientRect().top - 14 : cssH - 48;
     };
 
-    const isSlotBlocked = (cx: number, cy: number, slotW: number, slotH: number) => {
-      const halfW = slotW * 0.5 + 8;
-      const halfH = slotH * 0.5 + 8;
+    const isSlotBlocked = (
+      gx: number,
+      gy: number,
+      cx: number,
+      cy: number,
+      slotW: number,
+      slotH: number
+    ) => {
+      if (gy < MIN_VISIBLE_GY || gy > MAX_VISIBLE_GY) return true;
+      if (cx - slotW * 0.5 < edgeSafeX || cx + slotW * 0.5 > cssW - edgeSafeX) return true;
+      if (heroCutout) {
+        return (
+          gx >= heroCutout.gxMin &&
+          gx <= heroCutout.gxMax &&
+          gy >= heroCutout.gyMin &&
+          gy <= heroCutout.gyMax
+        );
+      }
+      const halfW = slotW * 0.5 + 6;
+      const halfH = slotH * 0.5 + 6;
       if (cy - halfH < topSafeY || cy + halfH > bottomSafeY) return true;
       return (
         cx + halfW > heroRect.left &&
@@ -581,7 +713,9 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
         for (let gx = gx1; gx <= gx2; gx++) {
           const s = slotByCoord(gx, gy);
           if (!s || s.blocked) return false;
-          if (s.cx < 14 || s.cx > cssW - 14) return false;
+          if (s.cx - gridMeta.slotW * 0.5 < 4 || s.cx + gridMeta.slotW * 0.5 > cssW - 4) {
+            return false;
+          }
         }
       }
       return true;
@@ -647,11 +781,17 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
         gy2,
         lift: withAnim ? 0.08 : 1,
         seed: id * 17 + gx1 * 7 + gx2 * 11 + gy1 * 13 + gy2 * 19,
-        lit: type === 'sconce' ? true : undefined,
+        lit:
+          type === 'sconce' || type === 'cubby'
+            ? stateRef.current.warmLightingOn
+            : undefined,
         hasProps:
-          type === 'wallShelf' || type === 'cradle'
+          type === 'wallShelf' || type === 'cradle' || type === 'shelf' || type === 'hook'
             ? stateRef.current.showProps
             : undefined,
+        doorOpen: type === 'cabinet' ? false : undefined,
+        doorProgress: type === 'cabinet' ? 0 : undefined,
+        doorOpenSide: type === 'cabinet' ? 'left' : undefined,
       });
     };
 
@@ -670,6 +810,7 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
         const lowerCy = m.centerY + item.gy2 * m.pitchY;
 
         if (item.type === 'hook') {
+          const itemHasProps = item.hasProps ?? stateRef.current.showProps;
           const cols = Math.max(1, item.gx2 - item.gx1 + 1);
           const rows = Math.max(1, item.gy2 - item.gy1 + 1);
           const hookW = m.slotW * 0.857;
@@ -705,13 +846,50 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
               return item;
             }
           }
+
+          // Include hanging simple backpack / hat props in hit-testing so clicking them toggles props cleanly
+          if (itemHasProps) {
+            const props = getHookPropsLayout(
+              item.gx1,
+              item.gx2,
+              item.gy1,
+              item.gy2,
+              m,
+              1,
+              0,
+              0,
+              item.seed
+            );
+            for (const p of props) {
+              if (
+                px >= p.cx - p.w * 0.5 - 3 &&
+                px <= p.cx + p.w * 0.5 + 3 &&
+                py >= p.topY - 3 &&
+                py <= p.topY + p.h + 3
+              ) {
+                return item;
+              }
+            }
+          }
         } else if (item.type === 'shelf') {
+          const itemHasProps = item.hasProps ?? stateRef.current.showProps;
           const t = m.slotW * 0.857;
           const leftX = leftCx - t * 0.5;
           const rightX = rightCx + t * 0.5;
           const topY = upperCy + m.slotH * 0.04;
           const botY = lowerCy + m.slotH * 0.11;
+          const rodDiam = Math.min(t * 1.48, m.pitchY * 0.25);
+          const hangerExtraH = itemHasProps ? (rodDiam / 1.3125) * 3.8 : 0;
           if (px >= leftX - 5 && px <= rightX + 5 && py >= topY - 5 && py <= botY + 5) {
+            return item;
+          }
+          if (
+            itemHasProps &&
+            px >= leftX + t &&
+            px <= rightX - t &&
+            py >= botY &&
+            py <= botY + hangerExtraH
+          ) {
             return item;
           }
         } else if (item.type === 'cradle') {
@@ -725,7 +903,7 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
             return item;
           }
         } else if (item.type === 'cubby') {
-          const t = Math.max(7.5, Math.min(11.5, m.pitchX * 0.145));
+          const t = m.slotW * 0.857;
           const leftX = leftCx - t * 0.5;
           const rightX = rightCx + t * 0.5;
           const topY = upperCy - m.slotH * 0.62;
@@ -745,16 +923,16 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
           }
         } else if (item.type === 'sconce') {
           const t = m.slotW * 0.857;
-          const leftX = leftCx - t * 0.85;
-          const rightX = rightCx + t * 0.85;
-          const barH = Math.max(15, Math.min(21, m.slotH * 0.54));
-          const topY = upperCy - barH * 0.5;
-          const botY = upperCy + barH * 0.5;
-          if (px >= leftX - 6 && px <= rightX + 6 && py >= topY - 7 && py <= botY + 7) {
+          const leftX = leftCx - t * 0.5;
+          const rightX = rightCx + t * 0.5;
+          const cheekTopY = upperCy - m.slotH * 0.52;
+          const cheekH = t * (0.78 + 1.0 + 3.15);
+          const cheekBotY = cheekTopY + cheekH;
+          if (px >= leftX - 6 && px <= rightX + 6 && py >= cheekTopY - 5 && py <= cheekBotY + 6) {
             return item;
           }
         } else {
-          const t = Math.max(7.5, Math.min(11.5, m.pitchX * 0.145));
+          const t = m.slotW * 0.857;
           const leftX = leftCx - t * 0.5;
           const rightX = rightCx + t * 0.5;
           const topY = upperCy - m.slotH * 0.62;
@@ -810,28 +988,127 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
 
     const rebuildGrid = () => {
       measureClearanceZones();
-      const sideMargin = Math.max(0, heroRect.left);
-      // Scale mortise grid so desktop flanks comfortably fit 5-hook-wide vinyl boxes, cabinets & shelves
-      const baseScale = Math.max(0.22, Math.min(0.295, cssW / 4800));
-      const scale =
-        sideMargin >= 200
-          ? Math.max(0.18, Math.min(baseScale, (sideMargin - 20) / (4.55 * SVG_PITCH_X)))
-          : baseScale;
+
+      // Scale mortise grid evenly on both axes so exactly 14 vertical rows of mortise holes span the viewport
+      const usableH = Math.max(200, bottomSafeY - topSafeY);
+      const scale = usableH / (TARGET_VERTICAL_ROWS * SVG_PITCH_Y);
       const slotW = SVG_SLOT_W * scale;
       const slotH = SVG_SLOT_H * scale;
       const slotR = SVG_SLOT_R * scale;
       const pitchX = SVG_PITCH_X * scale;
       const pitchY = SVG_PITCH_Y * scale;
-      const centerX = cssW * 0.5;
-      const centerY = cssH * 0.5;
-      const halfCols = Math.ceil((cssW * 0.5) / pitchX) + 1;
-      const halfRows = Math.ceil((cssH * 0.5) / pitchY) + 1;
+
+      const midX = cssW * 0.5;
+      const midY = (topSafeY + bottomSafeY) * 0.5;
+      // Offset centerY by +0.5 * pitchY so the 14 even rows (gy = -7..+6) sit symmetrically around midY
+      const centerY = midY + 0.5 * pitchY;
+      let centerX = midX;
+      heroCutout = null;
+
+      // Scale & center the middle hero stack so its 4 visual edges are strictly equidistant from the nearest mortise holes
+      const heroEl = heroSelector
+        ? (document.querySelector(heroSelector) as HTMLElement | null)
+        : null;
+      if (heroEl) {
+        const W0 = heroEl.offsetWidth;
+        const H0 = heroEl.offsetHeight;
+        const totalCols = Math.floor((cssW - 2 * edgeSafeX) / pitchX);
+
+        let best: {
+          kx: number;
+          ky: number;
+          s: number;
+          clearW: number;
+          clearH: number;
+          cost: number;
+        } | null = null;
+
+        if (W0 > 120 && H0 > 120 && W0 > H0 + 20) {
+          for (const ky of [8, 6, 10]) {
+            const clearH = (ky + 1) * pitchY - slotH;
+            const maxKx = Math.min(24, totalCols - 2);
+            for (let kx = 8; kx <= maxKx; kx++) {
+              const clearW = (kx + 1) * pitchX - slotW;
+              if (clearW <= clearH) continue;
+              // Exact uniform scale s such that (clearW - s*W0)/2 === (clearH - s*H0)/2 === G on all 4 sides
+              const s = (clearW - clearH) / (W0 - H0);
+              const G = (clearH - s * H0) * 0.5;
+              const gRatio = G / pitchY;
+              if (s < 0.62 || s > 1.32) continue;
+              if (gRatio < 0.24 || gRatio > 0.96) continue;
+              const flankCols = Math.floor((totalCols - kx) / 2);
+              if (flankCols < 3) continue;
+
+              // Target a prominent, commanding center stack (s ~ 1.04) while keeping generous flanks & equidistant framing
+              const sScore = Math.abs(s - 1.04) * 2.4;
+              const gScore = Math.abs(gRatio - 0.54) * 1.1;
+              const kyPenalty = ky === 8 ? 0 : ky === 6 ? 0.16 : 0.45;
+              const flankPenalty = flankCols < 5 ? (5 - flankCols) * 0.45 : 0;
+              const cost = sScore + gScore + kyPenalty + flankPenalty;
+              if (!best || cost < best.cost) {
+                best = { kx, ky, s, clearW, clearH, cost };
+              }
+            }
+          }
+        }
+
+        if (best) {
+          // Match horizontal grid parity to kx so left & right flanking columns are 100% symmetric
+          centerX = best.kx % 2 === 0 ? midX + 0.5 * pitchX : midX;
+          const gxMin = best.kx % 2 === 0 ? -(best.kx / 2) : -((best.kx - 1) / 2);
+          const gxMax = best.kx % 2 === 0 ? best.kx / 2 - 1 : (best.kx - 1) / 2;
+          const gyMin = -(best.ky / 2);
+          const gyMax = best.ky / 2 - 1;
+          heroCutout = { gxMin, gxMax, gyMin, gyMax };
+
+          // Align the center of #hero-center-stack exactly to (midX, midY) before scaling
+          const hr = heroEl.getBoundingClientRect();
+          const natCenterX = (hr.left + hr.right) * 0.5 - heroAppliedDx;
+          const natCenterY = (hr.top + hr.bottom) * 0.5 - heroAppliedDy;
+          const nextDx = Math.round((midX - natCenterX) * 100) / 100;
+          const nextDy = Math.round((midY - natCenterY) * 100) / 100;
+          const nextTransform = `translate(${nextDx}px, ${nextDy}px) scale(${best.s.toFixed(5)})`;
+
+          heroEl.style.transformOrigin = 'center center';
+          if (heroEl.style.transform !== nextTransform) {
+            heroEl.style.transform = nextTransform;
+          }
+          heroAppliedDx = nextDx;
+          heroAppliedDy = nextDy;
+
+          const scaledW = W0 * best.s;
+          const scaledH = H0 * best.s;
+          heroRect = {
+            left: midX - scaledW * 0.5,
+            right: midX + scaledW * 0.5,
+            top: midY - scaledH * 0.5,
+            bottom: midY + scaledH * 0.5,
+          };
+        } else {
+          // Graceful fallback on ultra-narrow portrait desktop panes
+          if (heroEl.style.transform) {
+            heroEl.style.transform = '';
+            heroEl.style.transformOrigin = '';
+          }
+          heroAppliedDx = 0;
+          heroAppliedDy = 0;
+          const hr = heroEl.getBoundingClientRect();
+          heroRect = {
+            left: hr.left - 8,
+            right: hr.right + 8,
+            top: hr.top - 8,
+            bottom: hr.bottom + 8,
+          };
+        }
+      }
+
+      const halfCols = Math.ceil((cssW * 0.5) / pitchX) + 2;
 
       gridMeta = {
         minGx: -halfCols,
         maxGx: halfCols,
-        minGy: -halfRows,
-        maxGy: halfRows,
+        minGy: MIN_VISIBLE_GY,
+        maxGy: MAX_VISIBLE_GY,
         slotW,
         slotH,
         slotR,
@@ -856,7 +1133,7 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
             gy,
             cx,
             cy,
-            blocked: isSlotBlocked(cx, cy, slotW, slotH),
+            blocked: isSlotBlocked(gx, gy, cx, cy, slotW, slotH),
             ox: prev ? prev.ox : 0,
             oy: prev ? prev.oy : 0,
             vx: prev ? prev.vx : 0,
@@ -1039,8 +1316,274 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
     };
 
     /**
-     * True 3D cast shadow of the CNC-cut J-profile Wall Hook (single or multi-cell hook rail)
-     * under upper-left directional light. Reveals projecting hook saddles and upturned catch noses.
+     * Deterministic layout for calm monotone architectural props (Simple Backpack & Simple Hat)
+     * hanging on single or multi-column Casegoods Wall Hooks.
+     */
+    const getHookPropsLayout = (
+      gx1: number,
+      gx2: number,
+      gy1: number,
+      gy2: number,
+      m: GridMeta,
+      lift: number,
+      ox: number,
+      oy: number,
+      seed = 0
+    ): Array<{
+      kind: 'backpack' | 'hat';
+      gx: number;
+      cx: number;
+      anchorY: number;
+      topY: number;
+      w: number;
+      h: number;
+      depth: number;
+    }> => {
+      const cols = Math.max(1, gx2 - gx1 + 1);
+      const rows = Math.max(1, gy2 - gy1 + 1);
+      const upperH = m.slotH * 0.768;
+      const lowerH = m.slotH * 1.382;
+      const extraH = Math.max(0, rows - 1) * m.pitchY;
+      const liftOffset = (1 - lift) * 6;
+      const upperCy = m.centerY + gy1 * m.pitchY + oy;
+      const hy = upperCy + m.slotH * 0.04 - liftOffset;
+      const seamY = hy + upperH + extraH;
+      const anchorY = seamY + lowerH * 0.22;
+      const hookW = m.slotW * 0.857;
+      const hookDepth = Math.max(hookW * 2.0, (upperH + lowerH) * 0.62) * lift;
+
+      const s = Math.abs(Math.round(seed || gx1 * 11 + gx2 * 17 + gy1 * 23));
+      const assignments: Array<{ gx: number; kind: 'backpack' | 'hat' }> = [];
+
+      if (cols === 1) {
+        assignments.push({ gx: gx1, kind: s % 2 === 0 ? 'backpack' : 'hat' });
+      } else if (cols === 2) {
+        // Real-scale Filson pack (~1.82 pitchX) or Cap (~1.06 pitchX) on one hook, leaving sibling birch hook clean
+        const pickLeft = s % 2 === 0;
+        const kind: 'backpack' | 'hat' = Math.floor(s / 2) % 2 === 0 ? 'backpack' : 'hat';
+        assignments.push({ gx: pickLeft ? gx1 : gx2, kind });
+      } else if (cols === 3 || cols === 4) {
+        // 3–4 col hook rail: Filson backpack + hanging cap flank exposed inner birch peg(s) cleanly
+        if (s % 2 === 0) {
+          assignments.push({ gx: gx1, kind: 'backpack' });
+          assignments.push({ gx: gx2, kind: 'hat' });
+        } else {
+          assignments.push({ gx: gx1, kind: 'hat' });
+          assignments.push({ gx: gx2, kind: 'backpack' });
+        }
+      } else {
+        // Wide 5–6 col entryway peg rail: space backpack & cap naturally with crisp open birch pegs between them
+        const leftPeg = cols >= 6 ? gx1 + 1 : gx1;
+        const rightPeg = cols >= 6 ? gx2 - 1 : gx2;
+        if (s % 2 === 0) {
+          assignments.push({ gx: leftPeg, kind: 'backpack' });
+          assignments.push({ gx: rightPeg, kind: 'hat' });
+        } else {
+          assignments.push({ gx: leftPeg, kind: 'hat' });
+          assignments.push({ gx: rightPeg, kind: 'backpack' });
+        }
+      }
+
+      return assignments.map(({ gx, kind }) => {
+        const cx = m.centerX + gx * m.pitchX + ox;
+        if (kind === 'backpack') {
+          // Exact real-world scale measured against the mortise wall photo (IMG_5140): ~1.82 pitchX wide × ~2.38 pitchY tall
+          const w = m.pitchX * 1.82;
+          const h = m.pitchY * 2.38;
+          const loopDrop = Math.max(8, m.slotH * 0.42);
+          return {
+            kind,
+            gx,
+            cx,
+            anchorY,
+            topY: anchorY + loopDrop,
+            w,
+            h,
+            depth: hookDepth * 1.32,
+          };
+        } else {
+          // Exact real-world scale measured against the mortise wall photo (IMG_5141): ~1.06 pitchX wide × ~1.50 pitchY tall
+          const w = m.pitchX * 1.06;
+          const h = m.pitchY * 1.5;
+          return {
+            kind,
+            gx,
+            cx,
+            anchorY,
+            topY: anchorY - m.slotH * 0.04,
+            w,
+            h,
+            depth: hookDepth * 1.05,
+          };
+        }
+      });
+    };
+
+    /**
+     * Traces the 2D front-elevation silhouette of the Filson Roll-Top Backpack (from IMG_5140)
+     * or the Backstrap-Hanging Cap with downward curved bill (from IMG_5141).
+     */
+    const appendHookPropSilhouette = (
+      kind: 'backpack' | 'hat',
+      cx: number,
+      topY: number,
+      w: number,
+      h: number
+    ) => {
+      if (kind === 'backpack') {
+        // Filson roll-top dry/canvas backpack: flared rolled collar ears tapering gently into soft-cornered body
+        const halfW = w * 0.5;
+        const flareW = w * 0.57;
+        const rollH = h * 0.145;
+        const botHalfW = w * 0.485;
+        const botR = Math.max(5, w * 0.11);
+
+        ctx.moveTo(cx - flareW + 4, topY);
+        ctx.lineTo(cx + flareW - 4, topY);
+        ctx.quadraticCurveTo(cx + flareW + 2, topY + rollH * 0.18, cx + flareW, topY + rollH * 0.58);
+        ctx.quadraticCurveTo(cx + flareW * 0.94, topY + rollH * 1.02, cx + halfW, topY + rollH * 1.15);
+        ctx.lineTo(cx + botHalfW, topY + h - botR);
+        ctx.quadraticCurveTo(cx + botHalfW, topY + h, cx + botHalfW - botR, topY + h);
+        ctx.lineTo(cx - botHalfW + botR, topY + h);
+        ctx.quadraticCurveTo(cx - botHalfW, topY + h, cx - botHalfW, topY + h - botR);
+        ctx.lineTo(cx - halfW, topY + rollH * 1.15);
+        ctx.quadraticCurveTo(cx - flareW * 0.94, topY + rollH * 1.02, cx - flareW, topY + rollH * 0.58);
+        ctx.quadraticCurveTo(cx - flareW - 2, topY + rollH * 0.18, cx - flareW + 4, topY);
+        ctx.closePath();
+      } else {
+        // Baseball cap hanging by its backstrap: fuller rounded crown above + narrower downward-pointing curved bill below
+        const halfW = w * 0.5;
+        const crownBotY = topY + h * 0.6;
+        const billHalfW = w * 0.39;
+        const billBotY = topY + h;
+        const strapHalfW = w * 0.16;
+
+        ctx.moveTo(cx - strapHalfW, topY + h * 0.03);
+        ctx.quadraticCurveTo(cx, topY - h * 0.015, cx + strapHalfW, topY + h * 0.03);
+        ctx.bezierCurveTo(
+          cx + halfW * 0.72,
+          topY + h * 0.06,
+          cx + halfW * 1.04,
+          topY + h * 0.24,
+          cx + halfW,
+          topY + h * 0.44
+        );
+        ctx.quadraticCurveTo(cx + halfW * 0.94, crownBotY, cx + billHalfW, crownBotY + h * 0.04);
+        ctx.bezierCurveTo(
+          cx + billHalfW * 1.02,
+          crownBotY + h * 0.25,
+          cx + billHalfW * 0.58,
+          billBotY,
+          cx,
+          billBotY
+        );
+        ctx.bezierCurveTo(
+          cx - billHalfW * 0.58,
+          billBotY,
+          cx - billHalfW * 1.02,
+          crownBotY + h * 0.25,
+          cx - billHalfW,
+          crownBotY + h * 0.04
+        );
+        ctx.quadraticCurveTo(cx - halfW * 0.94, crownBotY, cx - halfW, topY + h * 0.44);
+        ctx.bezierCurveTo(
+          cx - halfW * 1.04,
+          topY + h * 0.24,
+          cx - halfW * 0.72,
+          topY + h * 0.06,
+          cx - strapHalfW,
+          topY + h * 0.03
+        );
+        ctx.closePath();
+      }
+    };
+
+    /**
+     * Traces a wall-contact tapered cast shadow for the hanging cap:
+     * upper crown protrudes off the wall by (dx, dy) while the downward bill smoothly tapers
+     * down to z = 0 right where the tip of the bill rests flush against the mortise wall.
+     */
+    const appendHatWallContactShadow = (
+      cx: number,
+      topY: number,
+      w: number,
+      h: number,
+      dx: number,
+      dy: number
+    ) => {
+      const halfW = w * 0.5;
+      const crownBotY = topY + h * 0.6;
+      const billHalfW = w * 0.39;
+      const billBotY = topY + h;
+      const strapHalfW = w * 0.16;
+
+      // Upper strap & crown puff out off the wall; bill tip contacts the wall at z=0
+      const zStrap = 0.26;
+      const zCrown = 1.0;
+      const zBrow = 0.66;
+      const zMidBill = 0.24;
+      const zTip = 0.0;
+
+      ctx.moveTo(cx - strapHalfW + dx * zStrap, topY + h * 0.03 + dy * zStrap);
+      ctx.quadraticCurveTo(
+        cx + dx * zStrap,
+        topY - h * 0.015 + dy * zStrap,
+        cx + strapHalfW + dx * zStrap,
+        topY + h * 0.03 + dy * zStrap
+      );
+      ctx.bezierCurveTo(
+        cx + halfW * 0.72 + dx * (zCrown * 0.86),
+        topY + h * 0.06 + dy * (zCrown * 0.86),
+        cx + halfW * 1.04 + dx * zCrown,
+        topY + h * 0.24 + dy * zCrown,
+        cx + halfW + dx * zCrown,
+        topY + h * 0.44 + dy * zCrown
+      );
+      ctx.quadraticCurveTo(
+        cx + halfW * 0.94 + dx * zBrow,
+        crownBotY + dy * zBrow,
+        cx + billHalfW + dx * (zBrow * 0.85),
+        crownBotY + h * 0.04 + dy * (zBrow * 0.85)
+      );
+      // Bill tapers cleanly back into z=0 contact right at the bottom tip!
+      ctx.bezierCurveTo(
+        cx + billHalfW * 1.0 + dx * zMidBill,
+        crownBotY + h * 0.25 + dy * zMidBill,
+        cx + billHalfW * 0.56 + dx * (zTip + 0.04),
+        billBotY + dy * (zTip + 0.04),
+        cx + dx * zTip,
+        billBotY + dy * zTip
+      );
+      ctx.bezierCurveTo(
+        cx - billHalfW * 0.56 + dx * (zTip + 0.04),
+        billBotY + dy * (zTip + 0.04),
+        cx - billHalfW * 1.0 + dx * zMidBill,
+        crownBotY + h * 0.25 + dy * zMidBill,
+        cx - billHalfW + dx * (zBrow * 0.85),
+        crownBotY + h * 0.04 + dy * (zBrow * 0.85)
+      );
+      ctx.quadraticCurveTo(
+        cx - halfW * 0.94 + dx * zBrow,
+        crownBotY + dy * zBrow,
+        cx - halfW + dx * zCrown,
+        topY + h * 0.44 + dy * zCrown
+      );
+      ctx.bezierCurveTo(
+        cx - halfW * 1.04 + dx * zCrown,
+        topY + h * 0.24 + dy * zCrown,
+        cx - halfW * 0.72 + dx * (zCrown * 0.86),
+        topY + h * 0.06 + dy * (zCrown * 0.86),
+        cx - strapHalfW + dx * zStrap,
+        topY + h * 0.03 + dy * zStrap
+      );
+      ctx.closePath();
+    };
+
+    /**
+     * True 3D cast shadow of Josh's exact Casegoods CNC Baltic Birch Hook (from CASEGOODS2_90825123.svg):
+     * Crisp rectilinear rounded-corner L/U-hook profile (straight vertical wall stem -> rounded 90° bottom heel
+     * -> flat horizontal saddle projecting 1.5" off wall -> rounded 90° front turn up into flat vertical front lip
+     * -> rounded 90° inner throat returning to wall stem) + directional shadows for Filson Backpack & Hanging Cap.
      */
     const drawWallHookIsoShadow = (
       gx1: number,
@@ -1050,12 +1593,15 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       m: GridMeta,
       lift: number,
       ox: number,
-      oy: number
+      oy: number,
+      seed = 0,
+      showProps = true
     ) => {
       if (lift <= 0.02) return;
       const cols = Math.max(1, gx2 - gx1 + 1);
       const rows = Math.max(1, gy2 - gy1 + 1);
       const hookW = m.slotW * 0.857;
+      const edgeR = m.slotW * 0.143;
       const upperH = m.slotH * 0.768;
       const lowerH = m.slotH * 1.382;
       const extraH = Math.max(0, rows - 1) * m.pitchY;
@@ -1065,16 +1611,15 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       const upperCy = m.centerY + gy1 * m.pitchY + oy;
       const hy = upperCy + m.slotH * 0.04 - liftOffset;
 
-      // Real 3D wall projection depth of the CNC J-hook (~0.66 of standard single-cell height)
-      const baseH = upperH + lowerH;
-      const depth = baseH * 0.66 * lift;
+      // Exact CAD depth from CASEGOODS2_90825123.svg: 1.50" Z protrusion (2.0 × 3/4" ply thickness)
+      const depth = Math.max(hookW * 2.05, (upperH + lowerH) * 0.62) * lift;
       const projX = (x: number, zFrac: number) => x + depth * zFrac * LIGHT_KX;
       const projY = (yPx: number, zFrac: number) => hy + yPx + depth * zFrac * LIGHT_KY;
 
       ctx.save();
       ctx.beginPath();
 
-      // If multi-column hook rail (cols > 1), include the subtle backplate rail shadow first
+      // Multi-column horizontal mounting rail shadow when cols > 1
       if (cols > 1) {
         const leftCx = m.centerX + gx1 * m.pitchX + ox;
         const rightCx = m.centerX + gx2 * m.pitchX + ox;
@@ -1089,39 +1634,74 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
           railH,
           railDepth * LIGHT_KX,
           railDepth * LIGHT_KY,
-          m.slotW * 0.143
+          edgeR
         );
       }
 
+      // Exact rectilinear rounded-corner Casegoods hook side profile from CASEGOODS2_90825123.svg
+      // (straight vertical stem + rounded 90° lower saddle + flat vertical front catch lip + rounded inner throat)
+      const throatY = bendY + lowerH * 0.52;
+      const lipTopY = bendY + lowerH * 0.06;
       for (let gx = gx1; gx <= gx2; gx++) {
         const cx = m.centerX + gx * m.pitchX + ox;
         const hx = cx - hookW * 0.5;
         const rightEdge = hx + hookW;
 
-        ctx.moveTo(rightEdge, hy);
-        ctx.lineTo(projX(rightEdge, 0.22), projY(upperH * 0.17, 0.22));
-        ctx.lineTo(projX(rightEdge, 0.26), projY(bendY + lowerH * 0.19, 0.26));
+        ctx.moveTo(rightEdge, hy + edgeR);
+        // Upper mortise stem stepping straight out of wall with crisp 1/8" corner roundover
         ctx.quadraticCurveTo(
-          projX(rightEdge, 0.44),
-          projY(bendY + lowerH * 0.5, 0.44),
-          projX(rightEdge, 0.68),
-          projY(bendY + lowerH * 0.31, 0.68)
+          projX(rightEdge, 0.2),
+          projY(0, 0.2),
+          projX(rightEdge, 0.22),
+          projY(edgeR * 1.4, 0.22)
         );
+        // Inner vertical wall of hook dropping straight down into the rounded 90° inner throat
+        ctx.lineTo(projX(rightEdge, 0.22), projY(throatY - edgeR * 1.4, 0.22));
         ctx.quadraticCurveTo(
-          projX(rightEdge, 0.94),
-          projY(bendY - lowerH * 0.06, 0.94),
+          projX(rightEdge, 0.22),
+          projY(throatY, 0.22),
+          projX(rightEdge, 0.34),
+          projY(throatY, 0.34)
+        );
+        // Flat horizontal inner throat ledge turning cleanly up into inner face of front catch lip
+        ctx.lineTo(projX(rightEdge, 0.52), projY(throatY, 0.52));
+        ctx.quadraticCurveTo(
+          projX(rightEdge, 0.62),
+          projY(throatY, 0.62),
+          projX(rightEdge, 0.62),
+          projY(throatY - edgeR * 1.4, 0.62)
+        );
+        // Inner vertical face of upturned front catch lip rising to rounded top face
+        ctx.lineTo(projX(rightEdge, 0.62), projY(lipTopY + edgeR, 0.62));
+        ctx.quadraticCurveTo(
+          projX(rightEdge, 0.62),
+          projY(lipTopY, 0.62),
+          projX(rightEdge, 0.72),
+          projY(lipTopY, 0.72)
+        );
+        // Flat top of front catch lip -> rounded 90° top-front corner (1/8" roundover)
+        ctx.lineTo(projX(rightEdge, 0.9), projY(lipTopY, 0.9));
+        ctx.quadraticCurveTo(
           projX(rightEdge, 1.0),
-          projY(bendY + lowerH * 0.01, 1.0)
+          projY(lipTopY, 1.0),
+          projX(rightEdge, 1.0),
+          projY(lipTopY + edgeR * 1.4, 1.0)
         );
+        // Straight vertical outer front face descending to generously rounded 90° bottom-front corner
+        ctx.lineTo(projX(rightEdge, 1.0), projY(totalH - edgeR * 2.4, 1.0));
         ctx.quadraticCurveTo(
-          projX(rightEdge, 1.04),
-          projY(bendY + lowerH * 0.41, 1.04),
-          projX(rightEdge, 0.82),
-          projY(bendY + lowerH * 0.75, 0.82)
+          projX(rightEdge, 1.0),
+          projY(totalH, 1.0),
+          projX(rightEdge, 0.8),
+          projY(totalH, 0.8)
         );
-        ctx.lineTo(projX(hx, 0.42), projY(totalH - lowerH * 0.03, 0.42));
-        ctx.lineTo(hx, hy + totalH);
-        ctx.lineTo(hx, hy);
+        // Flat horizontal underside saddle returning cleanly to rounded bottom-back heel at wall (z=0)
+        ctx.lineTo(projX(hx, 0.26), projY(totalH, 0.26));
+        ctx.quadraticCurveTo(hx, hy + totalH, hx, hy + totalH - edgeR * 1.8);
+        ctx.lineTo(hx, hy + edgeR);
+        ctx.quadraticCurveTo(hx, hy, hx + edgeR, hy);
+        ctx.lineTo(rightEdge - edgeR, hy);
+        ctx.quadraticCurveTo(rightEdge, hy, rightEdge, hy + edgeR);
         ctx.closePath();
       }
 
@@ -1131,11 +1711,51 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
         firstHx,
         hy,
         projX(lastRight, 1.0),
-        projY(totalH, 0.85),
+        projY(totalH, 1.0),
         lift,
         5
       );
       ctx.restore();
+
+      // Directional cast shadows for real-scale Filson Backpack & Backstrap-Hanging Cap (bill touching wall)
+      if (showProps) {
+        const props = getHookPropsLayout(gx1, gx2, gy1, gy2, m, lift, ox, oy, seed);
+        if (props.length > 0) {
+          ctx.save();
+          ctx.beginPath();
+          let minX = Infinity;
+          let minY = Infinity;
+          let maxX = -Infinity;
+          let maxY = -Infinity;
+
+          for (const p of props) {
+            const pdx = p.depth * LIGHT_KX;
+            const pdy = p.depth * LIGHT_KY;
+            if (p.kind === 'hat') {
+              // Hat cast shadow: puffed crown projects off wall while lower curved bill touches wall at z=0
+              appendHatWallContactShadow(p.cx, p.topY, p.w, p.h, pdx, pdy);
+              appendHatWallContactShadow(p.cx, p.topY, p.w * 0.96, p.h * 0.99, pdx * 0.48, pdy * 0.48);
+            } else {
+              appendHookPropSilhouette('backpack', p.cx + pdx, p.topY + pdy, p.w, p.h);
+              appendHookPropSilhouette(
+                'backpack',
+                p.cx + pdx * 0.45,
+                p.topY + pdy * 0.45,
+                p.w * 0.96,
+                p.h * 0.98
+              );
+            }
+
+            minX = Math.min(minX, p.cx - p.w * 0.58);
+            minY = Math.min(minY, p.topY);
+            maxX = Math.max(maxX, p.cx + p.w * 0.58 + pdx);
+            maxY = Math.max(maxY, p.topY + p.h + pdy);
+          }
+
+          fillDirectionalCastShadow(minX, minY, maxX, maxY, lift, 8);
+          ctx.restore();
+        }
+      }
     };
 
     /**
@@ -1173,8 +1793,120 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
     };
 
     /**
-     * True 3D cast shadow of the Shelf + Closet Rod under upper-left directional light:
-     * twin protruding cheek brackets + deep horizontal shelf overhang + detached floating chrome rod shadow.
+     * Pure 2D Orthographic + True 3D Wall-Shadow Layout for Minimal Clothing Hangers on Shelf + Rod.
+     * Assumes standard closet rod diameter = 1.3125" (pxPerInch = rodDiam / 1.3125).
+     * Front elevation displays razor-simple perpendicular 2D edge-on hangers, while the wall cast shadow
+     * reveals the full 3D open-triangle hanger geometry projected strictly along (LIGHT_KX, LIGHT_KY).
+     */
+    const getShelfHangersLayout = (
+      innerLeft: number,
+      innerRight: number,
+      rodTopY: number,
+      rodBotY: number,
+      rodDiam: number,
+      rodDepth: number,
+      grainSeed: number
+    ) => {
+      const innerSpan = Math.max(0, innerRight - innerLeft);
+      const pxPerInch = rodDiam / 1.3125;
+      if (innerSpan < pxPerInch * 5.2 || pxPerInch <= 1.2) {
+        return {
+          pxPerInch,
+          hookStroke: 1.5,
+          edgeW: 4,
+          barThick: 3,
+          hangers: [] as Array<{
+            hx: number;
+            hookApexY: number;
+            neckBotY: number;
+            shoulderY: number;
+            barY: number;
+            zBack: number;
+            zFront: number;
+            zRod: number;
+          }>,
+        };
+      }
+
+      const seeded = (salt: number) => {
+        const s = Math.sin(grainSeed * 12.9898 + salt * 78.233) * 43758.5453;
+        return s - Math.floor(s);
+      };
+
+      const count =
+        innerSpan >= pxPerInch * 28
+          ? 6
+          : innerSpan >= pxPerInch * 22
+            ? 5
+            : innerSpan >= pxPerInch * 16.5
+              ? 4
+              : 3;
+      const mirror = Math.abs(Math.round(grainSeed)) % 2 === 1;
+      const baseFracs =
+        count === 6
+          ? mirror
+            ? [0.16, 0.28, 0.42, 0.56, 0.69, 0.82]
+            : [0.18, 0.31, 0.44, 0.58, 0.72, 0.84]
+          : count === 5
+            ? mirror
+              ? [0.19, 0.34, 0.5, 0.66, 0.8]
+              : [0.21, 0.36, 0.52, 0.67, 0.82]
+            : count === 4
+              ? mirror
+                ? [0.24, 0.39, 0.56, 0.72]
+                : [0.28, 0.44, 0.61, 0.76]
+              : mirror
+                ? [0.3, 0.48, 0.67]
+                : [0.33, 0.52, 0.7];
+
+      const hookStroke = Math.max(0.95, Math.min(2.1, pxPerInch * 0.14));
+      const edgeW = Math.max(2.4, Math.min(6.2, pxPerInch * 0.38));
+      const barThick = Math.max(1.5, Math.min(3.8, pxPerInch * 0.25));
+
+      const hookApexY = rodTopY - pxPerInch * 0.44;
+      const neckBotY = rodBotY + pxPerInch * 0.96;
+      const shoulderY = neckBotY + pxPerInch * 2.55;
+      const barY = neckBotY + pxPerInch * 3.35;
+
+      // Full 3D perpendicular hanger span along Z (clamped cleanly in front of wall z > 0)
+      const halfZ = rodDepth * 0.85;
+      const margin = Math.max(pxPerInch * 1.6, 8);
+
+      const hangers: Array<{
+        hx: number;
+        hookApexY: number;
+        neckBotY: number;
+        shoulderY: number;
+        barY: number;
+        zBack: number;
+        zFront: number;
+        zRod: number;
+      }> = [];
+
+      for (let i = 0; i < baseFracs.length; i++) {
+        const jitter = (seeded(i * 11 + 3) - 0.5) * 0.032;
+        const rawX = innerLeft + innerSpan * (baseFracs[i] + jitter);
+        const hx = Math.max(innerLeft + margin, Math.min(innerRight - margin, rawX));
+
+        hangers.push({
+          hx,
+          hookApexY,
+          neckBotY,
+          shoulderY,
+          barY,
+          zBack: rodDepth - halfZ,
+          zFront: rodDepth + halfZ,
+          zRod: rodDepth,
+        });
+      }
+
+      return { pxPerInch, hookStroke, edgeW, barThick, hangers };
+    };
+
+    /**
+     * True 3D cast shadow of the Shelf + Closet Rod (+ optional minimal clothing hangers) under upper-left directional light:
+     * twin protruding cheek brackets + deep horizontal shelf overhang + detached floating chrome rod shadow
+     * + full 3D open-triangle hanger shadows unfolding along the exact (LIGHT_KX, LIGHT_KY) light vector.
      */
     const drawShelfIsoShadow = (
       gx1: number,
@@ -1184,7 +1916,9 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       m: GridMeta,
       lift: number,
       ox: number,
-      oy: number
+      oy: number,
+      seed = 0,
+      showProps = true
     ) => {
       if (lift <= 0.02) return;
       const t = m.slotW * 0.857;
@@ -1193,6 +1927,7 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       const rightCx = m.centerX + gx2 * m.pitchX + ox;
       const upperCy = m.centerY + gy1 * m.pitchY + oy;
       const lowerCy = m.centerY + gy2 * m.pitchY + oy;
+      const grainSeed = seed || gx1 * 7 + gx2 * 13 + gy1 * 19 + gy2 * 23;
 
       const liftOffset = (1 - lift) * 6;
       const topY = upperCy + m.slotH * 0.04 - liftOffset;
@@ -1222,12 +1957,12 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       ctx.save();
       ctx.beginPath();
 
-      // 1. Left & right protruding vertical cheek bracket shadows
-      appendExtrudedBoxShadowPath(leftX, topY, t, bracketH, dx, dy, r * 2.2);
-      appendExtrudedBoxShadowPath(rightX, topY, t, bracketH, dx, dy, r * 2.2);
+      // 1. Left & right protruding vertical cheek bracket shadows (consistent 1/8" edge rounding)
+      appendExtrudedBoxShadowPath(leftX, topY, t, bracketH, dx, dy, r);
+      appendExtrudedBoxShadowPath(rightX, topY, t, bracketH, dx, dy, r);
 
       // 2. Deep horizontal shelf board overhang shadow (from wall z=0 to front edge z=shelfDepth)
-      appendExtrudedBoxShadowPath(leftCx, shelfTopY, shelfFullW, shelfH, dx, dy, 0);
+      appendExtrudedBoxShadowPath(leftCx, shelfTopY, shelfFullW, shelfH, dx, dy, r * 0.6);
 
       // 3. Detached cylindrical chrome closet rod shadow floating cleanly out at z=rodDepth
       if (innerSpan > 1) {
@@ -1250,6 +1985,103 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
         7
       );
       ctx.restore();
+
+      // 4. Minimal Clothing Hangers — Wall Shadow Displays Full 3D Open-Triangle Hanger Profile Along Exact (LIGHT_KX, LIGHT_KY)
+      if (showProps && innerSpan > 12) {
+        const layout = getShelfHangersLayout(
+          innerLeft,
+          innerRight,
+          rodTopY,
+          rodBotY,
+          rodDiam,
+          rodDepth,
+          grainSeed
+        );
+
+        if (layout.hangers.length > 0) {
+          const projX = (x: number, z: number) => x + z * LIGHT_KX;
+          const projY = (y: number, z: number) => y + z * LIGHT_KY;
+
+          ctx.save();
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.shadowColor = `rgba(18, 20, 24, ${(0.1 * lift).toFixed(3)})`;
+          ctx.shadowBlur = 5.5;
+          ctx.shadowOffsetX = 1.2 * lift;
+          ctx.shadowOffsetY = 1.6 * lift;
+
+          const firstH = layout.hangers[0];
+          const lastH = layout.hangers[layout.hangers.length - 1];
+          const shGrad = ctx.createLinearGradient(
+            projX(firstH.hx, firstH.zBack),
+            projY(firstH.hookApexY, firstH.zRod),
+            projX(lastH.hx, lastH.zFront),
+            projY(lastH.barY, lastH.zFront)
+          );
+          shGrad.addColorStop(0, `rgba(18, 20, 24, ${(0.2 * lift).toFixed(3)})`);
+          shGrad.addColorStop(0.55, `rgba(18, 20, 24, ${(0.135 * lift).toFixed(3)})`);
+          shGrad.addColorStop(1, `rgba(18, 20, 24, ${(0.075 * lift).toFixed(3)})`);
+          ctx.strokeStyle = shGrad;
+
+          // Curved wire hook + neck shadow hooking seamlessly over the floating chrome rod shadow
+          ctx.beginPath();
+          for (const h of layout.hangers) {
+            const hookZBack = h.zRod - rodDiam * 0.45;
+            const hookZFront = h.zRod + rodDiam * 0.45;
+            const apexSX = projX(h.hx, h.zRod);
+            const apexSY = projY(h.hookApexY, h.zRod);
+            const rodTopBackSX = projX(h.hx, hookZBack);
+            const rodTopBackSY = projY(rodTopY + rodDiam * 0.28, hookZBack);
+            const rodMidFrontSX = projX(h.hx, hookZFront);
+            const rodMidFrontSY = projY(rodTopY + rodDiam * 0.62, hookZFront);
+            const neckBotSX = projX(h.hx, h.zRod);
+            const neckBotSY = projY(h.neckBotY, h.zRod);
+
+            ctx.moveTo(rodTopBackSX, rodTopBackSY);
+            ctx.quadraticCurveTo(apexSX, apexSY - 1.5, rodMidFrontSX, rodMidFrontSY);
+            ctx.quadraticCurveTo(neckBotSX, projY(rodBotY, h.zRod), neckBotSX, neckBotSY);
+          }
+          ctx.lineWidth = Math.max(1.4, layout.hookStroke * 0.95);
+          ctx.stroke();
+
+          // True 3D perpendicular hanger triangle shadow (bottom bar runs 100% parallel to LIGHT_KX, LIGHT_KY)
+          ctx.beginPath();
+          for (const h of layout.hangers) {
+            const ax = projX(h.hx, h.zRod);
+            const ay = projY(h.neckBotY, h.zRod);
+            const bShoulderX = projX(h.hx, h.zBack);
+            const bShoulderY = projY(h.shoulderY, h.zBack);
+            const bx = projX(h.hx, h.zBack);
+            const by = projY(h.barY, h.zBack);
+            const fShoulderX = projX(h.hx, h.zFront);
+            const fShoulderY = projY(h.shoulderY, h.zFront);
+            const fx = projX(h.hx, h.zFront);
+            const fy = projY(h.barY, h.zFront);
+
+            ctx.moveTo(ax, ay);
+            ctx.quadraticCurveTo(
+              (ax + bShoulderX) * 0.5,
+              ay + (bShoulderY - ay) * 0.35,
+              bShoulderX,
+              bShoulderY
+            );
+            ctx.quadraticCurveTo(bx, by, bx + (fx - bx) * 0.08, by + (fy - by) * 0.08);
+            ctx.lineTo(fx - (fx - bx) * 0.08, fy - (fy - by) * 0.08);
+            ctx.quadraticCurveTo(fx, fy, fShoulderX, fShoulderY);
+            ctx.quadraticCurveTo(
+              (ax + fShoulderX) * 0.5,
+              ay + (fShoulderY - ay) * 0.35,
+              ax,
+              ay
+            );
+            ctx.closePath();
+          }
+          ctx.lineWidth = Math.max(2.0, layout.barThick * 0.9);
+          ctx.stroke();
+
+          ctx.restore();
+        }
+      }
     };
 
     /**
@@ -1272,7 +2104,7 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       const upperCy = m.centerY + gy1 * m.pitchY + oy;
       const lowerCy = m.centerY + gy2 * m.pitchY + oy;
 
-      const t = Math.max(7.5, Math.min(11.5, m.pitchX * 0.145));
+      const t = m.slotW * 0.857;
       const liftOffset = (1 - lift) * 7;
       const leftX = leftCx - t * 0.5;
       const rightX = rightCx + t * 0.5;
@@ -1286,9 +2118,10 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       const dx = cabDepth * LIGHT_KX;
       const dy = cabDepth * LIGHT_KY;
 
+      const edgeR = m.slotW * 0.143;
       ctx.save();
       ctx.beginPath();
-      appendExtrudedBoxShadowPath(leftX, topY, cabW, cabH, dx, dy, 0);
+      appendExtrudedBoxShadowPath(leftX, topY, cabW, cabH, dx, dy, edgeR);
       fillDirectionalCastShadow(
         leftX + cabW * 0.2,
         topY + cabH * 0.2,
@@ -1310,7 +2143,8 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       ox: number,
       oy: number,
       isGhost: boolean,
-      seed = 0
+      seed = 0,
+      showProps = true
     ) => {
       const cols = Math.max(1, gx2 - gx1 + 1);
       const rows = Math.max(1, gy2 - gy1 + 1);
@@ -1357,7 +2191,7 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
         ctx.stroke();
       }
 
-      // Individual CNC-cut 13-ply Baltic Birch J-hooks at each column in gx1..gx2
+      // Individual CNC-cut 13-ply Baltic Birch architectural hooks at each column in gx1..gx2
       for (let gx = gx1; gx <= gx2; gx++) {
         const cx = m.centerX + gx * m.pitchX + ox;
         const hx = cx - hookW * 0.5;
@@ -1395,14 +2229,356 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
         ctx.lineWidth = isGhost ? 1.5 : 1.85;
         ctx.stroke();
 
-        // Horizontal bend transition crease between upper neck & lower hook edge
+        // Horizontal bend transition crease with crisp 1/8" edge-roundover corners (per CASEGOODS2_90825123.svg)
         ctx.setLineDash([]);
         ctx.beginPath();
-        ctx.moveTo(hx, seamY);
-        ctx.lineTo(hx + hookW, seamY);
+        ctx.moveTo(hx, seamY + r);
+        ctx.quadraticCurveTo(hx, seamY, hx + r, seamY);
+        ctx.lineTo(hx + hookW - r, seamY);
+        ctx.quadraticCurveTo(hx + hookW, seamY, hx + hookW, seamY + r);
         ctx.strokeStyle = COLORS.black;
         ctx.lineWidth = isGhost ? 1.2 : 1.65;
         ctx.stroke();
+      }
+
+      // Optional Simplified Architectural Props (Real-Scale Filson Camo Roll-Top Backpack & Backstrap-Hanging Cap)
+      if (showProps) {
+        const props = getHookPropsLayout(gx1, gx2, gy1, gy2, m, lift, ox, oy, seed);
+        for (const p of props) {
+          ctx.save();
+          if (isGhost) {
+            ctx.setLineDash([4, 3]);
+          }
+
+          if (p.kind === 'backpack') {
+            const x = p.cx - p.w * 0.5;
+            const y = p.topY;
+            const rollH = p.h * 0.145;
+
+            // Khaki canvas webbing haul loop hooking cleanly over the Baltic Birch hook peg
+            const loopW = Math.max(hookW * 1.45, p.w * 0.24);
+            const loopTopY = p.anchorY - Math.max(2, lowerH * 0.12);
+            ctx.beginPath();
+            ctx.moveTo(p.cx - loopW * 0.48, y + 3);
+            ctx.quadraticCurveTo(p.cx - loopW * 0.52, loopTopY, p.cx, loopTopY);
+            ctx.quadraticCurveTo(p.cx + loopW * 0.52, loopTopY, p.cx + loopW * 0.48, y + 3);
+            ctx.strokeStyle = isGhost ? 'rgba(0, 0, 0, 0.7)' : COLORS.black;
+            ctx.lineWidth = Math.max(4.0, p.w * 0.056);
+            ctx.lineCap = 'round';
+            ctx.stroke();
+            if (!isGhost) {
+              ctx.strokeStyle = '#B8A382';
+              ctx.lineWidth = Math.max(2.1, p.w * 0.032);
+              ctx.stroke();
+            }
+
+            // Minimal side compression buckle tabs peeking at mid-lower sides
+            if (!isGhost) {
+              const tabW = Math.max(3.2, p.w * 0.048);
+              const tabH = Math.max(6, p.h * 0.055);
+              ctx.fillStyle = '#B8A382';
+              ctx.strokeStyle = COLORS.black;
+              ctx.lineWidth = 1.05;
+              drawRoundRect(x - tabW * 0.65, y + p.h * 0.56, tabW, tabH, 1.4);
+              ctx.fill();
+              ctx.stroke();
+              drawRoundRect(x + p.w - tabW * 0.35, y + p.h * 0.56, tabW, tabH, 1.4);
+              ctx.fill();
+              ctx.stroke();
+            }
+
+            // Main Filson Roll-Top Backpack Silhouette — Warm Khaki Canvas Base
+            ctx.beginPath();
+            appendHookPropSilhouette('backpack', p.cx, y, p.w, p.h);
+            ctx.fillStyle = isGhost ? '#DDD6C3' : '#C8BD9F';
+            ctx.fill();
+
+            if (!isGhost) {
+              ctx.save();
+              ctx.clip();
+
+              // Clean Simplified Organic Duck-Hunter Camo Pattern (Plant-style crisp vector shapes, zero noisy clutter)
+              const drawCamoBlob = (
+                bx: number,
+                by: number,
+                rx: number,
+                ry: number,
+                rot: number,
+                color: string
+              ) => {
+                ctx.save();
+                ctx.translate(bx, by);
+                ctx.rotate(rot);
+                ctx.beginPath();
+                ctx.moveTo(-rx * 0.85, -ry * 0.15);
+                ctx.bezierCurveTo(-rx * 0.95, -ry * 0.95, rx * 0.25, -ry * 1.05, rx * 0.78, -ry * 0.45);
+                ctx.bezierCurveTo(rx * 1.15, ry * 0.05, rx * 0.72, ry * 0.98, rx * 0.05, ry * 0.85);
+                ctx.bezierCurveTo(-rx * 0.48, ry * 0.75, -rx * 0.78, ry * 0.42, -rx * 0.85, -ry * 0.15);
+                ctx.closePath();
+                ctx.fillStyle = color;
+                ctx.fill();
+                ctx.restore();
+              };
+
+              // Olive-sage camo shapes
+              drawCamoBlob(p.cx - p.w * 0.28, y + p.h * 0.24, p.w * 0.24, p.h * 0.095, -0.35, '#686C52');
+              drawCamoBlob(p.cx + p.w * 0.26, y + p.h * 0.42, p.w * 0.25, p.h * 0.105, 0.4, '#686C52');
+              drawCamoBlob(p.cx - p.w * 0.24, y + p.h * 0.72, p.w * 0.23, p.h * 0.11, -0.22, '#686C52');
+              drawCamoBlob(p.cx + p.w * 0.22, y + p.h * 0.85, p.w * 0.21, p.h * 0.09, 0.3, '#686C52');
+              drawCamoBlob(p.cx + p.w * 0.04, y + p.h * 0.07, p.w * 0.2, p.h * 0.06, 0.12, '#686C52');
+
+              // Espresso bark-brown camo shapes
+              drawCamoBlob(p.cx + p.w * 0.3, y + p.h * 0.18, p.w * 0.19, p.h * 0.085, 0.25, '#463A31');
+              drawCamoBlob(p.cx - p.w * 0.18, y + p.h * 0.46, p.w * 0.21, p.h * 0.085, -0.45, '#463A31');
+              drawCamoBlob(p.cx + p.w * 0.28, y + p.h * 0.66, p.w * 0.18, p.h * 0.095, 0.5, '#463A31');
+              drawCamoBlob(p.cx - p.w * 0.32, y + p.h * 0.88, p.w * 0.18, p.h * 0.085, -0.3, '#463A31');
+
+              // Warm Filson rust-sienna camo accents
+              drawCamoBlob(p.cx - p.w * 0.34, y + p.h * 0.08, p.w * 0.16, p.h * 0.065, 0.22, '#844732');
+              drawCamoBlob(p.cx + p.w * 0.36, y + p.h * 0.07, p.w * 0.16, p.h * 0.06, -0.28, '#844732');
+              drawCamoBlob(p.cx - p.w * 0.02, y + p.h * 0.34, p.w * 0.17, p.h * 0.075, 0.35, '#844732');
+              drawCamoBlob(p.cx + p.w * 0.12, y + p.h * 0.56, p.w * 0.17, p.h * 0.08, -0.32, '#844732');
+              drawCamoBlob(p.cx - p.w * 0.22, y + p.h * 0.62, p.w * 0.15, p.h * 0.07, 0.42, '#844732');
+              drawCamoBlob(p.cx + p.w * 0.02, y + p.h * 0.82, p.w * 0.16, p.h * 0.075, -0.18, '#844732');
+
+              // Subtle dark espresso canvas bottom base reinforcement band
+              ctx.fillStyle = '#463A31';
+              ctx.fillRect(p.cx - p.w * 0.6, y + p.h * 0.91, p.w * 1.2, p.h * 0.12);
+
+              // Subtle plant-style upper-left studio highlight & lower-right depth shading
+              const packShade = ctx.createLinearGradient(x, y, x + p.w, y + p.h);
+              packShade.addColorStop(0.0, 'rgba(255, 255, 255, 0.14)');
+              packShade.addColorStop(0.5, 'rgba(0, 0, 0, 0)');
+              packShade.addColorStop(1.0, 'rgba(0, 0, 0, 0.16)');
+              ctx.fillStyle = packShade;
+              ctx.fillRect(p.cx - p.w * 0.6, y, p.w * 1.2, p.h);
+
+              // Crisp horizontal roll-top collar fold line & subtle under-fold shadow
+              ctx.fillStyle = 'rgba(0, 0, 0, 0.14)';
+              ctx.fillRect(p.cx - p.w * 0.56, y + rollH * 1.02, p.w * 1.12, Math.max(2.5, p.h * 0.022));
+              ctx.beginPath();
+              ctx.moveTo(p.cx - p.w * 0.52, y + rollH * 1.04);
+              ctx.quadraticCurveTo(p.cx, y + rollH * 1.22, p.cx + p.w * 0.52, y + rollH * 1.04);
+              ctx.strokeStyle = COLORS.black;
+              ctx.lineWidth = 1.2;
+              ctx.stroke();
+
+              // Signature Filson center vertical khaki webbing compression strap (over roll-top down to front pocket)
+              const strapW = Math.max(7, p.w * 0.145);
+              const strapX = p.cx - strapW * 0.5;
+              const strapTopY = y - 1;
+              const strapBotY = y + p.h * 0.55;
+              ctx.fillStyle = '#B8A382';
+              ctx.fillRect(strapX, strapTopY, strapW, strapBotY - strapTopY);
+              ctx.strokeStyle = COLORS.black;
+              ctx.lineWidth = 1.1;
+              ctx.strokeRect(strapX, strapTopY, strapW, strapBotY - strapTopY);
+
+              // Signature burnt-orange horizontal bartack stitch near lower end of compression strap
+              const bartackY = strapBotY - Math.max(5, p.h * 0.055);
+              ctx.beginPath();
+              ctx.moveTo(strapX + 1.2, bartackY);
+              ctx.lineTo(strapX + strapW - 1.2, bartackY);
+              ctx.strokeStyle = '#D46A3C';
+              ctx.lineWidth = 1.4;
+              ctx.stroke();
+
+              // Minimal CAD metal ladder-lock buckle bars on upper compression strap
+              const bklH = Math.max(5.5, p.h * 0.052);
+              const bklY = y + rollH * 0.22;
+              drawRoundRect(strapX - 1.2, bklY, strapW + 2.4, bklH, 1.5);
+              ctx.fillStyle = '#CFC8B8';
+              ctx.fill();
+              ctx.strokeStyle = COLORS.black;
+              ctx.lineWidth = 1.05;
+              ctx.stroke();
+              ctx.beginPath();
+              ctx.moveTo(strapX - 0.8, bklY + bklH * 0.5);
+              ctx.lineTo(strapX + strapW + 0.8, bklY + bklH * 0.5);
+              ctx.stroke();
+
+              // Structured lower front pocket with subtle shadow + curved khaki-trimmed V-flap & snap
+              const pktW = p.w * 0.74;
+              const pktH = p.h * 0.39;
+              const pktX = p.cx - pktW * 0.5;
+              const pktY = y + p.h * 0.52;
+              const pktR = Math.max(3, p.w * 0.05);
+
+              // Subtle cast shadow under pocket perimeter
+              ctx.fillStyle = 'rgba(0, 0, 0, 0.14)';
+              drawRoundRect(pktX + 1.5, pktY + 2.5, pktW, pktH, pktR);
+              ctx.fill();
+
+              // Pocket body (base camo visible inside + crisp architectural outline)
+              drawRoundRect(pktX, pktY, pktW, pktH, pktR);
+              ctx.fillStyle = 'rgba(200, 189, 159, 0.22)';
+              ctx.fill();
+              ctx.strokeStyle = COLORS.black;
+              ctx.lineWidth = 1.15;
+              ctx.stroke();
+
+              // Iconic curved V-shaped Filson pocket top flap with khaki cotton binding trim
+              const flapBotY = pktY + pktH * 0.34;
+              ctx.beginPath();
+              ctx.moveTo(pktX, pktY + 1);
+              ctx.quadraticCurveTo(p.cx, pktY - pktH * 0.05, pktX + pktW, pktY + 1);
+              ctx.lineTo(pktX + pktW, pktY + pktH * 0.14);
+              ctx.quadraticCurveTo(p.cx, flapBotY + pktH * 0.14, pktX, pktY + pktH * 0.14);
+              ctx.closePath();
+              ctx.fillStyle = 'rgba(0, 0, 0, 0.12)';
+              ctx.fill();
+
+              // Khaki binding edge along curved V-flap bottom
+              ctx.beginPath();
+              ctx.moveTo(pktX, pktY + pktH * 0.12);
+              ctx.quadraticCurveTo(p.cx, flapBotY + pktH * 0.12, pktX + pktW, pktY + pktH * 0.12);
+              ctx.strokeStyle = '#B8A382';
+              ctx.lineWidth = Math.max(2.8, p.w * 0.036);
+              ctx.stroke();
+              ctx.strokeStyle = COLORS.black;
+              ctx.lineWidth = 1.1;
+              ctx.stroke();
+
+              // Centered matte snap button on pocket flap
+              ctx.beginPath();
+              ctx.arc(p.cx, pktY + pktH * 0.16, Math.max(2.1, p.w * 0.028), 0, Math.PI * 2);
+              ctx.fillStyle = '#8F876F';
+              ctx.fill();
+              ctx.strokeStyle = COLORS.black;
+              ctx.lineWidth = 0.95;
+              ctx.stroke();
+
+              ctx.restore();
+            }
+
+            // Crisp architectural black CAD ink outline
+            ctx.beginPath();
+            appendHookPropSilhouette('backpack', p.cx, y, p.w, p.h);
+            ctx.strokeStyle = isGhost ? 'rgba(0, 0, 0, 0.72)' : COLORS.black;
+            ctx.lineWidth = isGhost ? 1.0 : 1.4;
+            ctx.stroke();
+          } else {
+            // Backstrap-Hanging Cap (matching IMG_5141 scale & pose: hanging from rear strap, curved bill touching wall)
+            const halfW = p.w * 0.5;
+            const y = p.topY;
+            const crownBotY = y + p.h * 0.6;
+            const billHalfW = p.w * 0.39;
+            const billBotY = y + p.h;
+
+            // Rear adjustment backstrap arch hooking visibly over the Baltic Birch hook peg
+            const strapW = Math.max(hookW * 1.15, p.w * 0.24);
+            const strapTopY = p.anchorY - Math.max(2.5, lowerH * 0.1);
+            ctx.beginPath();
+            ctx.moveTo(p.cx - strapW * 0.5, y + p.h * 0.08);
+            ctx.quadraticCurveTo(p.cx - strapW * 0.52, strapTopY, p.cx, strapTopY);
+            ctx.quadraticCurveTo(p.cx + strapW * 0.52, strapTopY, p.cx + strapW * 0.5, y + p.h * 0.08);
+            ctx.strokeStyle = isGhost ? 'rgba(0, 0, 0, 0.7)' : COLORS.black;
+            ctx.lineWidth = Math.max(3.2, p.w * 0.052);
+            ctx.lineCap = 'round';
+            ctx.stroke();
+            if (!isGhost) {
+              ctx.strokeStyle = '#383A40';
+              ctx.lineWidth = Math.max(1.5, p.w * 0.026);
+              ctx.stroke();
+            }
+
+            // Full hanging cap silhouette filled in simplified matte deep charcoal (matching IMG_5141)
+            ctx.beginPath();
+            appendHookPropSilhouette('hat', p.cx, y, p.w, p.h);
+            ctx.fillStyle = isGhost ? '#7C7E82' : '#2E3034';
+            ctx.fill();
+
+            if (!isGhost) {
+              ctx.save();
+              ctx.clip();
+
+              // Soft upper-left studio dome highlight & lower-right volume shade (same graphic polish as plant)
+              const crownGrad = ctx.createLinearGradient(
+                p.cx - halfW,
+                y,
+                p.cx + halfW,
+                crownBotY
+              );
+              crownGrad.addColorStop(0.0, 'rgba(255, 255, 255, 0.14)');
+              crownGrad.addColorStop(0.45, 'rgba(255, 255, 255, 0.03)');
+              crownGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0.24)');
+              ctx.fillStyle = crownGrad;
+              ctx.fillRect(p.cx - halfW - 4, y, p.w + 8, p.h * 0.68);
+
+              // Subtle dark rear keyhole cutout right beneath the backstrap where it meets the crown
+              ctx.beginPath();
+              ctx.ellipse(p.cx, y + p.h * 0.055, strapW * 0.34, p.h * 0.038, 0, 0, Math.PI * 2);
+              ctx.fillStyle = '#18191C';
+              ctx.fill();
+
+              // Downward-pointing curved visor/bill panel resting flush against the wall
+              ctx.beginPath();
+              ctx.moveTo(p.cx - halfW, crownBotY - p.h * 0.02);
+              ctx.quadraticCurveTo(p.cx, crownBotY + p.h * 0.11, p.cx + halfW, crownBotY - p.h * 0.02);
+              ctx.lineTo(p.cx + halfW, billBotY + 4);
+              ctx.lineTo(p.cx - halfW, billBotY + 4);
+              ctx.closePath();
+              ctx.fillStyle = '#202125';
+              ctx.fill();
+
+              // Crisp curved brow-to-bill transition seam
+              ctx.beginPath();
+              ctx.moveTo(p.cx - halfW * 0.94, crownBotY - p.h * 0.01);
+              ctx.quadraticCurveTo(p.cx, crownBotY + p.h * 0.11, p.cx + halfW * 0.94, crownBotY - p.h * 0.01);
+              ctx.strokeStyle = 'rgba(0, 0, 0, 0.85)';
+              ctx.lineWidth = 1.25;
+              ctx.stroke();
+
+              // Subtle curved stitching arc on the downward bill
+              ctx.beginPath();
+              ctx.moveTo(p.cx - billHalfW * 0.78, crownBotY + p.h * 0.17);
+              ctx.quadraticCurveTo(p.cx, billBotY - p.h * 0.055, p.cx + billHalfW * 0.78, crownBotY + p.h * 0.17);
+              ctx.strokeStyle = 'rgba(255, 255, 255, 0.14)';
+              ctx.lineWidth = 0.85;
+              ctx.stroke();
+
+              // 6-panel crown seams radiating gently from the crown button (~35% down from top backstrap)
+              const btnY = y + p.h * 0.34;
+              ctx.beginPath();
+              // Back panel seams up toward backstrap
+              ctx.moveTo(p.cx, btnY);
+              ctx.quadraticCurveTo(p.cx - halfW * 0.24, y + p.h * 0.18, p.cx - strapW * 0.45, y + p.h * 0.05);
+              ctx.moveTo(p.cx, btnY);
+              ctx.quadraticCurveTo(p.cx + halfW * 0.24, y + p.h * 0.18, p.cx + strapW * 0.45, y + p.h * 0.05);
+              // Side panel seams sweeping to left & right crown edges
+              ctx.moveTo(p.cx, btnY);
+              ctx.quadraticCurveTo(p.cx - halfW * 0.56, btnY + p.h * 0.05, p.cx - halfW * 0.96, crownBotY - p.h * 0.06);
+              ctx.moveTo(p.cx, btnY);
+              ctx.quadraticCurveTo(p.cx + halfW * 0.56, btnY + p.h * 0.05, p.cx + halfW * 0.96, crownBotY - p.h * 0.06);
+              // Center front seam running down to the curved brow
+              ctx.moveTo(p.cx, btnY);
+              ctx.lineTo(p.cx, crownBotY + p.h * 0.05);
+              ctx.strokeStyle = 'rgba(255, 255, 255, 0.16)';
+              ctx.lineWidth = 0.85;
+              ctx.stroke();
+
+              // Minimal crown apex button seated naturally on the hanging dome
+              ctx.beginPath();
+              ctx.arc(p.cx, btnY, Math.max(2.0, p.w * 0.036), 0, Math.PI * 2);
+              ctx.fillStyle = '#3B3D42';
+              ctx.fill();
+              ctx.strokeStyle = COLORS.black;
+              ctx.lineWidth = 0.95;
+              ctx.stroke();
+
+              ctx.restore();
+            }
+
+            // Crisp architectural CAD ink outline
+            ctx.beginPath();
+            appendHookPropSilhouette('hat', p.cx, y, p.w, p.h);
+            ctx.strokeStyle = isGhost ? 'rgba(0, 0, 0, 0.72)' : COLORS.black;
+            ctx.lineWidth = isGhost ? 1.0 : 1.4;
+            ctx.stroke();
+          }
+
+          ctx.restore();
+        }
       }
 
       ctx.restore();
@@ -1418,7 +2594,8 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       ox: number,
       oy: number,
       isGhost: boolean,
-      seed = 0
+      seed = 0,
+      showProps = true
     ) => {
       const t = m.slotW * 0.857;
       const r = m.slotW * 0.143;
@@ -1443,6 +2620,21 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       const rodDiam = Math.min(t * 1.48, m.pitchY * 0.25);
       const rodBotY = botY - Math.min(bracketH * 0.16, m.pitchY * 0.18);
       const rodTopY = rodBotY - rodDiam;
+      const shelfDepth = Math.min(bracketH, m.pitchY * 1.15) * 0.68 * lift;
+      const rodDepth = shelfDepth * 0.64;
+
+      const hangerLayout =
+        showProps && innerSpan > 12
+          ? getShelfHangersLayout(
+              innerLeft,
+              innerRight,
+              rodTopY,
+              rodBotY,
+              rodDiam,
+              rodDepth,
+              grainSeed
+            )
+          : null;
 
       ctx.save();
       if (isGhost) {
@@ -1450,7 +2642,7 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
         ctx.setLineDash([4, 3]);
       }
 
-      // 1. Cylindrical Closet Rod — Subtle Satin-Polished Chrome tubular steel
+      // 1. Cylindrical Closet Rod — Subtle Satin-Polished Chrome tubular steel (1.3125" standard diameter)
       if (isGhost) {
         ctx.fillStyle = '#E4E8EC';
         ctx.fillRect(innerLeft, rodTopY, innerSpan, rodDiam);
@@ -1485,6 +2677,79 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       ctx.lineTo(innerRight, rodBotY);
       ctx.stroke();
 
+      // 1B. Pure 2D Edge-On Minimal Clothing Hangers (Scaled strictly from 1.3125" rod; wall shadow carries 3D triangular complexity)
+      if (hangerLayout && hangerLayout.hangers.length > 0) {
+        const { hookStroke, edgeW, hangers } = hangerLayout;
+        ctx.save();
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        for (let hi = 0; hi < hangers.length; hi++) {
+          const h = hangers[hi];
+          const bodyX = h.hx - edgeW * 0.5;
+          const bodyH = Math.max(10, h.barY - h.neckBotY);
+          const bodyR = edgeW * 0.45;
+
+          if (isGhost) {
+            ctx.beginPath();
+            ctx.moveTo(h.hx, h.hookApexY);
+            ctx.lineTo(h.hx, h.neckBotY);
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.72)';
+            ctx.lineWidth = 1.15;
+            ctx.stroke();
+            drawRoundRect(bodyX, h.neckBotY, edgeW, bodyH, bodyR);
+            ctx.fillStyle = '#ECEBE6';
+            ctx.fill();
+            ctx.stroke();
+            continue;
+          }
+
+          // Whisper-subtle contact shadow where the vertical wire hook saddles over the 1.3125" chrome rod
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.16)';
+          ctx.fillRect(h.hx - hookStroke * 0.8, rodTopY + 0.5, hookStroke * 1.6, 2.2);
+
+          // Pure 2D edge-on vertical wire hook & neck wrapping straight over the rod
+          ctx.beginPath();
+          ctx.moveTo(h.hx, h.hookApexY);
+          ctx.lineTo(h.hx, h.neckBotY);
+          ctx.strokeStyle = COLORS.black;
+          ctx.lineWidth = hookStroke + 1.05;
+          ctx.stroke();
+
+          ctx.strokeStyle = '#6E747C';
+          ctx.lineWidth = Math.max(0.95, hookStroke - 0.35);
+          ctx.stroke();
+
+          // Pure 2D edge-on minimal hanger vertical profile (calm architectural Hard Maple/chalk strip)
+          drawRoundRect(bodyX, h.neckBotY, edgeW, bodyH, bodyR);
+          ctx.fillStyle = '#ECEBE6';
+          ctx.fill();
+
+          // Subtle upper-left edge highlight matching the calm monotone books aesthetic
+          ctx.save();
+          drawRoundRect(bodyX, h.neckBotY, edgeW, bodyH, bodyR);
+          ctx.clip();
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+          ctx.fillRect(bodyX, h.neckBotY, edgeW * 0.35, bodyH);
+          ctx.restore();
+
+          drawRoundRect(bodyX, h.neckBotY, edgeW, bodyH, bodyR);
+          ctx.strokeStyle = COLORS.black;
+          ctx.lineWidth = 1.05;
+          ctx.stroke();
+
+          // Single minimal CAD tick mark at the shoulder-to-trouser-bar transition
+          ctx.beginPath();
+          ctx.moveTo(bodyX + 0.6, h.shoulderY);
+          ctx.lineTo(bodyX + edgeW - 0.6, h.shoulderY);
+          ctx.strokeStyle = 'rgba(0, 0, 0, 0.45)';
+          ctx.lineWidth = 0.85;
+          ctx.stroke();
+        }
+
+        ctx.restore();
+      }
+
       // 2. Left & Right Vertical Cheek Brackets — exposed 3/4" Vertical Baltic Birch multi-ply edge
       const drawCheekBracket = (bx: number, bSeed: number) => {
         if (isGhost) {
@@ -1509,18 +2774,24 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       drawCheekBracket(leftX, grainSeed + 5);
       drawCheekBracket(rightX, grainSeed + 9);
 
-      // 3. Continuous Horizontal Shelf Board seated into half-lap dados (leftCx..rightCx)
-      //    Clean uninterrupted 13-ply horizontal Baltic Birch edge — no top color stripe or extra black dividers
+      // 3. Continuous Horizontal Shelf Board seated into half-lap dados (leftCx..rightCx) with matching edge rounding
+      const shelfR = r * 0.55;
       ctx.setLineDash([]);
       if (isGhost) {
+        drawRoundRect(leftCx, shelfTopY, shelfFullW, shelfH, shelfR);
         ctx.fillStyle = '#E8D5B5';
-        ctx.fillRect(leftCx, shelfTopY, shelfFullW, shelfH);
+        ctx.fill();
       } else {
+        ctx.save();
+        drawRoundRect(leftCx, shelfTopY, shelfFullW, shelfH, shelfR);
+        ctx.clip();
         drawBirchEdge(leftCx, shelfTopY, shelfFullW, shelfH, 'horizontal', grainSeed + 1);
+        ctx.restore();
       }
+      drawRoundRect(leftCx, shelfTopY, shelfFullW, shelfH, shelfR);
       ctx.strokeStyle = COLORS.black;
       ctx.lineWidth = isGhost ? 1.3 : 1.75;
-      ctx.strokeRect(leftCx, shelfTopY, shelfFullW, shelfH);
+      ctx.stroke();
 
       if (!isGhost) {
         // Subtle ambient-occlusion shadow where the rod seats into each cheek bracket
@@ -1541,7 +2812,9 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       ox: number,
       oy: number,
       isGhost: boolean,
-      seed = 0
+      seed = 0,
+      doorProgress = 0,
+      doorOpenSide: 'left' | 'right' = 'left'
     ) => {
       const leftCx = m.centerX + gx1 * m.pitchX + ox;
       const rightCx = m.centerX + gx2 * m.pitchX + ox;
@@ -1549,8 +2822,8 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       const lowerCy = m.centerY + gy2 * m.pitchY + oy;
       const grainSeed = seed || gx1 * 11 + gx2 * 17 + gy1 * 23 + gy2 * 29;
 
-      // Uniform 3/4" carcass plywood thickness across all variable widths & heights
-      const t = Math.max(7.5, Math.min(11.5, m.pitchX * 0.145));
+      // Uniform 3/4" carcass plywood thickness matching every other modular object on the wall
+      const t = m.slotW * 0.857;
       const liftOffset = (1 - lift) * 7;
       const leftX = leftCx - t * 0.5;
       const rightX = rightCx + t * 0.5;
@@ -1561,22 +2834,82 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
 
       const innerX = leftX + t;
       const innerY = topY + t;
-      const innerW = Math.max(18, cabW - t * 2);
-      const innerH = Math.max(24, cabH - t * 2);
+      const innerW = Math.max(12, cabW - t * 2);
+      const innerH = Math.max(16, cabH - t * 2);
 
-      // Bypass sliding door vertical overlap seam (front left door overlaps ~3% past midpoint per CAD: 53.03%)
-      const seamX = innerX + innerW * 0.5303;
-      const leftDoorW = Math.max(0, seamX - innerX);
-      const rightDoorW = Math.max(0, innerX + innerW - seamX);
+      // True bypass sliding doors: each door spans 53.03% of innerW so they overlap cleanly at center when closed
+      const p = isGhost ? 0 : Math.max(0, Math.min(1, doorProgress));
+      const doorW = innerW * 0.5303;
+      const maxTravel = Math.max(0, innerW - doorW);
+      const leftDoorX =
+        doorOpenSide === 'left' ? innerX + maxTravel * p : innerX;
+      const rightDoorX =
+        doorOpenSide === 'right'
+          ? innerX + innerW - doorW - maxTravel * p
+          : innerX + innerW - doorW;
 
-      // Circular finger-pull cutouts positioned cleanly in upper-left & upper-right door corners
-      const pullR = Math.max(4.6, Math.min(m.pitchY * 0.1, innerH * 0.075, innerW * 0.042));
-      const pullInsetX = Math.max(pullR + 5, Math.min(innerW * 0.125, m.pitchX * 0.42));
-      const pullInsetY = Math.max(pullR + 6, Math.min(innerH * 0.2, m.pitchY * 0.36));
-      const leftPullCx = innerX + pullInsetX;
-      const rightPullCx = innerX + innerW - pullInsetX;
+      // Circular finger-pull cutouts ride cleanly with each bypass door panel
+      const pullR = Math.max(3.0, Math.min(m.pitchY * 0.1, innerH * 0.075, innerW * 0.042));
+      const pullInsetX = Math.max(pullR + 3.5, Math.min(innerW * 0.125, m.pitchX * 0.42));
+      const pullInsetY = Math.max(pullR + 4.0, Math.min(innerH * 0.2, m.pitchY * 0.36));
+      const leftPullCx = leftDoorX + pullInsetX;
+      const rightPullCx = rightDoorX + doorW - pullInsetX;
       const pullCy = innerY + pullInsetY;
 
+      const drawFingerPull = (
+        px: number,
+        py: number,
+        cutSeed: number,
+        overlapsRearDoor: boolean
+      ) => {
+        if (isGhost) {
+          ctx.beginPath();
+          ctx.arc(px, py, pullR, 0, Math.PI * 2);
+          ctx.fillStyle = COLORS.white;
+          ctx.fill();
+        } else {
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(px, py, pullR, 0, Math.PI * 2);
+          ctx.clip();
+
+          // Shows rear door maple if slid over rear door, otherwise recessed vertical-grain back panel
+          drawMapleFace(
+            px - pullR,
+            py - pullR,
+            pullR * 2,
+            pullR * 2,
+            overlapsRearDoor ? 'horizontal' : 'vertical',
+            undefined,
+            0,
+            cutSeed
+          );
+
+          ctx.fillStyle = overlapsRearDoor ? 'rgba(0, 0, 0, 0.16)' : 'rgba(0, 0, 0, 0.14)';
+          ctx.fillRect(px - pullR, py - pullR, pullR * 2, pullR * 2);
+
+          const rimShadow = ctx.createLinearGradient(
+            px - pullR,
+            py - pullR,
+            px + pullR * 0.6,
+            py + pullR * 0.6
+          );
+          rimShadow.addColorStop(0.0, 'rgba(0, 0, 0, 0.36)');
+          rimShadow.addColorStop(0.45, 'rgba(0, 0, 0, 0.09)');
+          rimShadow.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
+          ctx.fillStyle = rimShadow;
+          ctx.fillRect(px - pullR, py - pullR, pullR * 2, pullR * 2);
+          ctx.restore();
+        }
+
+        ctx.beginPath();
+        ctx.arc(px, py, pullR, 0, Math.PI * 2);
+        ctx.strokeStyle = COLORS.black;
+        ctx.lineWidth = isGhost ? 1.1 : 1.55;
+        ctx.stroke();
+      };
+
+      const edgeR = m.slotW * 0.143;
       ctx.save();
       if (isGhost) {
         ctx.globalAlpha = 0.45;
@@ -1584,10 +2917,14 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       }
 
       if (isGhost) {
+        drawRoundRect(leftX, topY, cabW, cabH, edgeR);
         ctx.fillStyle = '#EAD8BD';
-        ctx.fillRect(leftX, topY, cabW, cabH);
+        ctx.fill();
       } else {
-        // 1. Outer Carcass Exposed 13-Ply Baltic Birch Edges with True Half-Lap Rabbet Orientation
+        // 1. Outer Carcass Exposed 13-Ply Baltic Birch Edges clipped to consistent 1/8" edge rounding
+        ctx.save();
+        drawRoundRect(leftX, topY, cabW, cabH, edgeR);
+        ctx.clip();
         drawBirchEdge(leftX, topY, t * 0.5, cabH, 'vertical', grainSeed + 1);
         drawBirchEdge(leftCx, innerY, t * 0.5, innerH, 'vertical', grainSeed + 1.4);
         drawBirchEdge(rightCx, topY, t * 0.5, cabH, 'vertical', grainSeed + 2);
@@ -1596,27 +2933,135 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
         // Top & bottom horizontal carcass panels seated into half-lap rabbets (leftCx..rightCx)
         drawBirchEdge(leftCx, topY, rightCx - leftCx, t, 'horizontal', grainSeed + 3);
         drawBirchEdge(leftCx, innerY + innerH, rightCx - leftCx, t, 'horizontal', grainSeed + 4);
+        ctx.restore();
 
-        // 2. Left (Front) & Right (Rear) Bypass Sliding Doors — Pure Natural Hard Maple horizontal grain
-        drawMapleFace(innerX, innerY, leftDoorW, innerH, 'horizontal', undefined, 0, grainSeed + 5);
-        drawMapleFace(seamX, innerY, rightDoorW, innerH, 'horizontal', undefined, 0, grainSeed + 9);
+        // 2. Clipped Interior Cavity + Bypass Sliding Doors (Rear Right Door -> Front Left Door)
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(innerX, innerY, innerW, innerH);
+        ctx.clip();
 
-        // Subtle shadow cast by front left door onto rear right door
-        const overlapShadowW = Math.max(2.6, Math.min(5.5, t * 0.48));
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.16)';
-        ctx.fillRect(seamX, innerY, Math.min(overlapShadowW, rightDoorW), innerH);
+        // 2A. Recessed Cabinet Interior Cavity (revealed cleanly as either door slides open)
+        if (p > 0.004) {
+          drawMapleFace(innerX, innerY, innerW, innerH, 'vertical', undefined, 0, grainSeed + 13);
+
+          // Recessed interior cavity depth shadows (top, left, and overall subtle recess tone)
+          const topShadowH = Math.max(6, Math.min(22, innerH * 0.18));
+          const leftShadowW = Math.max(5, Math.min(18, innerW * 0.12));
+
+          const topGrad = ctx.createLinearGradient(0, innerY, 0, innerY + topShadowH);
+          topGrad.addColorStop(0.0, 'rgba(0, 0, 0, 0.28)');
+          topGrad.addColorStop(0.5, 'rgba(0, 0, 0, 0.1)');
+          topGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
+          ctx.fillStyle = topGrad;
+          ctx.fillRect(innerX, innerY, innerW, topShadowH);
+
+          const leftGrad = ctx.createLinearGradient(innerX, 0, innerX + leftShadowW, 0);
+          leftGrad.addColorStop(0.0, 'rgba(0, 0, 0, 0.22)');
+          leftGrad.addColorStop(0.5, 'rgba(0, 0, 0, 0.07)');
+          leftGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
+          ctx.fillStyle = leftGrad;
+          ctx.fillRect(innerX, innerY, leftShadowW, innerH);
+
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.08)';
+          ctx.fillRect(innerX, innerY, innerW, innerH);
+
+          // Interior horizontal Baltic Birch divider shelf/shelves on taller cabinets (1 shelf for 3–4 rows, 2 for 5–6 rows)
+          if (innerH >= m.pitchY * 1.15) {
+            const shelfH = Math.max(3.5, t * 0.72);
+            const shelfFracs = innerH >= m.pitchY * 2.65 ? [0.34, 0.67] : [0.5];
+            for (let si = 0; si < shelfFracs.length; si++) {
+              const shelfY = innerY + innerH * shelfFracs[si] - shelfH * 0.5;
+              const shelfUnderGrad = ctx.createLinearGradient(
+                0,
+                shelfY + shelfH,
+                0,
+                shelfY + shelfH + 10
+              );
+              shelfUnderGrad.addColorStop(0.0, 'rgba(0, 0, 0, 0.2)');
+              shelfUnderGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
+              ctx.fillStyle = shelfUnderGrad;
+              ctx.fillRect(innerX, shelfY + shelfH, innerW, 10);
+
+              drawBirchEdge(innerX, shelfY, innerW, shelfH, 'horizontal', grainSeed + 31 + si * 7);
+              ctx.strokeStyle = 'rgba(0, 0, 0, 0.72)';
+              ctx.lineWidth = 1.05;
+              ctx.strokeRect(innerX, shelfY, innerW, shelfH);
+            }
+          }
+
+          // Subtle machined bypass door guide tracks along top & bottom inner rails
+          const trackH = Math.max(1.8, t * 0.2);
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.24)';
+          ctx.fillRect(innerX, innerY, innerW, trackH);
+          ctx.fillRect(innerX, innerY + innerH - trackH, innerW, trackH);
+        }
+
+        // 2B. Rear (Right) Bypass Sliding Door — Natural Hard Maple horizontal grain
+        drawMapleFace(rightDoorX, innerY, doorW, innerH, 'horizontal', undefined, 0, grainSeed + 9);
         // Subtle recessed shadow along rear door top sliding track
         ctx.fillStyle = 'rgba(0, 0, 0, 0.12)';
-        ctx.fillRect(seamX, innerY, rightDoorW, Math.max(2.2, t * 0.26));
+        ctx.fillRect(rightDoorX, innerY, doorW, Math.max(2.2, t * 0.26));
+        // Rear door crisp left & right vertical borders
+        ctx.beginPath();
+        ctx.moveTo(rightDoorX, innerY);
+        ctx.lineTo(rightDoorX, innerY + innerH);
+        ctx.moveTo(rightDoorX + doorW, innerY);
+        ctx.lineTo(rightDoorX + doorW, innerY + innerH);
+        ctx.strokeStyle = COLORS.black;
+        ctx.lineWidth = 1.45;
+        ctx.stroke();
+
+        // Rear door finger-pull cutout (naturally occluded when it slides behind the front left door!)
+        drawFingerPull(rightPullCx, pullCy, grainSeed + 24, false);
+
+        // 2C. Cast Shadow from Front (Left) Bypass Door onto Rear Door & Open Interior Cavity
+        const overlapShadowW = Math.max(2.8, Math.min(6.0, t * 0.52));
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.17)';
+        ctx.fillRect(leftDoorX + doorW, innerY, overlapShadowW, innerH);
+        if (leftDoorX > innerX + 1) {
+          // Subtle shadow on open interior along left vertical stile of slid front door
+          const leftDropW = Math.max(2.2, Math.min(4.8, t * 0.38));
+          const leftDropGrad = ctx.createLinearGradient(
+            leftDoorX - leftDropW,
+            0,
+            leftDoorX,
+            0
+          );
+          leftDropGrad.addColorStop(0.0, 'rgba(0, 0, 0, 0)');
+          leftDropGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0.16)');
+          ctx.fillStyle = leftDropGrad;
+          ctx.fillRect(leftDoorX - leftDropW, innerY, leftDropW, innerH);
+        }
+
+        // 2D. Front (Left) Bypass Sliding Door — Natural Hard Maple horizontal grain
+        drawMapleFace(leftDoorX, innerY, doorW, innerH, 'horizontal', undefined, 0, grainSeed + 5);
         // Subtle top-edge highlight on front left door
         ctx.fillStyle = 'rgba(255, 255, 255, 0.22)';
-        ctx.fillRect(innerX + 1, innerY + 1, Math.max(0, leftDoorW - 2), Math.max(1.8, t * 0.2));
+        ctx.fillRect(leftDoorX + 1, innerY + 1, Math.max(0, doorW - 2), Math.max(1.8, t * 0.2));
+        // Front door crisp architectural vertical edge outlines
+        ctx.beginPath();
+        ctx.moveTo(leftDoorX, innerY);
+        ctx.lineTo(leftDoorX, innerY + innerH);
+        ctx.moveTo(leftDoorX + doorW, innerY);
+        ctx.lineTo(leftDoorX + doorW, innerY + innerH);
+        ctx.strokeStyle = COLORS.black;
+        ctx.lineWidth = 1.65;
+        ctx.stroke();
+
+        // Front door finger-pull cutout (shows rear door maple if slid across the rear panel)
+        const leftPullOverRear =
+          leftPullCx >= rightDoorX && leftPullCx <= rightDoorX + doorW;
+        drawFingerPull(leftPullCx, pullCy, grainSeed + 17, leftPullOverRear);
+
+        ctx.restore();
       }
 
-      // Outer Carcass Crisp Architectural Ink Frame
+      // Outer Carcass Crisp Architectural Ink Frame (consistent 1/8" edge rounding)
+      drawRoundRect(leftX, topY, cabW, cabH, edgeR);
       ctx.strokeStyle = COLORS.black;
       ctx.lineWidth = isGhost ? 1.4 : 1.9;
-      ctx.strokeRect(leftX, topY, cabW, cabH);
+      ctx.stroke();
 
       // Half-Lap Rabbet Corner Joinery + Inner Carcass Frame Lines (exact CAD corner lines)
       ctx.setLineDash([]);
@@ -1644,48 +3089,18 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       ctx.lineWidth = isGhost ? 1.05 : 1.35;
       ctx.stroke();
 
-      // Vertical Bypass Sliding Door Center Overlap Seam
-      ctx.beginPath();
-      ctx.moveTo(seamX, innerY);
-      ctx.lineTo(seamX, innerY + innerH);
-      ctx.strokeStyle = COLORS.black;
-      ctx.lineWidth = isGhost ? 1.15 : 1.65;
-      ctx.stroke();
-
-      // Circular Finger-Pull Cutouts (Upper-Left & Upper-Right)
-      const pullCenters = [leftPullCx, rightPullCx];
-      for (let i = 0; i < pullCenters.length; i++) {
-        const px = pullCenters[i];
-
+      // Ghost preview door seam & finger-pulls
+      if (isGhost) {
+        const seamX = innerX + doorW;
         ctx.beginPath();
-        ctx.arc(px, pullCy, pullR, 0, Math.PI * 2);
-        ctx.fillStyle = isGhost ? COLORS.white : '#F5F2EC';
-        ctx.fill();
-
-        if (!isGhost) {
-          // Recessed interior Baltic Birch rim shadow along upper crescent of finger cutout
-          ctx.save();
-          ctx.beginPath();
-          ctx.arc(px, pullCy, pullR, 0, Math.PI * 2);
-          ctx.clip();
-          drawBirchEdge(
-            px - pullR,
-            pullCy - pullR,
-            pullR * 2,
-            Math.max(2.6, pullR * 0.56),
-            'horizontal',
-            grainSeed + i * 3
-          );
-          ctx.fillStyle = 'rgba(0, 0, 0, 0.22)';
-          ctx.fillRect(px - pullR, pullCy - pullR, pullR * 2, Math.max(2.6, pullR * 0.56));
-          ctx.restore();
-        }
-
-        ctx.beginPath();
-        ctx.arc(px, pullCy, pullR, 0, Math.PI * 2);
+        ctx.moveTo(seamX, innerY);
+        ctx.lineTo(seamX, innerY + innerH);
         ctx.strokeStyle = COLORS.black;
-        ctx.lineWidth = isGhost ? 1.1 : 1.55;
+        ctx.lineWidth = 1.15;
         ctx.stroke();
+
+        drawFingerPull(innerX + pullInsetX, pullCy, grainSeed + 17, false);
+        drawFingerPull(innerX + innerW - pullInsetX, pullCy, grainSeed + 24, false);
       }
 
       ctx.restore();
@@ -1693,7 +3108,7 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
 
     /**
      * Shared geometry helper for the Pure 2D Baltic Birch Open Cube (min 3×3 hooks).
-     * Uses the exact same outer carcass geometry & 3/4" birch thickness as the Sliding-Door Cabinet.
+     * Uses full 3/4" Baltic Birch plywood thickness (m.slotW * 0.857) matching Hook, Shelf + Rod, and Vinyl Box.
      */
     const getOpenCubeMetrics = (
       gx1: number,
@@ -1709,7 +3124,7 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       const rightCx = m.centerX + gx2 * m.pitchX + ox;
       const upperCy = m.centerY + gy1 * m.pitchY + oy;
       const lowerCy = m.centerY + gy2 * m.pitchY + oy;
-      const t = Math.max(7.5, Math.min(11.5, m.pitchX * 0.145));
+      const t = m.slotW * 0.857;
       const liftOffset = (1 - lift) * 7;
 
       const leftX = leftCx - t * 0.5;
@@ -1723,9 +3138,8 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
     };
 
     /**
-     * 4. OPEN CUBE — Directional Hollow-Frame Cast Shadow
-     * Extrudes all 4 individual carcass walls so light passes naturally through the open hollow center
-     * while the top and left walls cast subtle directional shadows into the opening.
+     * 4A. OPEN CUBE — Directional Cast Shadow
+     * Projects the full 3/4" Baltic Birch cube carcass with recessed back panel off the mortise wall.
      */
     const drawOpenCubeIsoShadow = (
       gx1: number,
@@ -1739,23 +3153,14 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
     ) => {
       if (lift <= 0.02) return;
       const c = getOpenCubeMetrics(gx1, gx2, gy1, gy2, m, lift, ox, oy);
-      const innerX = c.leftX + c.t;
-      const innerW = Math.max(8, c.boxW - c.t * 2);
       const depth = Math.min(c.boxH, m.pitchY * 1.45) * 0.44 * lift;
       const dx = depth * LIGHT_KX;
       const dy = depth * LIGHT_KY;
 
+      const edgeR = m.slotW * 0.143;
       ctx.save();
       ctx.beginPath();
-      // Left vertical wall shadow
-      appendExtrudedBoxShadowPath(c.leftX, c.topY, c.t, c.boxH, dx, dy, 0);
-      // Right vertical wall shadow
-      appendExtrudedBoxShadowPath(c.rightX - c.t, c.topY, c.t, c.boxH, dx, dy, 0);
-      // Top horizontal board shadow (casts softly into upper interior cavity)
-      appendExtrudedBoxShadowPath(innerX, c.topY, innerW, c.t, dx, dy, 0);
-      // Bottom horizontal board shadow
-      appendExtrudedBoxShadowPath(innerX, c.botY - c.t, innerW, c.t, dx, dy, 0);
-
+      appendExtrudedBoxShadowPath(c.leftX, c.topY, c.boxW, c.boxH, dx, dy, edgeR);
       fillDirectionalCastShadow(
         c.leftX + c.t * 0.5,
         c.topY + c.t * 0.5,
@@ -1768,9 +3173,10 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
     };
 
     /**
-     * 4. OPEN CUBE — Strict Pure 2D Orthographic Front Elevation (min 3×3 hooks)
-     * Matches Cabinet carcass geometry exactly: pure 100% 13-ply Baltic Birch 4-sided frame with
-     * butt-joint vertical sides and a completely open hollow back revealing the mortise wall behind it.
+     * 4B. OPEN CUBE — Strict Pure 2D Orthographic Front Elevation (min 3×3 hooks)
+     * Full 3/4" exposed 13-ply Baltic Birch 4-sided outer carcass with vertical wood-grain interior back panel.
+     * Lighting assumes a continuous concealed LED strip recessed 1.5" back around all four interior edges
+     * in the selected Kelvin color temperature (2700K / 3000K / 4000K / 5000K) with zero exterior spill.
      */
     const drawOpenCube = (
       gx1: number,
@@ -1782,53 +3188,153 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       ox: number,
       oy: number,
       isGhost: boolean,
-      seed = 0
+      seed = 0,
+      lit = true,
+      kelvin: LightKelvin = 2700
     ) => {
       const grainSeed = seed || gx1 * 13 + gx2 * 19 + gy1 * 23 + gy2 * 31;
       const c = getOpenCubeMetrics(gx1, gx2, gy1, gy2, m, lift, ox, oy);
+      const edgeR = m.slotW * 0.143;
+      const leftCx = c.leftX + c.t * 0.5;
+      const rightCx = c.rightX - c.t * 0.5;
       const innerX = c.leftX + c.t;
       const innerY = c.topY + c.t;
       const innerW = Math.max(18, c.boxW - c.t * 2);
       const innerH = Math.max(18, c.boxH - c.t * 2);
+      const isLit = !isGhost && lit;
+      const kPal = LIGHT_KELVIN_PRESETS[kelvin];
 
       ctx.save();
       if (isGhost) {
         ctx.globalAlpha = 0.45;
         ctx.setLineDash([4, 3]);
-        // Hollow 2D frame ghost fill (even-odd cutout keeps center transparent)
-        ctx.beginPath();
-        ctx.rect(c.leftX, c.topY, c.boxW, c.boxH);
-        ctx.rect(innerX, innerY, innerW, innerH);
+        drawRoundRect(c.leftX, c.topY, c.boxW, c.boxH, edgeR);
         ctx.fillStyle = '#EAD8BD';
-        ctx.fill('evenodd');
+        ctx.fill();
       } else {
-        // Exposed 13-Ply Baltic Birch 4-Sided Outer Carcass (Full-Height Vertical Sides + Inset Top/Bottom)
-        drawBirchEdge(c.leftX, c.topY, c.t, c.boxH, 'vertical', grainSeed + 1);
-        drawBirchEdge(c.rightX - c.t, c.topY, c.t, c.boxH, 'vertical', grainSeed + 2);
-        drawBirchEdge(innerX, c.topY, innerW, c.t, 'horizontal', grainSeed + 3);
-        drawBirchEdge(innerX, innerY + innerH, innerW, c.t, 'horizontal', grainSeed + 4);
+        // 1. Interior Back Panel — Vertical wood grain matching the object button texture
+        drawMapleFace(innerX, innerY, innerW, innerH, 'vertical', undefined, 0, grainSeed + 7);
+
+        if (isLit) {
+          // Continuous 360° recessed interior LED strip (1.5" back from front edge on all 4 inner walls)
+          ctx.fillStyle = `rgba(${kPal.ambientRgb}, 0.27)`;
+          ctx.fillRect(innerX, innerY, innerW, innerH);
+
+          const coveDepthV = Math.max(10, Math.min(innerH * 0.42, c.t * 3.8));
+          const coveDepthH = Math.max(10, Math.min(innerW * 0.42, c.t * 3.8));
+
+          // Top interior wall cove wash
+          const topCove = ctx.createLinearGradient(0, innerY, 0, innerY + coveDepthV);
+          topCove.addColorStop(0.0, `rgba(${kPal.coreRgb}, 0.66)`);
+          topCove.addColorStop(0.32, `rgba(${kPal.midRgb}, 0.32)`);
+          topCove.addColorStop(0.7, `rgba(${kPal.washRgb}, 0.12)`);
+          topCove.addColorStop(1.0, `rgba(${kPal.washRgb}, 0)`);
+          ctx.fillStyle = topCove;
+          ctx.fillRect(innerX, innerY, innerW, coveDepthV);
+
+          // Bottom interior wall cove wash
+          const botCove = ctx.createLinearGradient(0, innerY + innerH, 0, innerY + innerH - coveDepthV);
+          botCove.addColorStop(0.0, `rgba(${kPal.coreRgb}, 0.60)`);
+          botCove.addColorStop(0.32, `rgba(${kPal.midRgb}, 0.28)`);
+          botCove.addColorStop(0.7, `rgba(${kPal.washRgb}, 0.11)`);
+          botCove.addColorStop(1.0, `rgba(${kPal.washRgb}, 0)`);
+          ctx.fillStyle = botCove;
+          ctx.fillRect(innerX, innerY + innerH - coveDepthV, innerW, coveDepthV);
+
+          // Left interior wall cove wash
+          const leftCove = ctx.createLinearGradient(innerX, 0, innerX + coveDepthH, 0);
+          leftCove.addColorStop(0.0, `rgba(${kPal.coreRgb}, 0.58)`);
+          leftCove.addColorStop(0.32, `rgba(${kPal.midRgb}, 0.27)`);
+          leftCove.addColorStop(0.7, `rgba(${kPal.washRgb}, 0.10)`);
+          leftCove.addColorStop(1.0, `rgba(${kPal.washRgb}, 0)`);
+          ctx.fillStyle = leftCove;
+          ctx.fillRect(innerX, innerY, coveDepthH, innerH);
+
+          // Right interior wall cove wash
+          const rightCove = ctx.createLinearGradient(innerX + innerW, 0, innerX + innerW - coveDepthH, 0);
+          rightCove.addColorStop(0.0, `rgba(${kPal.coreRgb}, 0.58)`);
+          rightCove.addColorStop(0.32, `rgba(${kPal.midRgb}, 0.27)`);
+          rightCove.addColorStop(0.7, `rgba(${kPal.washRgb}, 0.10)`);
+          rightCove.addColorStop(1.0, `rgba(${kPal.washRgb}, 0)`);
+          ctx.fillStyle = rightCove;
+          ctx.fillRect(innerX + innerW - coveDepthH, innerY, coveDepthH, innerH);
+
+          // Subtle luminous continuous cove rim grazing the 4 inner walls (1.5" back from front birch frame)
+          ctx.save();
+          ctx.strokeStyle = `rgba(${kPal.rimRgb}, 0.82)`;
+          ctx.lineWidth = Math.max(1.2, Math.min(2.4, c.t * 0.2));
+          ctx.strokeRect(innerX + 1.1, innerY + 1.1, Math.max(0, innerW - 2.2), Math.max(0, innerH - 2.2));
+          ctx.restore();
+        } else {
+          // Unlit architectural daylight — recessed studio shadow depth
+          const topShadowH = Math.max(6, Math.min(24, innerH * 0.16));
+          const leftShadowW = Math.max(5, Math.min(20, innerW * 0.14));
+
+          const topGrad = ctx.createLinearGradient(0, innerY, 0, innerY + topShadowH);
+          topGrad.addColorStop(0.0, 'rgba(0, 0, 0, 0.24)');
+          topGrad.addColorStop(0.45, 'rgba(0, 0, 0, 0.09)');
+          topGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
+          ctx.fillStyle = topGrad;
+          ctx.fillRect(innerX, innerY, innerW, topShadowH);
+
+          const leftGrad = ctx.createLinearGradient(innerX, 0, innerX + leftShadowW, 0);
+          leftGrad.addColorStop(0.0, 'rgba(0, 0, 0, 0.2)');
+          leftGrad.addColorStop(0.45, 'rgba(0, 0, 0, 0.07)');
+          leftGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
+          ctx.fillStyle = leftGrad;
+          ctx.fillRect(innerX, innerY, leftShadowW, innerH);
+
+          // Gentle overall recessed tone so the interior sits clearly behind the bright front birch edge
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+          ctx.fillRect(innerX, innerY, innerW, innerH);
+        }
+
+        // 2. Exposed 3/4" 13-Ply Baltic Birch Outer Carcass clipped to consistent 1/8" edge rounding
+        ctx.save();
+        drawRoundRect(c.leftX, c.topY, c.boxW, c.boxH, edgeR);
+        ctx.clip();
+        drawBirchEdge(c.leftX, c.topY, c.t * 0.5, c.boxH, 'vertical', grainSeed + 1);
+        drawBirchEdge(leftCx, innerY, c.t * 0.5, innerH, 'vertical', grainSeed + 1.4);
+        drawBirchEdge(rightCx, c.topY, c.t * 0.5, c.boxH, 'vertical', grainSeed + 2);
+        drawBirchEdge(innerX + innerW, innerY, c.t * 0.5, innerH, 'vertical', grainSeed + 2.4);
+
+        // Top & bottom horizontal carcass panels seated 3/8" deep into half-lap dados (leftCx..rightCx)
+        drawBirchEdge(leftCx, c.topY, rightCx - leftCx, c.t, 'horizontal', grainSeed + 3);
+        drawBirchEdge(leftCx, innerY + innerH, rightCx - leftCx, c.t, 'horizontal', grainSeed + 4);
+        ctx.restore();
       }
 
-      // Crisp Architectural CAD Ink Outlines (Outer Frame)
+      // Crisp Architectural CAD Ink Outlines (Outer Frame with consistent 1/8" edge rounding)
+      drawRoundRect(c.leftX, c.topY, c.boxW, c.boxH, edgeR);
       ctx.strokeStyle = COLORS.black;
       ctx.lineWidth = isGhost ? 1.4 : 1.9;
-      ctx.strokeRect(c.leftX, c.topY, c.boxW, c.boxH);
+      ctx.stroke();
 
+      // Cabinet-Matched 3/8" × 3/4" Half-Lap Dado Corner Joinery + Inner Cavity Frame Lines
       ctx.setLineDash([]);
-      // Butt-joint vertical side seams
       ctx.beginPath();
-      ctx.moveTo(innerX, c.topY);
-      ctx.lineTo(innerX, c.botY);
-      ctx.moveTo(innerX + innerW, c.topY);
-      ctx.lineTo(innerX + innerW, c.botY);
+      // Left & right 3/8" dado vertical cuts at top and bottom panels
+      ctx.moveTo(leftCx, c.topY);
+      ctx.lineTo(leftCx, innerY);
+      ctx.moveTo(rightCx, c.topY);
+      ctx.lineTo(rightCx, innerY);
+      ctx.moveTo(leftCx, innerY + innerH);
+      ctx.lineTo(leftCx, c.botY);
+      ctx.moveTo(rightCx, innerY + innerH);
+      ctx.lineTo(rightCx, c.botY);
+      // Inner top & bottom carcass lines extending to the 3/8" dado mid-lines
+      ctx.moveTo(leftCx, innerY);
+      ctx.lineTo(rightCx, innerY);
+      ctx.moveTo(leftCx, innerY + innerH);
+      ctx.lineTo(rightCx, innerY + innerH);
+      // Inner left & right carcass walls
+      ctx.moveTo(innerX, innerY);
+      ctx.lineTo(innerX, innerY + innerH);
+      ctx.moveTo(innerX + innerW, innerY);
+      ctx.lineTo(innerX + innerW, innerY + innerH);
       ctx.strokeStyle = COLORS.black;
       ctx.lineWidth = isGhost ? 1.05 : 1.45;
       ctx.stroke();
-
-      // Crisp open-cavity inner frame outline
-      ctx.strokeStyle = COLORS.black;
-      ctx.lineWidth = isGhost ? 1.15 : 1.7;
-      ctx.strokeRect(innerX, innerY, innerW, innerH);
 
       ctx.restore();
     };
@@ -1857,7 +3363,7 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
 
       // Flat cantilevered shelf sits cleanly on lower row gy2, leaving gy1 clear for the potted plant
       const shelfTopY = lowerCy - m.slotH * 0.2 - liftOffset;
-      const shelfH = Math.max(8, t * 0.96);
+      const shelfH = Math.max(4, t * 0.96);
       const shelfBotY = shelfTopY + shelfH;
       const shelfLeftX = leftCx - t * 1.1;
       const shelfRightX = rightCx + t * 1.1;
@@ -1871,12 +3377,12 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       const corbelH = m.slotH * 0.86;
 
       // Architectural potted plant resting directly on shelfTopY
-      const spanInner = Math.max(36, rightCx - leftCx - earW * 2);
+      const spanInner = Math.max(20, rightCx - leftCx - earW * 2);
       const plantSideBias = Math.abs(seed) % 2 === 0 ? 0.38 : 0.62;
       const plantCx = leftCx + earW + spanInner * plantSideBias;
-      const potW = Math.max(24, Math.min(44, m.pitchX * 0.56));
-      const potH = Math.max(22, Math.min(38, m.pitchY * 0.36));
-      const saucerH = 3.6;
+      const potW = Math.max(14, Math.min(44, m.pitchX * 0.56));
+      const potH = Math.max(12, Math.min(38, m.pitchY * 0.36));
+      const saucerH = Math.max(2.0, t * 0.32);
       const potBotY = shelfTopY - saucerH;
       const potTopY = potBotY - potH;
       const foliageTopLimitY = upperCy - m.slotH * 0.38 - liftOffset;
@@ -1921,7 +3427,7 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       foliageTopLimitY: number,
       variant: number
     ) => {
-      const availH = Math.max(32, potTopY - foliageTopLimitY);
+      const availH = Math.max(18, potTopY - foliageTopLimitY);
       if (variant === 0) {
         // Variant A: Sculptural architectural Rubber / Fiddle-Leaf plant (stems + broad oval CAD leaves)
         const baseY = potTopY + 1;
@@ -2100,8 +3606,8 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
         s.r
       );
 
-      // Main cantilevered horizontal shelf board shadow
-      appendExtrudedBoxShadowPath(s.shelfLeftX, s.shelfTopY, s.shelfW, s.shelfH, dx, dy, 0);
+      // Main cantilevered horizontal shelf board shadow (consistent 1/8" edge rounding)
+      appendExtrudedBoxShadowPath(s.shelfLeftX, s.shelfTopY, s.shelfW, s.shelfH, dx, dy, m.slotW * 0.143);
 
       // Architectural potted plant cast shadow (when props enabled)
       if (showProps) {
@@ -2175,10 +3681,11 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
         ctx.setLineDash([4, 3]);
       }
 
-      // 1. Twin Rear Rounded-Top CNC Baltic Birch Mounting Ears Peeking Above the Shelf (per Image 2)
+      // 1. Twin Rear Rounded-Top CNC Baltic Birch Mounting Ears Peeking Above the Shelf (consistent 1/8" edge rounding)
+      const edgeR = m.slotW * 0.143;
       const drawEar = (cx: number, bSeed: number) => {
         const ex = cx - s.earW * 0.5;
-        const topR = Math.min(s.earW * 0.48, s.earH * 0.48);
+        const topR = Math.min(edgeR, s.earW * 0.48, s.earH * 0.48);
         ctx.beginPath();
         ctx.moveTo(ex, s.shelfTopY + 0.5);
         ctx.lineTo(ex, s.earTopY + topR);
@@ -2218,7 +3725,7 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       // 2. Twin Under-Shelf CNC Baltic Birch Corbel Brackets Directly Below the Shelf Board
       const drawCorbel = (cx: number, bSeed: number) => {
         const bx = cx - s.corbelW * 0.5;
-        const botR = Math.min(s.corbelW * 0.32, s.corbelH * 0.25);
+        const botR = Math.min(edgeR, s.corbelW * 0.45, s.corbelH * 0.35);
         ctx.beginPath();
         ctx.moveTo(bx, s.shelfBotY - 0.5);
         ctx.lineTo(bx + s.corbelW, s.shelfBotY - 0.5);
@@ -2438,22 +3945,28 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       ctx.stroke();
       }
 
-      // 4. Main Horizontal Cantilevered 13-Ply Baltic Birch Shelf Board (Front Edge)
+      // 4. Main Horizontal Cantilevered 13-Ply Baltic Birch Shelf Board (consistent 1/8" edge rounding)
       ctx.setLineDash([]);
       if (isGhost) {
+        drawRoundRect(s.shelfLeftX, s.shelfTopY, s.shelfW, s.shelfH, edgeR);
         ctx.fillStyle = '#E8D5B5';
-        ctx.fillRect(s.shelfLeftX, s.shelfTopY, s.shelfW, s.shelfH);
+        ctx.fill();
       } else {
+        ctx.save();
+        drawRoundRect(s.shelfLeftX, s.shelfTopY, s.shelfW, s.shelfH, edgeR);
+        ctx.clip();
         drawBirchEdge(s.shelfLeftX, s.shelfTopY, s.shelfW, s.shelfH, 'horizontal', grainSeed + 1);
         // Subtle crisp top sheen & bottom edge depth
         ctx.fillStyle = 'rgba(255, 255, 255, 0.22)';
         ctx.fillRect(s.shelfLeftX + 1, s.shelfTopY + 0.8, Math.max(0, s.shelfW - 2), 1.4);
         ctx.fillStyle = 'rgba(0, 0, 0, 0.12)';
         ctx.fillRect(s.shelfLeftX + 1, s.shelfBotY - 1.8, Math.max(0, s.shelfW - 2), 1.4);
+        ctx.restore();
       }
+      drawRoundRect(s.shelfLeftX, s.shelfTopY, s.shelfW, s.shelfH, edgeR);
       ctx.strokeStyle = COLORS.black;
       ctx.lineWidth = isGhost ? 1.4 : 1.85;
-      ctx.strokeRect(s.shelfLeftX, s.shelfTopY, s.shelfW, s.shelfH);
+      ctx.stroke();
 
       ctx.restore();
     };
@@ -2463,6 +3976,81 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
      * 3-sided open-top Baltic Birch plywood U-box (left wall, right wall, bottom floor — exact Shelf + Rod height)
      * + cast shadow of the properly scaled edge-on 12" vinyl records standing inside.
      */
+    /**
+     * Shared deterministic layout for various-sized calm monotone architectural books
+     * (represented in the same clean CAD spine style as the vinyl records, with varied heights & thicknesses).
+     */
+    const getShelfBooksLayout = (
+      innerLeft: number,
+      innerRight: number,
+      innerBot: number,
+      maxBookH: number,
+      t: number,
+      grainSeed: number
+    ) => {
+      const innerSpan = Math.max(0, innerRight - innerLeft);
+      const hash = (n: number) => {
+        const v = Math.sin(n * 127.1 + grainSeed * 311.7) * 43758.5453;
+        return v - Math.floor(v);
+      };
+
+      // Curated architectural book width & height ratios so adjacent books never look repetitive
+      const widthRatios = [0.68, 0.44, 0.92, 0.54, 0.78, 0.46, 0.86, 0.6, 0.98, 0.5];
+      const heightRatios = [0.97, 0.76, 0.88, 0.64, 0.93, 0.72, 0.83, 0.6, 0.91, 0.78];
+
+      const upright: Array<{ x: number; y: number; w: number; h: number; idx: number }> = [];
+      const leaning: Array<{
+        pivotX: number;
+        w: number;
+        h: number;
+        tiltRad: number;
+        idx: number;
+      }> = [];
+
+      const openGap = Math.max(14, innerSpan * 0.24);
+      const limitX = innerRight - openGap;
+      const minBookW = Math.max(3.2, t * 0.42);
+
+      let cursor = innerLeft + 0.6;
+      let idx = 0;
+      const startOffset = Math.abs(grainSeed) % widthRatios.length;
+
+      while (cursor < limitX - minBookW) {
+        const pat = (idx + startOffset) % widthRatios.length;
+        const wJitter = 0.92 + hash(idx * 7 + 11) * 0.16;
+        const rawW = Math.max(minBookW, t * widthRatios[pat] * wJitter);
+        const w = Math.min(rawW, limitX - cursor);
+        if (w < minBookW * 0.85) break;
+
+        const hJitter = 0.94 + hash(idx * 13 + 5) * 0.1;
+        const hRatio = Math.min(1.0, Math.max(0.56, heightRatios[pat] * hJitter));
+        const h = Math.max(10, maxBookH * hRatio);
+        upright.push({ x: cursor, y: innerBot - h, w, h, idx });
+        cursor += w;
+        idx++;
+      }
+
+      // 1–2 gently leaning books resting naturally against the upright row
+      let leanBaseX = cursor + 1.6;
+      for (let li = 0; li < 2; li++) {
+        const lw = Math.max(minBookW, t * (li === 0 ? 0.62 : 0.48));
+        const lh = Math.max(12, maxBookH * (li === 0 ? 0.84 : 0.71));
+        const tiltRad = 0.15 + li * 0.065;
+        const topShiftX = Math.sin(tiltRad) * lh;
+        if (leanBaseX + lw + topShiftX > innerRight - 2.5) break;
+        leaning.push({
+          pivotX: leanBaseX + topShiftX,
+          w: lw,
+          h: lh,
+          tiltRad,
+          idx: idx + 5 + li,
+        });
+        leanBaseX += lw + 2.4;
+      }
+
+      return { upright, leaning };
+    };
+
     const drawVinylBoxIsoShadow = (
       gx1: number,
       gx2: number,
@@ -2472,6 +4060,7 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       lift: number,
       ox: number,
       oy: number,
+      seed = 0,
       showProps = true
     ) => {
       if (lift <= 0.02) return;
@@ -2481,6 +4070,7 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       const upperCy = m.centerY + gy1 * m.pitchY + oy;
       const lowerCy = m.centerY + gy2 * m.pitchY + oy;
       const liftOffset = (1 - lift) * 6;
+      const grainSeed = seed || gx1 * 7 + gx2 * 13 + gy1 * 19 + gy2 * 23;
 
       // Exact same topY and botY as Shelf + Rod
       const topY = upperCy + m.slotH * 0.04 - liftOffset;
@@ -2493,35 +4083,52 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       const innerBot = botY - t;
       const innerSpan = Math.max(0, innerRight - innerLeft);
 
-      // 12" records peek cleanly above the open-top 3-sided U-box
-      const recordTopY = upperCy - m.slotH * 0.32 - liftOffset;
-      const recordH = Math.max(20, innerBot - recordTopY);
-      const packedW = Math.max(0, innerSpan * 0.78);
+      // Tallest art/architecture books peek cleanly above the open-top 3-sided U-box
+      const bookTopLimitY = upperCy - m.slotH * 0.34 - liftOffset;
+      const maxBookH = Math.max(24, innerBot - bookTopLimitY);
 
       const boxDepth = Math.min(boxH, m.pitchY * 1.15) * 0.62 * lift;
       const dx = boxDepth * LIGHT_KX;
       const dy = boxDepth * LIGHT_KY;
 
+      const edgeR = m.slotW * 0.143;
       ctx.save();
       ctx.beginPath();
-      // Left & right vertical birch side walls
-      appendExtrudedBoxShadowPath(leftX, topY, t, boxH, dx, dy, 0);
-      appendExtrudedBoxShadowPath(rightX - t, topY, t, boxH, dx, dy, 0);
+      // Left & right vertical birch side walls (consistent 1/8" edge rounding)
+      appendExtrudedBoxShadowPath(leftX, topY, t, boxH, dx, dy, edgeR);
+      appendExtrudedBoxShadowPath(rightX - t, topY, t, boxH, dx, dy, edgeR);
       // Bottom horizontal birch floor board
-      appendExtrudedBoxShadowPath(innerLeft, innerBot, innerSpan, t, dx, dy, 0);
-      // Standing edge-on 12" vinyl record stack shadow (when props enabled)
-      if (showProps && packedW > 6) {
-        appendExtrudedBoxShadowPath(innerLeft + 1, recordTopY, packedW, recordH, dx * 0.88, dy * 0.88, 0);
+      appendExtrudedBoxShadowPath(innerLeft, innerBot, innerSpan, t, dx, dy, edgeR * 0.6);
+      // Stepped cast shadow matching each varied-height upright book (when props enabled)
+      if (showProps && innerSpan > 22 && maxBookH > 16) {
+        const { upright } = getShelfBooksLayout(
+          innerLeft,
+          innerRight,
+          innerBot,
+          maxBookH,
+          t,
+          grainSeed
+        );
+        for (const bk of upright) {
+          appendExtrudedBoxShadowPath(bk.x, bk.y, bk.w, bk.h, dx * 0.82, dy * 0.82, 0);
+        }
       }
-      fillDirectionalCastShadow(leftX, showProps ? recordTopY : topY, rightX + dx, botY + dy, lift, 8);
+      fillDirectionalCastShadow(
+        leftX,
+        showProps ? bookTopLimitY : topY,
+        rightX + dx,
+        botY + dy,
+        lift,
+        8
+      );
       ctx.restore();
     };
 
     /**
-     * 6. VINYL BOX — Pure 2D Architectural Elevation (3-Sided Open-Top Baltic Birch Box + Monotone 12" LPs)
+     * 6. OPEN BOOK / VINYL SHELF — Pure 2D Architectural Elevation (3-Sided Open-Top Baltic Birch U-Shelf)
      * 5 hooks wide by default, exact same height as Shelf + Rod. Three exposed 13-ply Baltic Birch boards only
-     * (left wall, right wall, bottom floor — open top, no center divider) holding calm, monotone edge-on
-     * 12" vinyl record sleeves side-by-side when props are enabled.
+     * (left wall, right wall, bottom floor — open top) holding calm monotone various-sized architectural books
+     * side-by-side (varied heights, spine thicknesses, and gently leaning end volumes) when props are enabled.
      */
     const drawVinylBox = (
       gx1: number,
@@ -2556,9 +4163,9 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       const innerBot = botY - t;
       const innerSpan = Math.max(0, innerRight - innerLeft);
 
-      // Properly scaled 12" LP record height resting on bottom floor, rising cleanly proud through the open top
-      const recordTopY = upperCy - m.slotH * 0.32 - liftOffset;
-      const baseRecordH = Math.max(24, innerBot - recordTopY);
+      // Tallest architecture monographs peek cleanly proud of the open top; smaller books step down naturally
+      const bookTopLimitY = upperCy - m.slotH * 0.34 - liftOffset;
+      const maxBookH = Math.max(24, innerBot - bookTopLimitY);
 
       ctx.save();
       if (isGhost) {
@@ -2566,9 +4173,9 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
         ctx.setLineDash([4, 3]);
       }
 
-      // 1. Calm Monotone Edge-On 12" Vinyl Record Sleeves Side-by-Side (Optional Prop)
-      if (showProps && innerSpan > 22 && baseRecordH > 16) {
-        // Understated architectural monotone paper & concrete-gray sleeve palette
+      // 1. Calm Monotone Various-Sized Architectural Books Side-by-Side (Optional Prop)
+      if (showProps && innerSpan > 22 && maxBookH > 16) {
+        // Same understated architectural monotone paper & concrete-gray spine palette
         const spinePalette = [
           '#F5F4F0', // gallery white
           '#ECEBE6', // soft chalk
@@ -2580,16 +4187,7 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
           '#DCDBD6', // light architectural gray
         ] as const;
 
-        const hash = (n: number) => {
-          const v = Math.sin(n * 127.1 + grainSeed * 311.7) * 43758.5453;
-          return v - Math.floor(v);
-        };
-
-        // Calm, steady edge-on LP spine thicknesses scaled cleanly to 3/4" birch thickness t
-        const minSpineW = Math.max(3.2, t * 0.24);
-        const spineRangeW = Math.max(1.3, t * 0.11);
-
-        const drawSpineRect = (
+        const drawBookSpine = (
           x: number,
           y: number,
           w: number,
@@ -2607,57 +4205,58 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
           if (!isGhost) {
             // Whisper-subtle upper-left paper edge highlight for crisp 2D depth
             ctx.fillStyle = 'rgba(255, 255, 255, 0.34)';
-            ctx.fillRect(x + 0.5, y + 0.5, Math.max(0.75, w * 0.22), Math.max(0, h - 1));
+            ctx.fillRect(x + 0.5, y + 0.5, Math.max(0.85, w * 0.2), Math.max(0, h - 1));
+
+            // Minimal CAD spine rule lines on wider architectural monographs
+            if (w >= t * 0.62 && (idx + grainSeed) % 2 === 0) {
+              ctx.strokeStyle = 'rgba(0, 0, 0, 0.22)';
+              ctx.lineWidth = 0.7;
+              ctx.beginPath();
+              ctx.moveTo(x + 1.1, y + h * 0.16);
+              ctx.lineTo(x + w - 1.1, y + h * 0.16);
+              ctx.moveTo(x + 1.1, y + h * 0.84);
+              ctx.lineTo(x + w - 1.1, y + h * 0.84);
+              ctx.stroke();
+            }
           }
 
-          ctx.strokeStyle = isGhost ? 'rgba(0, 0, 0, 0.75)' : 'rgba(0, 0, 0, 0.72)';
-          ctx.lineWidth = isGhost ? 0.7 : 0.85;
+          ctx.strokeStyle = isGhost ? 'rgba(0, 0, 0, 0.75)' : 'rgba(0, 0, 0, 0.74)';
+          ctx.lineWidth = isGhost ? 0.75 : 0.9;
           ctx.strokeRect(x, y, w, h);
         };
 
+        const { upright, leaning } = getShelfBooksLayout(
+          innerLeft,
+          innerRight,
+          innerBot,
+          maxBookH,
+          t,
+          grainSeed
+        );
+
         ctx.save();
         ctx.beginPath();
-        ctx.rect(innerLeft + 0.5, recordTopY - 6, innerSpan - 1, innerBot - (recordTopY - 6));
+        ctx.rect(
+          innerLeft + 0.5,
+          bookTopLimitY - 8,
+          innerSpan - 1,
+          innerBot - (bookTopLimitY - 8)
+        );
         ctx.clip();
 
-        // Pack tidy upright edge-on LP spines side-by-side from left wall across ~76% of open span
-        const openGap = Math.max(24, innerSpan * 0.23);
-        const limitX = innerRight - openGap;
-        let cursor = innerLeft + 0.6;
-        let idx = 0;
-
-        while (cursor < limitX - minSpineW) {
-          const rw = minSpineW + hash(idx * 7 + 11) * spineRangeW;
-          const w = Math.min(rw, limitX - cursor);
-          if (w < minSpineW * 0.85) break;
-          const hJitter = (hash(idx * 13 + 5) - 0.5) * 0.9;
-          const rh = Math.max(22, baseRecordH + hJitter);
-          const ry = innerBot - rh;
-          drawSpineRect(cursor, ry, w, rh, idx);
-          cursor += w;
-          idx++;
+        for (const bk of upright) {
+          drawBookSpine(bk.x, bk.y, bk.w, bk.h, bk.idx);
         }
 
-        // 2 gently leaning edge-on 12" sleeves resting naturally against the upright stack
-        let leanBaseX = cursor + 1.4;
-        for (let li = 0; li < 2; li++) {
-          const lw = minSpineW + hash((idx + li) * 11) * (spineRangeW * 0.7);
-          const lh = baseRecordH - 0.6;
-          const tiltRad = 0.14 + li * 0.06;
-          const topShiftX = Math.sin(tiltRad) * lh;
-          if (leanBaseX + lw + topShiftX > innerRight - 2.5) break;
-
+        for (const lb of leaning) {
           ctx.save();
-          const bottomPivotX = leanBaseX + topShiftX;
-          ctx.translate(bottomPivotX, innerBot);
-          ctx.rotate(-tiltRad);
-          drawSpineRect(0, -lh, lw, lh, idx + 5 + li);
+          ctx.translate(lb.pivotX, innerBot);
+          ctx.rotate(-lb.tiltRad);
+          drawBookSpine(0, -lb.h, lb.w, lb.h, lb.idx);
           ctx.restore();
-
-          leanBaseX += lw + 2.0;
         }
 
-        // Subtle resting AO line right where the records sit on the bottom Baltic Birch shelf
+        // Subtle resting AO line right where the books sit on the bottom Baltic Birch shelf
         if (!isGhost) {
           ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
           ctx.fillRect(innerLeft, innerBot - 2.0, innerSpan, 2.0);
@@ -2665,40 +4264,102 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
         ctx.restore();
       }
 
-      // 2. Bottom Horizontal Exposed 13-Ply Baltic Birch Floor Board (Open Top — No Top Board, No Divider)
-      if (innerSpan > 2) {
-        if (isGhost) {
-          ctx.fillStyle = '#E8D5B5';
-          ctx.fillRect(innerLeft, innerBot, innerSpan, t);
-        } else {
-          drawBirchEdge(innerLeft, innerBot, innerSpan, t, 'horizontal', grainSeed + 17);
+      // 2. Exposed 3/4" 13-Ply Baltic Birch 3-Sided U-Frame with Open Cube–Matched 3/8" × 3/4" Half-Lap Dado Joinery
+      const innerWallH = Math.max(0, innerBot - topY);
+      // Helper to trace the 3-sided U-profile with consistent 1/8" edge rounding on all outer & top-lip corners
+      const edgeR = m.slotW * 0.143;
+      const traceRoundedBookShelfU = () => {
+        const rTop = Math.min(edgeR, t * 0.42);
+        const rBot = Math.min(edgeR, t * 0.48);
+        ctx.beginPath();
+        ctx.moveTo(innerLeft, innerBot);
+        ctx.lineTo(innerLeft, topY + rTop);
+        ctx.quadraticCurveTo(innerLeft, topY, innerLeft - rTop, topY);
+        ctx.lineTo(leftX + rTop, topY);
+        ctx.quadraticCurveTo(leftX, topY, leftX, topY + rTop);
+        ctx.lineTo(leftX, botY - rBot);
+        ctx.quadraticCurveTo(leftX, botY, leftX + rBot, botY);
+        ctx.lineTo(rightX - rBot, botY);
+        ctx.quadraticCurveTo(rightX, botY, rightX, botY - rBot);
+        ctx.lineTo(rightX, topY + rTop);
+        ctx.quadraticCurveTo(rightX, topY, rightX - rTop, topY);
+        ctx.lineTo(innerRight + rTop, topY);
+        ctx.quadraticCurveTo(innerRight, topY, innerRight, topY + rTop);
+        ctx.lineTo(innerRight, innerBot);
+        ctx.closePath();
+      };
+
+      if (isGhost) {
+        traceRoundedBookShelfU();
+        ctx.fillStyle = '#E8D5B5';
+        ctx.fill();
+      } else {
+        ctx.save();
+        traceRoundedBookShelfU();
+        ctx.clip();
+        // Vertical side walls split at the 3/8" half-lap dado centerlines (leftCx, rightCx)
+        drawBirchEdge(leftX, topY, t * 0.5, boxH, 'vertical', grainSeed + 5);
+        drawBirchEdge(leftCx, topY, t * 0.5, innerWallH, 'vertical', grainSeed + 5.4);
+        drawBirchEdge(rightCx, topY, t * 0.5, boxH, 'vertical', grainSeed + 9);
+        drawBirchEdge(innerRight, topY, t * 0.5, innerWallH, 'vertical', grainSeed + 9.4);
+
+        // Bottom horizontal floor board seated 3/8" deep into half-lap dados (leftCx..rightCx)
+        if (rightCx - leftCx > 2) {
+          drawBirchEdge(leftCx, innerBot, rightCx - leftCx, t, 'horizontal', grainSeed + 17);
         }
-        ctx.strokeStyle = COLORS.black;
-        ctx.lineWidth = isGhost ? 1.3 : 1.75;
-        ctx.strokeRect(innerLeft, innerBot, innerSpan, t);
+        ctx.restore();
       }
 
-      // 3. Full-Height Left & Right Vertical Exposed 13-Ply Baltic Birch Side Walls (3-Sided U-Profile)
-      const drawSideWall = (bx: number, bSeed: number) => {
-        if (isGhost) {
-          ctx.fillStyle = '#E8D5B5';
-          ctx.fillRect(bx, topY, t, boxH);
-        } else {
-          drawBirchEdge(bx, topY, t, boxH, 'vertical', bSeed);
-        }
-        ctx.strokeStyle = COLORS.black;
-        ctx.lineWidth = isGhost ? 1.4 : 1.85;
-        ctx.strokeRect(bx, topY, t, boxH);
-      };
-      drawSideWall(leftX, grainSeed + 5);
-      drawSideWall(rightX - t, grainSeed + 9);
+      // 3. Crisp Architectural CAD Ink Outlines (Outer 3-Sided U-Profile with consistent 1/8" edge rounding)
+      const rTop = Math.min(edgeR, t * 0.42);
+      const rBot = Math.min(edgeR, t * 0.48);
+      ctx.beginPath();
+      ctx.moveTo(innerLeft, topY + rTop);
+      ctx.quadraticCurveTo(innerLeft, topY, innerLeft - rTop, topY);
+      ctx.lineTo(leftX + rTop, topY);
+      ctx.quadraticCurveTo(leftX, topY, leftX, topY + rTop);
+      ctx.lineTo(leftX, botY - rBot);
+      ctx.quadraticCurveTo(leftX, botY, leftX + rBot, botY);
+      ctx.lineTo(rightX - rBot, botY);
+      ctx.quadraticCurveTo(rightX, botY, rightX, botY - rBot);
+      ctx.lineTo(rightX, topY + rTop);
+      ctx.quadraticCurveTo(rightX, topY, rightX - rTop, topY);
+      ctx.lineTo(innerRight + rTop, topY);
+      ctx.quadraticCurveTo(innerRight, topY, innerRight, topY + rTop);
+      ctx.strokeStyle = COLORS.black;
+      ctx.lineWidth = isGhost ? 1.4 : 1.9;
+      ctx.stroke();
+
+      // Open Cube–Matched 3/8" × 3/4" Half-Lap Dado Corner Joinery + Inner Cavity Wall Lines
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      // Left & right 3/8" dado vertical cuts at bottom corners
+      ctx.moveTo(leftCx, innerBot);
+      ctx.lineTo(leftCx, botY);
+      ctx.moveTo(rightCx, innerBot);
+      ctx.lineTo(rightCx, botY);
+      // Inner bottom floor line extending to the 3/8" dado mid-lines
+      ctx.moveTo(leftCx, innerBot);
+      ctx.lineTo(rightCx, innerBot);
+      // Inner left & right vertical side walls down to the floor surface
+      ctx.moveTo(innerLeft, topY + rTop);
+      ctx.lineTo(innerLeft, innerBot);
+      ctx.moveTo(innerRight, topY + rTop);
+      ctx.lineTo(innerRight, innerBot);
+      ctx.strokeStyle = COLORS.black;
+      ctx.lineWidth = isGhost ? 1.05 : 1.45;
+      ctx.stroke();
 
       ctx.restore();
     };
 
     /**
-     * Shared geometry helper for the Sleek Linear Baltic Birch Wall Sconce (2..6 cols × 1 row, wire-free).
-     * Thin architectural horizontal piece of wood with a full-length recessed LED light channel across the face.
+     * Shared geometry helper for Josh's Custom "Light Shelf" Wall Sconce (2..6 cols × 1 row, wire-free).
+     * Faithful 2D architectural front elevation of the uploaded Rhino STL:
+     * - Two identical 3/4" Baltic Birch vertical side cheeks centered on the outer mortise slots
+     *   (integral rear top-back mortise hooks + generously radiused bottom-front corners)
+     * - Recessed 3/4" Baltic Birch horizontal shelf set 3/4" below the top edge of the side cheeks
+     * - Full-width routed LED strip & frosted diffuser channel milled into the underside of the shelf
      */
     const getWallSconceMetrics = (
       gx1: number,
@@ -2710,47 +4371,67 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       ox: number,
       oy: number
     ) => {
-      const t = m.slotW * 0.857;
+      const t = m.slotW * 0.857; // Exact 3/4" Baltic Birch thickness in canvas pixels
       const leftCx = m.centerX + gx1 * m.pitchX + ox;
       const rightCx = m.centerX + gx2 * m.pitchX + ox;
       const upperCy = m.centerY + gy1 * m.pitchY + oy;
       const liftOffset = (1 - lift) * 5;
 
-      const leftX = leftCx - t * 0.85;
-      const rightX = rightCx + t * 0.85;
-      const barW = Math.max(48, rightX - leftX);
-      const barH = Math.max(15, Math.min(21, m.slotH * 0.54));
-      const barTopY = upperCy - barH * 0.5 - liftOffset;
-      const barBotY = barTopY + barH;
+      // Two identical 3/4" side cheeks centered directly over the left & right mortise slots
+      const cheekW = t;
+      const leftX = leftCx - cheekW * 0.5;
+      const leftInnerX = leftCx + cheekW * 0.5;
+      const rightInnerX = rightCx - cheekW * 0.5;
+      const rightX = rightCx + cheekW * 0.5;
+      const totalW = Math.max(44, rightX - leftX);
 
-      // Full-length recessed frosted LED channel milled cleanly across the thin wood bar
-      const endCap = Math.max(4.5, Math.min(7, barH * 0.34));
-      const ledX = leftX + endCap;
-      const ledW = Math.max(16, barW - endCap * 2);
-      const ledH = Math.max(5.2, Math.min(7.5, barH * 0.36));
-      const ledY = barTopY + (barH - ledH) * 0.5;
+      // Top of side cheeks covers the top-back integral mortise hook slot
+      const cheekTopY = upperCy - m.slotH * 0.52 - liftOffset;
+      const earH = t * 0.78; // Top cheek ears rising ~3/4" above the recessed horizontal shelf
+      const shelfT = t; // Exact 3/4" Baltic Birch horizontal shelf
+      const shelfTopY = cheekTopY + earH;
+      const shelfBotY = shelfTopY + shelfT;
+      const cheekTailH = t * 3.15; // Side cheeks extending cleanly below the shelf with radiused bottom-front corners
+      const cheekH = earH + shelfT + cheekTailH;
+      const cheekBotY = cheekTopY + cheekH;
+
+      // Inner horizontal shelf span + routed under-shelf LED diffuser channel
+      const shelfX = leftInnerX;
+      const shelfW = Math.max(12, rightInnerX - leftInnerX);
+      const ledH = Math.max(2.0, Math.min(4.8, shelfT * 0.28));
+      const ledY = shelfBotY - 0.6;
 
       return {
+        t,
         leftCx,
         rightCx,
         upperCy,
+        cheekW,
         leftX,
+        leftInnerX,
+        rightInnerX,
         rightX,
-        barW,
-        barH,
-        barTopY,
-        barBotY,
-        ledX,
+        totalW,
+        cheekTopY,
+        cheekBotY,
+        cheekH,
+        earH,
+        shelfX,
+        shelfW,
+        shelfT,
+        shelfTopY,
+        shelfBotY,
+        ledX: shelfX + 1,
         ledY,
-        ledW,
+        ledW: Math.max(12, shelfW - 2),
         ledH,
       };
     };
 
     /**
-     * 7A. WALL SCONCE — Sleek Linear Architectural Up & Down Grazing Wall Light Wash (Pass 0)
-     * Casts a generous, unmistakable warm-white/soft-gold wash upward and downward across the full length
-     * of the thin wood sconce bar when lit; turns completely off when clicked.
+     * 7A. LIGHT SHELF WALL SCONCE — Routed Under-Shelf Diffused Downward Wall Light Wash (Pass 0)
+     * Casts a warm 2700K architectural light wash straight down from the diffused LED channel routed into
+     * the underside of the horizontal shelf, cleanly framed between the two Baltic Birch side cheeks.
      */
     const drawWallSconceLightWash = (
       gx1: number,
@@ -2761,73 +4442,57 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       lift: number,
       ox: number,
       oy: number,
-      lit: boolean
+      lit: boolean,
+      kelvin: LightKelvin = 2700
     ) => {
       if (!lit || lift <= 0.05) return;
       const sc = getWallSconceMetrics(gx1, gx2, gy1, gy2, m, lift, ox, oy);
-      const upReach = Math.max(m.pitchY * 0.96, 78);
-      const downReach = Math.max(m.pitchY * 1.18, 96);
-      const flareUp = Math.min(26, sc.barW * 0.14);
-      const flareDown = Math.min(32, sc.barW * 0.16);
+      const downReach = Math.max(m.pitchY * 1.42, sc.cheekH * 1.85);
+      const flareDown = Math.min(42, sc.shelfW * 0.22);
       const midX = (sc.leftX + sc.rightX) * 0.5;
+      const kPal = LIGHT_KELVIN_PRESETS[kelvin];
 
       ctx.save();
 
-      // 1. Wide Architectural Upward Wall Grazing Wash
+      // 1. Primary Architectural Downward Wall Grazing Wash (in active Kelvin temperature)
       ctx.beginPath();
-      ctx.moveTo(sc.ledX - 3, sc.barTopY + 2);
-      ctx.lineTo(sc.ledX + sc.ledW + 3, sc.barTopY + 2);
-      ctx.lineTo(sc.ledX + sc.ledW + flareUp, sc.barTopY - upReach);
-      ctx.quadraticCurveTo(midX, sc.barTopY - upReach - 14, sc.ledX - flareUp, sc.barTopY - upReach);
+      ctx.moveTo(sc.leftInnerX, sc.shelfBotY);
+      ctx.lineTo(sc.rightInnerX, sc.shelfBotY);
+      ctx.lineTo(sc.rightInnerX, sc.cheekBotY - 2);
+      ctx.lineTo(sc.rightInnerX + flareDown, sc.shelfBotY + downReach);
+      ctx.quadraticCurveTo(
+        midX,
+        sc.shelfBotY + downReach + 22,
+        sc.leftInnerX - flareDown,
+        sc.shelfBotY + downReach
+      );
+      ctx.lineTo(sc.leftInnerX, sc.cheekBotY - 2);
       ctx.closePath();
 
-      const upGrad = ctx.createLinearGradient(0, sc.barTopY, 0, sc.barTopY - upReach - 10);
-      upGrad.addColorStop(0.0, `rgba(253, 203, 51, ${(0.38 * lift).toFixed(3)})`);
-      upGrad.addColorStop(0.28, `rgba(253, 203, 51, ${(0.2 * lift).toFixed(3)})`);
-      upGrad.addColorStop(0.65, `rgba(253, 203, 51, ${(0.065 * lift).toFixed(3)})`);
-      upGrad.addColorStop(1.0, 'rgba(253, 203, 51, 0)');
-      ctx.fillStyle = upGrad;
-      ctx.fill();
-
-      // 2. Wide Architectural Downward Wall Grazing Wash
-      ctx.beginPath();
-      ctx.moveTo(sc.ledX - 3, sc.barBotY - 2);
-      ctx.lineTo(sc.ledX + sc.ledW + 3, sc.barBotY - 2);
-      ctx.lineTo(sc.ledX + sc.ledW + flareDown, sc.barBotY + downReach);
-      ctx.quadraticCurveTo(midX, sc.barBotY + downReach + 16, sc.ledX - flareDown, sc.barBotY + downReach);
-      ctx.closePath();
-
-      const downGrad = ctx.createLinearGradient(0, sc.barBotY, 0, sc.barBotY + downReach + 12);
-      downGrad.addColorStop(0.0, `rgba(253, 203, 51, ${(0.42 * lift).toFixed(3)})`);
-      downGrad.addColorStop(0.26, `rgba(253, 203, 51, ${(0.22 * lift).toFixed(3)})`);
-      downGrad.addColorStop(0.64, `rgba(253, 203, 51, ${(0.075 * lift).toFixed(3)})`);
-      downGrad.addColorStop(1.0, 'rgba(253, 203, 51, 0)');
+      const downGrad = ctx.createLinearGradient(0, sc.shelfBotY, 0, sc.shelfBotY + downReach + 18);
+      downGrad.addColorStop(0.0, `rgba(${kPal.midRgb}, ${(0.58 * lift).toFixed(3)})`);
+      downGrad.addColorStop(0.18, `rgba(${kPal.washRgb}, ${(0.38 * lift).toFixed(3)})`);
+      downGrad.addColorStop(0.55, `rgba(${kPal.washRgb}, ${(0.15 * lift).toFixed(3)})`);
+      downGrad.addColorStop(0.85, `rgba(${kPal.washRgb}, ${(0.045 * lift).toFixed(3)})`);
+      downGrad.addColorStop(1.0, `rgba(${kPal.washRgb}, 0)`);
       ctx.fillStyle = downGrad;
       ctx.fill();
 
-      // 3. Soft Tight Luminous Warm-White Halo Hugging the Full Linear Bar
-      const haloPadY = sc.barH * 1.35;
-      const haloGrad = ctx.createLinearGradient(0, sc.barTopY - haloPadY, 0, sc.barBotY + haloPadY);
-      haloGrad.addColorStop(0.0, 'rgba(255, 244, 196, 0)');
-      haloGrad.addColorStop(0.42, `rgba(255, 242, 180, ${(0.46 * lift).toFixed(3)})`);
-      haloGrad.addColorStop(0.58, `rgba(255, 242, 180, ${(0.46 * lift).toFixed(3)})`);
-      haloGrad.addColorStop(1.0, 'rgba(255, 244, 196, 0)');
-      ctx.fillStyle = haloGrad;
-      drawRoundRect(
-        sc.leftX - 10,
-        sc.barTopY - haloPadY,
-        sc.barW + 20,
-        sc.barH + haloPadY * 2,
-        haloPadY
-      );
-      ctx.fill();
+      // 2. Concentrated Diffuser Core directly tucked under the horizontal shelf
+      const coreH = Math.max(22, sc.cheekH * 0.45);
+      const coreGrad = ctx.createLinearGradient(0, sc.shelfBotY, 0, sc.shelfBotY + coreH);
+      coreGrad.addColorStop(0.0, `rgba(${kPal.coreRgb}, ${(0.74 * lift).toFixed(3)})`);
+      coreGrad.addColorStop(0.45, `rgba(${kPal.midRgb}, ${(0.34 * lift).toFixed(3)})`);
+      coreGrad.addColorStop(1.0, `rgba(${kPal.midRgb}, 0)`);
+      ctx.fillStyle = coreGrad;
+      ctx.fillRect(sc.leftInnerX, sc.shelfBotY, sc.shelfW, coreH);
 
       ctx.restore();
     };
 
     /**
-     * 7B. WALL SCONCE — Subtle Floating Linear Cast Shadow
-     * Clean thin extruded directional cast shadow projecting the sleek Baltic Birch bar off the mortise wall.
+     * 7B. LIGHT SHELF WALL SCONCE — 3D Architectural Cast Shadow (Pass 1)
+     * Casts crisp directional shadows projecting both 6"-deep side cheeks and the recessed horizontal shelf off the wall.
      */
     const drawWallSconceIsoShadow = (
       gx1: number,
@@ -2841,21 +4506,34 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
     ) => {
       if (lift <= 0.02) return;
       const sc = getWallSconceMetrics(gx1, gx2, gy1, gy2, m, lift, ox, oy);
-      const depth = sc.barH * 0.72 * lift;
-      const dx = depth * LIGHT_KX;
-      const dy = depth * LIGHT_KY;
+      const edgeR = m.slotW * 0.143;
+      const cheekDepth = sc.t * 2.1 * lift;
+      const shelfDepth = cheekDepth * 0.92;
+      const cdx = cheekDepth * LIGHT_KX;
+      const cdy = cheekDepth * LIGHT_KY;
+      const sdx = shelfDepth * LIGHT_KX;
+      const sdy = shelfDepth * LIGHT_KY;
 
       ctx.save();
       ctx.beginPath();
-      appendExtrudedBoxShadowPath(sc.leftX, sc.barTopY, sc.barW, sc.barH, dx, dy, 1.5);
-      fillDirectionalCastShadow(sc.leftX, sc.barTopY, sc.rightX + dx, sc.barBotY + dy, lift, 6);
+      appendExtrudedBoxShadowPath(sc.leftX, sc.cheekTopY, sc.cheekW, sc.cheekH, cdx, cdy, edgeR);
+      appendExtrudedBoxShadowPath(sc.rightInnerX, sc.cheekTopY, sc.cheekW, sc.cheekH, cdx, cdy, edgeR);
+      appendExtrudedBoxShadowPath(sc.shelfX, sc.shelfTopY, sc.shelfW, sc.shelfT, sdx, sdy, edgeR * 0.55);
+      fillDirectionalCastShadow(
+        sc.leftX,
+        sc.cheekTopY,
+        sc.rightX + cdx,
+        sc.cheekBotY + cdy,
+        lift,
+        8
+      );
       ctx.restore();
     };
 
     /**
-     * 7C. WALL SCONCE — Pure 2D Architectural Elevation (Sleek Wire-Free Baltic Birch Bar + Full-Length Recessed LED)
-     * Ultra-clean thin linear piece of Baltic Birch wood with a continuous recessed frosted LED strip
-     * running all the way across the front face; zero wires visible; click anywhere on the bar to toggle light.
+     * 7C. LIGHT SHELF WALL SCONCE — Pure 2D Architectural Elevation (Pass 2)
+     * Two 3/4" Baltic Birch side cheeks with integral rear hooks & consistent 1/8" edge rounding,
+     * recessed 3/4" horizontal Baltic Birch shelf, and routed under-shelf frosted LED diffuser bar.
      */
     const drawWallSconce = (
       gx1: number,
@@ -2868,12 +4546,14 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       oy: number,
       isGhost: boolean,
       seed = 0,
-      lit = true
+      lit = true,
+      kelvin: LightKelvin = 2700
     ) => {
       const grainSeed = seed || gx1 * 17 + gx2 * 23 + gy1 * 31;
       const sc = getWallSconceMetrics(gx1, gx2, gy1, gy2, m, lift, ox, oy);
+      const edgeR = m.slotW * 0.143;
       const isLit = !isGhost && lit;
-      const r = 1.6;
+      const kPal = LIGHT_KELVIN_PRESETS[kelvin];
 
       ctx.save();
       if (isGhost) {
@@ -2881,78 +4561,109 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
         ctx.setLineDash([4, 3]);
       }
 
-      // 1. Sleek Thin Horizontal Baltic Birch Wood Bar
+      // 1. Left & Right Identical 3/4" Baltic Birch Side Cheeks (consistent 1/8" edge rounding)
+      const drawSideCheek = (cxLeft: number, isLeft: boolean, cheekSeed: number) => {
+        drawRoundRect(cxLeft, sc.cheekTopY, sc.cheekW, sc.cheekH, edgeR);
+
+        if (isGhost) {
+          ctx.fillStyle = '#E8D5B5';
+          ctx.fill();
+        } else {
+          ctx.save();
+          ctx.clip();
+
+          // Vertical 13-ply Baltic Birch plywood front edge
+          drawBirchEdge(cxLeft, sc.cheekTopY, sc.cheekW, sc.cheekH, 'vertical', cheekSeed);
+
+          // Smooth curved lower-front fillet roll-off shading (matches the 1.5" radius bottom-front corner in the Rhino STL)
+          const filletStartY = sc.cheekBotY - sc.cheekH * 0.28;
+          const filletShade = ctx.createLinearGradient(0, filletStartY, 0, sc.cheekBotY);
+          filletShade.addColorStop(0.0, 'rgba(0, 0, 0, 0)');
+          filletShade.addColorStop(0.55, 'rgba(0, 0, 0, 0.12)');
+          filletShade.addColorStop(1.0, 'rgba(0, 0, 0, 0.34)');
+          ctx.fillStyle = filletShade;
+          ctx.fillRect(cxLeft, filletStartY, sc.cheekW, sc.cheekBotY - filletStartY);
+
+          // Subtle Kelvin LED graze along the inner edge of the cheek below the shelf when lit
+          if (isLit) {
+            const grazeX0 = isLeft ? cxLeft + sc.cheekW : cxLeft;
+            const grazeX1 = isLeft ? cxLeft + sc.cheekW * 0.3 : cxLeft + sc.cheekW * 0.7;
+            const innerGlow = ctx.createLinearGradient(grazeX0, 0, grazeX1, 0);
+            innerGlow.addColorStop(0.0, `rgba(${kPal.midRgb}, 0.46)`);
+            innerGlow.addColorStop(1.0, `rgba(${kPal.midRgb}, 0)`);
+            ctx.fillStyle = innerGlow;
+            ctx.fillRect(cxLeft, sc.shelfBotY, sc.cheekW, sc.cheekBotY - sc.shelfBotY);
+          }
+
+          ctx.restore();
+        }
+
+        // Crisp Black CAD Outer Frame
+        drawRoundRect(cxLeft, sc.cheekTopY, sc.cheekW, sc.cheekH, edgeR);
+        ctx.strokeStyle = COLORS.black;
+        ctx.lineWidth = isGhost ? 1.3 : 1.85;
+        ctx.stroke();
+      };
+
+      drawSideCheek(sc.leftX, true, grainSeed + 11);
+      drawSideCheek(sc.rightInnerX, false, grainSeed + 19);
+
+      // 2. Routed Under-Shelf Frosted Acrylic LED Diffuser Strip (flush along bottom edge between the inner cheek faces)
+      if (!isGhost) {
+        ctx.save();
+        drawRoundRect(sc.ledX, sc.ledY, sc.ledW, sc.ledH, 1.0);
+        if (isLit) {
+          const ledGrad = ctx.createLinearGradient(0, sc.ledY, 0, sc.ledY + sc.ledH);
+          ledGrad.addColorStop(0.0, '#FFFFFF');
+          ledGrad.addColorStop(0.55, kPal.diffuserMid);
+          ledGrad.addColorStop(1.0, kPal.diffuserBot);
+          ctx.fillStyle = ledGrad;
+          ctx.fill();
+          ctx.strokeStyle = 'rgba(0, 0, 0, 0.55)';
+          ctx.lineWidth = 0.9;
+          ctx.stroke();
+        } else {
+          // Unlit recessed matte frosted acrylic diffuser
+          ctx.fillStyle = '#E4E2DC';
+          ctx.fill();
+          ctx.strokeStyle = 'rgba(0, 0, 0, 0.72)';
+          ctx.lineWidth = 0.95;
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      // 3. Continuous 3/4" Horizontal Shelf Board seated 3/8" deep into half-lap dados (leftCx..rightCx) with matching edge rounding
+      const dadoShelfW = Math.max(16, sc.rightCx - sc.leftCx);
+      const shelfR = edgeR * 0.55;
+      ctx.setLineDash([]);
       if (isGhost) {
-        drawRoundRect(sc.leftX, sc.barTopY, sc.barW, sc.barH, r);
+        drawRoundRect(sc.leftCx, sc.shelfTopY, dadoShelfW, sc.shelfT, shelfR);
         ctx.fillStyle = '#EAD8BD';
         ctx.fill();
       } else {
         ctx.save();
-        drawRoundRect(sc.leftX, sc.barTopY, sc.barW, sc.barH, r);
+        drawRoundRect(sc.leftCx, sc.shelfTopY, dadoShelfW, sc.shelfT, shelfR);
         ctx.clip();
 
-        // Warm natural pale Baltic Birch horizontal wood grain
-        drawMapleFace(sc.leftX, sc.barTopY, sc.barW, sc.barH, 'horizontal', undefined, 0, grainSeed + 3);
+        // Continuous exposed horizontal 13-ply Baltic Birch plywood front edge
+        drawBirchEdge(sc.leftCx, sc.shelfTopY, dadoShelfW, sc.shelfT, 'horizontal', grainSeed + 3);
 
-        // Subtle architectural gallery bevel highlight along top edge & crisp bottom depth shadow
-        const bevelGrad = ctx.createLinearGradient(0, sc.barTopY, 0, sc.barBotY);
-        bevelGrad.addColorStop(0.0, 'rgba(255, 255, 255, 0.28)');
-        bevelGrad.addColorStop(0.24, 'rgba(255, 255, 255, 0.04)');
-        bevelGrad.addColorStop(0.76, 'rgba(0, 0, 0, 0.03)');
-        bevelGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0.16)');
-        ctx.fillStyle = bevelGrad;
-        ctx.fillRect(sc.leftX, sc.barTopY, sc.barW, sc.barH);
-
-        // Warm subtle spill along milled wood bezel directly hugging the recessed LED channel when ON
-        if (isLit) {
-          const bezelGlow = ctx.createLinearGradient(0, sc.barTopY, 0, sc.barBotY);
-          bezelGlow.addColorStop(0.0, 'rgba(253, 203, 51, 0)');
-          bezelGlow.addColorStop(0.32, 'rgba(253, 203, 51, 0.26)');
-          bezelGlow.addColorStop(0.68, 'rgba(253, 203, 51, 0.26)');
-          bezelGlow.addColorStop(1.0, 'rgba(253, 203, 51, 0)');
-          ctx.fillStyle = bezelGlow;
-          ctx.fillRect(sc.ledX - 2, sc.barTopY, sc.ledW + 4, sc.barH);
-        }
+        // Subtle gallery bevel shading (crisp top edge highlight + slight underside Kelvin tint)
+        const shelfBevel = ctx.createLinearGradient(0, sc.shelfTopY, 0, sc.shelfBotY);
+        shelfBevel.addColorStop(0.0, 'rgba(255, 255, 255, 0.22)');
+        shelfBevel.addColorStop(0.28, 'rgba(255, 255, 255, 0)');
+        shelfBevel.addColorStop(0.76, 'rgba(0, 0, 0, 0.04)');
+        shelfBevel.addColorStop(1.0, isLit ? `rgba(${kPal.washRgb}, 0.24)` : 'rgba(0, 0, 0, 0.16)');
+        ctx.fillStyle = shelfBevel;
+        ctx.fillRect(sc.leftCx, sc.shelfTopY, dadoShelfW, sc.shelfT);
 
         ctx.restore();
       }
 
-      // Crisp Black CAD Outer Frame
-      drawRoundRect(sc.leftX, sc.barTopY, sc.barW, sc.barH, r);
+      drawRoundRect(sc.leftCx, sc.shelfTopY, dadoShelfW, sc.shelfT, shelfR);
       ctx.strokeStyle = COLORS.black;
-      ctx.lineWidth = isGhost ? 1.35 : 1.85;
-      ctx.stroke();
-
-      // 2. Full-Length Recessed Frosted Acrylic LED Strip Channel
-      const ledR = Math.min(1.2, sc.ledH * 0.25);
-      ctx.setLineDash([]);
-      drawRoundRect(sc.ledX, sc.ledY, sc.ledW, sc.ledH, ledR);
-
-      if (isGhost) {
-        ctx.fillStyle = '#FFF7D6';
-        ctx.fill();
-      } else if (isLit) {
-        const ledGrad = ctx.createLinearGradient(0, sc.ledY, 0, sc.ledY + sc.ledH);
-        ledGrad.addColorStop(0.0, '#FFE47E');
-        ledGrad.addColorStop(0.3, '#FFFBE6');
-        ledGrad.addColorStop(0.5, '#FFFFFF');
-        ledGrad.addColorStop(0.7, '#FFFBE6');
-        ledGrad.addColorStop(1.0, '#FFE06B');
-        ctx.fillStyle = ledGrad;
-        ctx.fill();
-      } else {
-        // Unlit matte frosted diffuser sitting recessed inside milled birch groove
-        const offGrad = ctx.createLinearGradient(0, sc.ledY, 0, sc.ledY + sc.ledH);
-        offGrad.addColorStop(0.0, '#C8C6C0');
-        offGrad.addColorStop(0.28, '#E6E4DF');
-        offGrad.addColorStop(1.0, '#F0EFEA');
-        ctx.fillStyle = offGrad;
-        ctx.fill();
-      }
-
-      // Crisp milled recess channel border lines
-      ctx.strokeStyle = isLit ? 'rgba(0, 0, 0, 0.72)' : COLORS.black;
-      ctx.lineWidth = isGhost ? 0.95 : 1.15;
+      ctx.lineWidth = isGhost ? 1.3 : 1.75;
       ctx.stroke();
 
       ctx.restore();
@@ -2973,10 +4684,10 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
     ) => {
       switch (type) {
         case 'hook':
-          drawWallHookIsoShadow(gx1, gx2, gy1, gy2, m, lift, ox, oy);
+          drawWallHookIsoShadow(gx1, gx2, gy1, gy2, m, lift, ox, oy, seed, showProps);
           break;
         case 'shelf':
-          drawShelfIsoShadow(gx1, gx2, gy1, gy2, m, lift, ox, oy);
+          drawShelfIsoShadow(gx1, gx2, gy1, gy2, m, lift, ox, oy, seed, showProps);
           break;
         case 'cabinet':
           drawCabinetIsoShadow(gx1, gx2, gy1, gy2, m, lift, ox, oy);
@@ -2988,7 +4699,7 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
           drawWallShelfIsoShadow(gx1, gx2, gy1, gy2, m, lift, ox, oy, seed, showProps);
           break;
         case 'cradle':
-          drawVinylBoxIsoShadow(gx1, gx2, gy1, gy2, m, lift, ox, oy, showProps);
+          drawVinylBoxIsoShadow(gx1, gx2, gy1, gy2, m, lift, ox, oy, seed, showProps);
           break;
         case 'sconce':
           drawWallSconceIsoShadow(gx1, gx2, gy1, gy2, m, lift, ox, oy);
@@ -3009,20 +4720,36 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       isGhost: boolean,
       seed = 0,
       lit = true,
-      showProps = true
+      showProps = true,
+      doorProgress = 0,
+      doorOpenSide: 'left' | 'right' = 'left',
+      lightKelvin: LightKelvin = 2700
     ) => {
       switch (type) {
         case 'hook':
-          drawWallHook(gx1, gx2, gy1, gy2, m, lift, ox, oy, isGhost, seed);
+          drawWallHook(gx1, gx2, gy1, gy2, m, lift, ox, oy, isGhost, seed, showProps);
           break;
         case 'shelf':
-          drawShelfWithRod(gx1, gx2, gy1, gy2, m, lift, ox, oy, isGhost, seed);
+          drawShelfWithRod(gx1, gx2, gy1, gy2, m, lift, ox, oy, isGhost, seed, showProps);
           break;
         case 'cabinet':
-          drawSlidingDoorCabinet(gx1, gx2, gy1, gy2, m, lift, ox, oy, isGhost, seed);
+          drawSlidingDoorCabinet(
+            gx1,
+            gx2,
+            gy1,
+            gy2,
+            m,
+            lift,
+            ox,
+            oy,
+            isGhost,
+            seed,
+            doorProgress,
+            doorOpenSide
+          );
           break;
         case 'cubby':
-          drawOpenCube(gx1, gx2, gy1, gy2, m, lift, ox, oy, isGhost, seed);
+          drawOpenCube(gx1, gx2, gy1, gy2, m, lift, ox, oy, isGhost, seed, lit, lightKelvin);
           break;
         case 'wallShelf':
           drawWallShelf(gx1, gx2, gy1, gy2, m, lift, ox, oy, isGhost, seed, showProps);
@@ -3031,7 +4758,7 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
           drawVinylBox(gx1, gx2, gy1, gy2, m, lift, ox, oy, isGhost, seed, showProps);
           break;
         case 'sconce':
-          drawWallSconce(gx1, gx2, gy1, gy2, m, lift, ox, oy, isGhost, seed, lit);
+          drawWallSconce(gx1, gx2, gy1, gy2, m, lift, ox, oy, isGhost, seed, lit, lightKelvin);
           break;
       }
     };
@@ -3043,9 +4770,12 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       ensureLoop();
     };
 
+    let lastArrangementArchetype = -1;
+
     /**
-     * Generates a fresh randomized composition of `targetCount` (default 7) restrained Baltic Birch modular items
-     * across available open mortise wall cells on every page reload or Rearrange click.
+     * Generates a practical, architecturally composed Baltic Birch modular wall layout
+     * weighted 60% Aesthetic Composition Rules and 40% Real-World Functionality Rules,
+     * with controlled room for organic human variation on each Rearrange click.
      */
     const applyRandomArrangement = (
       targetCount = INITIAL_RANDOM_COUNT,
@@ -3057,174 +4787,898 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       );
       if (openSlots.length === 0) return;
 
-      const usedCells = new Set<string>();
+      const AESTHETIC_WEIGHT = 0.6;
+      const FUNCTIONAL_WEIGHT = 0.4;
+
       const pickRandom = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
+      const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
+      const gaussScore = (val: number, ideal: number, spread: number) =>
+        Math.exp(-Math.pow((val - ideal) / Math.max(0.05, spread), 2));
 
-      const isRectFree = (gx1: number, gx2: number, gy1: number, gy2: number) => {
-        if (!canPlaceRect(gx1, gx2, gy1, gy2)) return false;
-        for (let gy = gy1; gy <= gy2; gy++) {
-          for (let gx = gx1; gx <= gx2; gx++) {
-            if (usedCells.has(keyOf(gx, gy))) return false;
-          }
-        }
-        return true;
+      // Measure actual open wall bounds (smaller gy = higher toward ceiling, larger gy = lower toward floor)
+      let minOpenGy = Infinity;
+      let maxOpenGy = -Infinity;
+      for (let i = 0; i < openSlots.length; i++) {
+        const s = openSlots[i];
+        if (s.gy < minOpenGy) minOpenGy = s.gy;
+        if (s.gy > maxOpenGy) maxOpenGy = s.gy;
+      }
+      const rowSpan = Math.max(1, maxOpenGy - minOpenGy);
+      const totalOpenCells = openSlots.length;
+
+      type WallBay = 'left' | 'right' | 'center';
+      interface CandidateRect {
+        gx1: number;
+        gx2: number;
+        gy1: number;
+        gy2: number;
+        cols: number;
+        rows: number;
+        bay: WallBay;
+        midX: number;
+        topNorm: number;
+        midNorm: number;
+        botNorm: number;
+      }
+      interface LayoutPiece extends CandidateRect {
+        type: WallTool;
+      }
+
+      const classifyBay = (midX: number): WallBay => {
+        if (midX < cssW * 0.46) return 'left';
+        if (midX > cssW * 0.54) return 'right';
+        return 'center';
       };
 
-      const markRectUsed = (gx1: number, gx2: number, gy1: number, gy2: number) => {
-        for (let gy = gy1; gy <= gy2; gy++) {
-          for (let gx = gx1; gx <= gx2; gx++) {
-            usedCells.add(keyOf(gx, gy));
-          }
-        }
-      };
+      const hasLeftBay = openSlots.some((s) => s.cx < cssW * 0.46);
+      const hasRightBay = openSlots.some((s) => s.cx > cssW * 0.54);
+      const dualBayWall = hasLeftBay && hasRightBay;
 
-      const mMidX = (gx1: number, gx2: number) =>
-        gridMeta.centerX + ((gx1 + gx2) * 0.5) * gridMeta.pitchX;
-
-      const tryPlaceRandomOfSize = (
-        type: WallTool,
-        cols: number,
-        rows: number,
-        preferSide?: 'left' | 'right'
-      ): boolean => {
-        const candidates: Array<{ gx1: number; gx2: number; gy1: number; gy2: number }> = [];
-        const preferred: Array<{ gx1: number; gx2: number; gy1: number; gy2: number }> = [];
-
+      // Precompute all valid rectangles by "cols,rows" once for fast multi-candidate evaluation
+      const rectsBySize = new Map<string, CandidateRect[]>();
+      const getValidRects = (cols: number, rows: number): CandidateRect[] => {
+        const sizeKey = `${cols}x${rows}`;
+        const cached = rectsBySize.get(sizeKey);
+        if (cached) return cached;
+        const list: CandidateRect[] = [];
         for (let i = 0; i < openSlots.length; i++) {
           const s = openSlots[i];
           const gx1 = s.gx;
           const gx2 = s.gx + cols - 1;
           const gy1 = s.gy;
           const gy2 = s.gy + rows - 1;
-          if (!isRectFree(gx1, gx2, gy1, gy2)) continue;
-          const rect = { gx1, gx2, gy1, gy2 };
-          candidates.push(rect);
-          if (preferSide) {
-            const midX = mMidX(gx1, gx2);
+          if (!canPlaceRect(gx1, gx2, gy1, gy2)) continue;
+          const midX = gridMeta.centerX + ((gx1 + gx2) * 0.5) * gridMeta.pitchX;
+          list.push({
+            gx1,
+            gx2,
+            gy1,
+            gy2,
+            cols,
+            rows,
+            bay: classifyBay(midX),
+            midX,
+            topNorm: (gy1 - minOpenGy) / rowSpan,
+            midNorm: ((gy1 + gy2) * 0.5 - minOpenGy) / rowSpan,
+            botNorm: (gy2 - minOpenGy) / rowSpan,
+          });
+        }
+        rectsBySize.set(sizeKey, list);
+        return list;
+      };
+
+      // Visual mass density per modular object (drives left/right balance & visual gravity)
+      const VISUAL_DENSITY: Record<WallTool, number> = {
+        cabinet: 1.38,
+        cubby: 1.18,
+        cradle: 0.96,
+        shelf: 0.9,
+        wallShelf: 0.82,
+        sconce: 0.48,
+        hook: 0.46,
+      };
+      const pieceVisualMass = (p: { type: WallTool; cols: number; rows: number }) =>
+        p.cols * p.rows * VISUAL_DENSITY[p.type];
+
+      const colsOverlap = (
+        a: { gx1: number; gx2: number },
+        b: { gx1: number; gx2: number }
+      ) => a.gx1 <= b.gx2 && b.gx1 <= a.gx2;
+
+      const rowsOverlap = (
+        a: { gy1: number; gy2: number },
+        b: { gy1: number; gy2: number }
+      ) => a.gy1 <= b.gy2 && b.gy1 <= a.gy2;
+
+      // Real-world ergonomic height suitability (0..1) for each modular object on an actual wall
+      const ergonomicHeightScore = (type: WallTool, r: CandidateRect): number => {
+        switch (type) {
+          case 'sconce': {
+            // Architectural wall lighting belongs high / upper-mid wall, never ankle-height
+            let s = gaussScore(r.topNorm, 0.14, 0.24);
+            if (r.topNorm > 0.52) s *= 0.22;
+            if (r.topNorm > 0.66) s *= 0.1;
+            return clamp01(s);
+          }
+          case 'shelf': {
+            // Closet rod + shelf: comfortable upper-mid reach with floor clearance for hanging clothes
+            let s = gaussScore(r.midNorm, 0.28, 0.22);
+            if (r.botNorm > 0.72) s *= 0.28;
+            if (maxOpenGy - r.gy2 < 1 && rowSpan >= 4) s *= 0.08;
+            return clamp01(s);
+          }
+          case 'wallShelf': {
+            // Display shelf with sculptural plant + books: upper-to-mid eye level, headroom preferred
+            let s = gaussScore(r.midNorm, 0.36, 0.26);
+            if (r.gy1 === minOpenGy && rowSpan >= 4) s *= 0.76;
+            if (r.botNorm > 0.86) s *= 0.45;
+            return clamp01(s);
+          }
+          case 'cradle': {
+            // Book Shelf: natural eye-to-waist browsing & reach zone
+            let s = gaussScore(r.midNorm, 0.46, 0.26);
+            if (r.topNorm < 0.06 && rowSpan >= 5) s *= 0.72;
+            return clamp01(s);
+          }
+          case 'hook': {
+            // Everyday carry hooks (backpack & hat): reachable mid-wall height, never ceiling or floor
+            let s = gaussScore(r.midNorm, 0.46, 0.24);
+            if (r.gy1 === minOpenGy && rowSpan >= 4) s *= 0.35;
+            if (r.gy2 === maxOpenGy && rowSpan >= 3) s *= 0.12;
+            return clamp01(s);
+          }
+          case 'cubby': {
+            // Open Cube: focal mid-to-lower gallery height
+            let s = gaussScore(r.midNorm, 0.56, 0.26);
+            if (r.topNorm < 0.04 && rowSpan >= 5) s *= 0.65;
+            return clamp01(s);
+          }
+          case 'cabinet': {
+            // Sliding-door Cabinet: anchors lower-to-mid credenza/waist zone
+            let s = gaussScore(r.midNorm, 0.72, 0.25);
+            if (r.topNorm < 0.16 && rowSpan >= 4) s *= 0.28;
+            return clamp01(s);
+          }
+        }
+      };
+
+      // Helper: checks if a drop zone below a piece would intrude into the centered hero cutout
+      const dropHitsHeroCutout = (p: LayoutPiece, dropRows: number): boolean => {
+        if (!heroCutout) return false;
+        const hitsX = p.gx1 <= heroCutout.gxMax && p.gx2 >= heroCutout.gxMin;
+        if (!hitsX) return false;
+        return p.gy2 < heroCutout.gyMin && p.gy2 + dropRows >= heroCutout.gyMin;
+      };
+
+      // Check real-world physical clearance & non-interference for piece `p` against all other items
+      const pieceClearanceScore = (p: LayoutPiece, all: LayoutPiece[]): number => {
+        let score = 1.0;
+
+        if (p.type === 'shelf') {
+          // Garment hangers hang ~1.5–2 rows downward beneath the closet rod (never dangle over center logo)
+          const wallRowsBelow = maxOpenGy - p.gy2;
+          if (dropHitsHeroCutout(p, 2)) score -= 0.96;
+          if (rowSpan >= 4 && wallRowsBelow < 2) score -= 0.78;
+          else if (rowSpan >= 6 && wallRowsBelow < 3) score -= 0.26;
+
+          for (let i = 0; i < all.length; i++) {
+            const o = all[i];
+            if (o === p || !colsOverlap(p, o)) continue;
+            const gapBelow = o.gy1 - p.gy2 - 1;
+            if (gapBelow === 0) score -= 0.85;
+            else if (gapBelow === 1) score -= 0.56;
+            else if (gapBelow === 2 && o.type !== 'cabinet') score -= 0.18;
+          }
+        } else if (p.type === 'hook') {
+          // Real-scale Filson backpack (~2.4 rows) & hanging cap (~1.5 rows) need clear open drop below the hook
+          const wallRowsBelow = maxOpenGy - p.gy2;
+          if (dropHitsHeroCutout(p, 3)) score -= 0.96;
+          if (rowSpan >= 4 && wallRowsBelow < 2) score -= 0.82;
+          else if (rowSpan >= 6 && wallRowsBelow < 3) score -= 0.34;
+          for (let i = 0; i < all.length; i++) {
+            const o = all[i];
+            if (o === p || !colsOverlap(p, o)) continue;
+            const gapBelow = o.gy1 - p.gy2 - 1;
+            if (gapBelow === 0) score -= 0.84;
+            else if (gapBelow === 1) score -= 0.56;
+            else if (gapBelow === 2) score -= 0.22;
+            // Hooks shouldn't sit trapped underneath a garment rod's hanging clothes
+            if (o.type === 'shelf') {
+              const distBelowRod = p.gy1 - o.gy2 - 1;
+              if (distBelowRod >= 0 && distBelowRod <= 2) score -= 0.68;
+            }
+          }
+        } else if (p.type === 'wallShelf') {
+          // Sculptural plant + books rise above the top surface
+          for (let i = 0; i < all.length; i++) {
+            const o = all[i];
+            if (o === p || !colsOverlap(p, o)) continue;
+            const gapAbove = p.gy1 - o.gy2 - 1;
+            if (gapAbove === 0) score -= 0.56;
+            if (o.type === 'shelf' && gapAbove >= 0 && gapAbove <= 2) score -= 0.55;
+            if (o.type === 'hook' && gapAbove === 0) score -= 0.5;
+          }
+        } else if (p.type === 'cradle') {
+          // Open-top Book Shelf needs clear access above to pull books out
+          for (let i = 0; i < all.length; i++) {
+            const o = all[i];
+            if (o === p || !colsOverlap(p, o)) continue;
+            const gapAbove = p.gy1 - o.gy2 - 1;
+            if (gapAbove === 0) score -= 0.44;
+            if (o.type === 'shelf' && gapAbove >= 0 && gapAbove <= 1) score -= 0.55;
+          }
+        } else if (p.type === 'sconce') {
+          // Sconce casts warm ambient light — don't trap it directly beneath a deep cabinet/cube overhang
+          for (let i = 0; i < all.length; i++) {
+            const o = all[i];
+            if (o === p || !colsOverlap(p, o)) continue;
+            const gapAbove = p.gy1 - o.gy2 - 1;
+            if (gapAbove === 0 && (o.type === 'cabinet' || o.type === 'cubby' || o.type === 'shelf')) {
+              score -= 0.62;
+            }
+            const gapBelow = o.gy1 - p.gy2 - 1;
+            if (gapBelow === 0 && (o.type === 'wallShelf' || o.type === 'cradle')) {
+              // Too tight directly on top of plant/books
+              score -= 0.25;
+            }
+          }
+        } else if (p.type === 'cabinet' || p.type === 'cubby') {
+          // Heavy base/focal units shouldn't sit inside a garment rod or backpack drop zone
+          for (let i = 0; i < all.length; i++) {
+            const o = all[i];
+            if (o === p || !colsOverlap(p, o)) continue;
+            const gapAbove = p.gy1 - o.gy2 - 1;
+            if (o.type === 'shelf' && gapAbove >= 0 && gapAbove <= 1) score -= 0.72;
+            if (o.type === 'hook' && gapAbove === 0) score -= 0.62;
+          }
+        }
+
+        return clamp01(score);
+      };
+
+      // Score a single candidate placement during constructive generation (60% Aesthetic / 40% Functional)
+      const scoreLocalPlacement = (
+        type: WallTool,
+        r: CandidateRect,
+        placed: LayoutPiece[],
+        preferredBay: WallBay | null,
+        errorTolerance: number
+      ): number => {
+        const piece: LayoutPiece = { ...r, type };
+        const tempAll = [...placed, piece];
+
+        // --- FUNCTIONAL COMPONENT (0..100) ---
+        const heightPts = ergonomicHeightScore(type, r) * 44;
+        const clearancePts = pieceClearanceScore(piece, tempAll) * 42;
+        let synergyPts = 7;
+
+        for (let i = 0; i < placed.length; i++) {
+          const o = placed[i];
+          const overlapX = colsOverlap(r, o);
+          // Task lighting: Sconce illuminating a Cabinet, Book Shelf, Wall Shelf, or Open Cube 1–3 rows below
+          if (type === 'sconce' && overlapX) {
+            const gapBelow = o.gy1 - r.gy2 - 1;
             if (
-              (preferSide === 'left' && midX < cssW * 0.5) ||
-              (preferSide === 'right' && midX >= cssW * 0.5)
+              gapBelow >= 1 &&
+              gapBelow <= 3 &&
+              (o.type === 'cabinet' || o.type === 'cradle' || o.type === 'wallShelf' || o.type === 'cubby')
             ) {
-              preferred.push(rect);
+              synergyPts += 9;
+            }
+          } else if (
+            o.type === 'sconce' &&
+            overlapX &&
+            (type === 'cabinet' || type === 'cradle' || type === 'wallShelf' || type === 'cubby')
+          ) {
+            const gapAbove = r.gy1 - o.gy2 - 1;
+            if (gapAbove >= 1 && gapAbove <= 3) synergyPts += 7;
+          }
+          // Wardrobe / Entryway pairing: Hooks in the same bay or beside Shelf+Rod / Cabinet without blocking vertically
+          if (type === 'hook' && (o.type === 'shelf' || o.type === 'cabinet')) {
+            if (r.bay === o.bay && !overlapX) synergyPts += 5;
+            else if (r.bay !== o.bay && Math.abs(r.midNorm - o.midNorm) < 0.25) synergyPts += 3;
+          }
+          // Credenza + Upper Shelf pairing
+          if (
+            (type === 'wallShelf' || type === 'cradle') &&
+            o.type === 'cabinet' &&
+            overlapX
+          ) {
+            const gapBelow = o.gy1 - r.gy2 - 1;
+            if (gapBelow === 1 || gapBelow === 2) synergyPts += 8;
+          }
+        }
+        const localFunctional = Math.min(100, heightPts + clearancePts + Math.min(14, synergyPts));
+
+        // --- AESTHETIC COMPONENT (0..100) ---
+        let alignPts = placed.length === 0 ? 22 : 8;
+        let datumPts = placed.length === 0 ? 12 : 4;
+        let spacingPts = 24;
+        let balancePts = 18;
+        let gravityPts = 10;
+
+        let bestAlign = 0;
+        let bestDatum = 0;
+
+        for (let i = 0; i < placed.length; i++) {
+          const o = placed[i];
+          const sameBay = r.bay === o.bay;
+
+          if (sameBay) {
+            // Vertical architectural edge alignment inside a bay (Vitsoe/Bauhaus column discipline)
+            if (r.gx1 === o.gx1 && r.gx2 === o.gx2) bestAlign = Math.max(bestAlign, 30);
+            else if (r.gx1 === o.gx1 || r.gx2 === o.gx2) bestAlign = Math.max(bestAlign, 22);
+            else if (Math.abs((r.gx1 + r.gx2) - (o.gx1 + o.gx2)) <= 1) {
+              bestAlign = Math.max(bestAlign, 18);
+            }
+          } else {
+            // Horizontal datum lines bridging Left & Right flanks across the center wordmark
+            if (r.gy1 === o.gy1 || r.gy2 === o.gy2) bestDatum = Math.max(bestDatum, 18);
+            else if (Math.abs((r.gy1 + r.gy2) - (o.gy1 + o.gy2)) <= 1) {
+              bestDatum = Math.max(bestDatum, 12);
+            }
+          }
+
+          // Clean negative space / breathing room between nearby pieces
+          const dxGap = Math.max(0, Math.max(r.gx1 - o.gx2 - 1, o.gx1 - r.gx2 - 1));
+          const dyGap = Math.max(0, Math.max(r.gy1 - o.gy2 - 1, o.gy1 - r.gy2 - 1));
+          const overlapX = colsOverlap(r, o);
+          const overlapY = rowsOverlap(r, o);
+
+          if (overlapX && dyGap === 0) {
+            // Flush vertical touching looks cramped on a mortise wall
+            spacingPts -= 13;
+          } else if (overlapX && dyGap === 1) {
+            // Crisp 1-row architectural reveal
+            spacingPts += 5;
+          }
+
+          if (overlapY && dxGap === 0) {
+            // Flush side-by-side touching
+            spacingPts -= 11;
+          } else if (overlapY && (dxGap === 1 || dxGap === 2)) {
+            spacingPts += 4;
+          }
+
+          // Avoid putting identical object types right next to each other
+          if (o.type === type && sameBay && dxGap <= 1 && dyGap <= 1) {
+            spacingPts -= 10;
+          }
+        }
+
+        if (placed.length > 0) {
+          alignPts = Math.min(30, 6 + bestAlign);
+          datumPts = Math.min(18, 3 + bestDatum);
+        }
+        spacingPts = Math.max(0, Math.min(26, spacingPts));
+
+        // Left / Right bay balance guidance
+        if (dualBayWall) {
+          let leftMass = 0;
+          let rightMass = 0;
+          for (let i = 0; i < placed.length; i++) {
+            const m = pieceVisualMass(placed[i]);
+            if (placed[i].bay === 'left') leftMass += m;
+            else if (placed[i].bay === 'right') rightMass += m;
+          }
+          const myMass = pieceVisualMass(piece);
+          const nextLeft = leftMass + (r.bay === 'left' ? myMass : 0);
+          const nextRight = rightMass + (r.bay === 'right' ? myMass : 0);
+          const totalM = Math.max(1, nextLeft + nextRight);
+          const imbalance = Math.abs(nextLeft - nextRight) / totalM;
+          balancePts = Math.max(2, 18 * (1 - imbalance * 1.15));
+          if (preferredBay && r.bay === preferredBay) balancePts += 3;
+        }
+
+        // Visual gravity: heavy closed pieces feel grounded lower; light sconces/shelves lift upper wall
+        const massNorm = clamp01((VISUAL_DENSITY[type] - 0.45) / 0.95);
+        const idealVisualY = 0.22 + massNorm * 0.5;
+        gravityPts = gaussScore(r.midNorm, idealVisualY, 0.34) * 10;
+
+        const localAesthetic = Math.min(
+          100,
+          alignPts + datumPts + spacingPts + Math.min(18, balancePts) + gravityPts
+        );
+
+        // Weighted 60% Aesthetic + 40% Functional + controlled stochastic room for error
+        const noise = (Math.random() - 0.5) * 2 * errorTolerance;
+        return AESTHETIC_WEIGHT * localAesthetic + FUNCTIONAL_WEIGHT * localFunctional + noise;
+      };
+
+      // Whole-composition evaluation (strictly 60% Aesthetic / 40% Functionality)
+      const evaluateComposition = (items: LayoutPiece[]) => {
+        if (items.length === 0) {
+          return { aestheticScore: 0, functionalScore: 0, totalScore: 0 };
+        }
+
+        // ============== 1. FUNCTIONAL SCORE (0..100, 40% weight) ==============
+        let heightSum = 0;
+        let clearanceSum = 0;
+        for (let i = 0; i < items.length; i++) {
+          heightSum += ergonomicHeightScore(items[i].type, items[i]);
+          clearanceSum += pieceClearanceScore(items[i], items);
+        }
+        const heightScore = (heightSum / items.length) * 38;
+        const clearanceScore = (clearanceSum / items.length) * 40;
+
+        // Functional zoning & real-world pairing synergy (up to 22 pts)
+        let synergyScore = 8;
+        const sconces = items.filter((it) => it.type === 'sconce');
+        for (const sc of sconces) {
+          const illuminatesSurface = items.some(
+            (o) =>
+              o !== sc &&
+              colsOverlap(sc, o) &&
+              o.gy1 - sc.gy2 - 1 >= 1 &&
+              o.gy1 - sc.gy2 - 1 <= 3 &&
+              (o.type === 'cabinet' || o.type === 'cradle' || o.type === 'wallShelf' || o.type === 'cubby')
+          );
+          if (illuminatesSurface) synergyScore += 6;
+        }
+        const cabinets = items.filter((it) => it.type === 'cabinet');
+        for (const cab of cabinets) {
+          const hasUpperCompanion = items.some(
+            (o) =>
+              o !== cab &&
+              o.bay === cab.bay &&
+              o.gy2 < cab.gy1 &&
+              (o.type === 'wallShelf' || o.type === 'cradle' || o.type === 'sconce' || o.type === 'cubby')
+          );
+          if (hasUpperCompanion) synergyScore += 4;
+        }
+        const hooks = items.filter((it) => it.type === 'hook');
+        const shelves = items.filter((it) => it.type === 'shelf');
+        if (hooks.length > 0 && (shelves.length > 0 || cabinets.length > 0)) {
+          synergyScore += 4;
+        }
+        const functionalScore = clamp01((heightScore + clearanceScore + Math.min(22, synergyScore)) / 100) * 100;
+
+        // ============== 2. AESTHETIC SCORE (0..100, 60% weight) ==============
+        // 2a. Vertical column edge alignment within bays (28 pts)
+        let alignedItems = 0;
+        let bayPairedItems = 0;
+        for (let i = 0; i < items.length; i++) {
+          const a = items[i];
+          const peers = items.filter((b) => b !== a && b.bay === a.bay);
+          if (peers.length === 0) continue;
+          bayPairedItems++;
+          let best = 0;
+          for (const b of peers) {
+            if (a.gx1 === b.gx1 && a.gx2 === b.gx2) best = Math.max(best, 1.0);
+            else if (a.gx1 === b.gx1 || a.gx2 === b.gx2) best = Math.max(best, 0.8);
+            else if (Math.abs((a.gx1 + a.gx2) - (b.gx1 + b.gx2)) <= 1) best = Math.max(best, 0.68);
+          }
+          alignedItems += best;
+        }
+        const verticalAlignPts =
+          bayPairedItems > 0 ? (alignedItems / bayPairedItems) * 28 : 20;
+
+        // 2b. Horizontal datum harmony across the wall (18 pts)
+        let datumMatches = 0;
+        for (let i = 0; i < items.length; i++) {
+          const a = items[i];
+          let best = 0;
+          for (let j = 0; j < items.length; j++) {
+            if (i === j) continue;
+            const b = items[j];
+            if (a.bay === b.bay) continue;
+            if (a.gy1 === b.gy1 || a.gy2 === b.gy2) best = Math.max(best, 1.0);
+            else if (Math.abs((a.gy1 + a.gy2) - (b.gy1 + b.gy2)) <= 1) best = Math.max(best, 0.65);
+          }
+          datumMatches += best;
+        }
+        const datumPts = dualBayWall ? (datumMatches / items.length) * 18 : 13;
+
+        // 2c. Breathing room & gallery negative space density (22 pts)
+        let flushCollisions = 0;
+        let crispReveals = 0;
+        let usedCells = 0;
+        for (let i = 0; i < items.length; i++) {
+          const a = items[i];
+          usedCells += a.cols * a.rows;
+          for (let j = i + 1; j < items.length; j++) {
+            const b = items[j];
+            const dxGap = Math.max(0, Math.max(a.gx1 - b.gx2 - 1, b.gx1 - a.gx2 - 1));
+            const dyGap = Math.max(0, Math.max(a.gy1 - b.gy2 - 1, b.gy1 - a.gy2 - 1));
+            if (colsOverlap(a, b) && dyGap === 0) flushCollisions++;
+            else if (rowsOverlap(a, b) && dxGap === 0) flushCollisions++;
+            else if (
+              (colsOverlap(a, b) && dyGap === 1) ||
+              (rowsOverlap(a, b) && (dxGap === 1 || dxGap === 2))
+            ) {
+              crispReveals++;
             }
           }
         }
+        const fillRatio = usedCells / Math.max(1, totalOpenCells);
+        // Welcome minimalist sparse walls (2–4 pieces) through fuller studio walls without penalizing gallery negative space
+        const densityScore =
+          fillRatio <= 0.42
+            ? Math.max(7.5, gaussScore(fillRatio, 0.24, 0.22) * 12)
+            : gaussScore(fillRatio, 0.34, 0.14) * 12;
+        const revealScore = Math.min(10, 6 + crispReveals * 1.4 - flushCollisions * 4.5);
+        const spacingPts = Math.max(0, Math.min(22, densityScore + revealScore));
 
-        const pool = preferred.length > 0 ? preferred : candidates;
-        if (pool.length === 0) return false;
-        const chosen = pickRandom(pool);
-        addPlacedItem(type, chosen.gx1, chosen.gx2, chosen.gy1, chosen.gy2, withPulse);
-        markRectUsed(chosen.gx1, chosen.gx2, chosen.gy1, chosen.gy2);
-        return true;
+        // 2d. Left/Right asymmetrical visual mass balance (18 pts)
+        let balancePts = 15;
+        if (dualBayWall && items.length >= 2) {
+          let leftMass = 0;
+          let rightMass = 0;
+          let centerMass = 0;
+          let leftCount = 0;
+          let rightCount = 0;
+          for (const it of items) {
+            const m = pieceVisualMass(it);
+            if (it.bay === 'left') {
+              leftMass += m;
+              leftCount++;
+            } else if (it.bay === 'right') {
+              rightMass += m;
+              rightCount++;
+            } else {
+              centerMass += m;
+            }
+          }
+          const sideTotal = leftMass + rightMass;
+          if (sideTotal <= 0 && centerMass > 0) {
+            balancePts = 16;
+          } else if (items.length >= 3 && (leftCount === 0 || rightCount === 0)) {
+            balancePts = centerMass > 0 ? 9 : 3;
+          } else {
+            const diffRatio = Math.abs(leftMass - rightMass) / Math.max(1, sideTotal);
+            balancePts = clamp01(1 - Math.max(0, diffRatio - 0.14) * 1.75) * 18;
+          }
+        }
+
+        // 2e. Visual gravity & silhouette rhythm (14 pts)
+        let massWeightedY = 0;
+        let totalMass = 0;
+        const uniqueTypes = new Set<WallTool>();
+        for (const it of items) {
+          const m = pieceVisualMass(it);
+          massWeightedY += it.midNorm * m;
+          totalMass += m;
+          uniqueTypes.add(it.type);
+        }
+        const cgY = totalMass > 0 ? massWeightedY / totalMass : 0.5;
+        const gravityPts = gaussScore(cgY, 0.54, 0.2) * 8;
+        const varietyPts = Math.min(6, (uniqueTypes.size / Math.max(1, Math.min(4, items.length))) * 6);
+
+        const aestheticScore = clamp01(
+          (verticalAlignPts + datumPts + spacingPts + balancePts + gravityPts + varietyPts) / 100
+        ) * 100;
+
+        const totalScore =
+          AESTHETIC_WEIGHT * aestheticScore + FUNCTIONAL_WEIGHT * functionalScore;
+
+        return { aestheticScore, functionalScore, totalScore };
       };
 
-      // Balanced Baltic Birch architectural composition: Shelf + Rod, Cabinet, Open Cube, Wall Shelf w/ Plant, 5-Hook Vinyl Box & Hooks
-      const cabinetSizePool: PieceSize[] = [
-        { cols: 4, rows: 2 },
-        { cols: 5, rows: 2 },
+      // Real-world practical size pools (4.25" pitchX × 5.375" pitchY mortise increments)
+      interface PieceRecipe {
+        type: WallTool;
+        sizes: PieceSize[];
+      }
+
+      // Cabinets (width & height adjustable): 18"–39" wide × 12.75"–23.5" tall (flank cabinets & wide credenzas)
+      const cabinetFlankSizes: PieceSize[] = [
+        { cols: 5, rows: 3 },
+        { cols: 6, rows: 3 },
+        { cols: 5, rows: 4 },
+        { cols: 6, rows: 4 },
         { cols: 4, rows: 3 },
+        { cols: 5, rows: 5 },
       ];
-      const shelfSizePool: PieceSize[] = [
-        { cols: 4, rows: 2 },
+      const cabinetCredenzaSizes: PieceSize[] = [
+        { cols: 8, rows: 3 },
+        { cols: 7, rows: 3 },
+        { cols: 9, rows: 3 },
+        { cols: 6, rows: 3 },
+        { cols: 10, rows: 3 },
+        { cols: 6, rows: 2 },
+        { cols: 8, rows: 2 },
+        { cols: 5, rows: 3 },
+      ];
+      const cabinetAllSizes: PieceSize[] = [
+        ...cabinetFlankSizes,
+        { cols: 7, rows: 3 },
+        { cols: 8, rows: 3 },
+      ];
+
+      // Open Cubes (width & height adjustable): 13.5"×12.75" LP square, 17.75"×18.1" vitrine, wide gallery niches
+      const cubbySizes: PieceSize[] = [
+        { cols: 4, rows: 3 },
+        { cols: 5, rows: 4 },
+        { cols: 5, rows: 3 },
+        { cols: 4, rows: 4 },
+        { cols: 6, rows: 3 },
+        { cols: 3, rows: 3 },
+        { cols: 7, rows: 3 },
         { cols: 5, rows: 2 },
       ];
-      const cubbySizePool: PieceSize[] = [
-        { cols: 3, rows: 3 },
-        { cols: 3, rows: 3 },
-        { cols: 4, rows: 3 },
-      ];
-      const wallShelfSizePool: PieceSize[] = [
+
+      // Shelf + Rod (width adjustable, 2 rows): practical 18"–31" entryway/wardrobe coat bars
+      const shelfSizes: PieceSize[] = [
+        { cols: 5, rows: 2 },
+        { cols: 6, rows: 2 },
+        { cols: 7, rows: 2 },
         { cols: 4, rows: 2 },
+        { cols: 8, rows: 2 },
+      ];
+
+      // Book Shelf (width adjustable, 2 rows): 18"–35" studio library troughs
+      const cradleSizes: PieceSize[] = [
+        { cols: 5, rows: 2 },
+        { cols: 6, rows: 2 },
+        { cols: 7, rows: 2 },
+        { cols: 8, rows: 2 },
+        { cols: 4, rows: 2 },
+        { cols: 9, rows: 2 },
+      ];
+
+      // Wall Shelf (width adjustable, 2 rows): 13.5"–35" cantilevered display ledges
+      const wallShelfSizes: PieceSize[] = [
+        { cols: 5, rows: 2 },
+        { cols: 6, rows: 2 },
+        { cols: 4, rows: 2 },
+        { cols: 7, rows: 2 },
+        { cols: 8, rows: 2 },
         { cols: 3, rows: 2 },
-        { cols: 5, rows: 2 },
       ];
-      const cradleSizePool: PieceSize[] = [
-        { cols: 5, rows: 2 },
-        { cols: 5, rows: 2 },
-        { cols: 4, rows: 2 },
-      ];
-      const sconceSizePool: PieceSize[] = [
+
+      // Wall Sconce (width adjustable, 1 row): 9"–30.5" architectural linear light shelves
+      const sconceSizes: PieceSize[] = [
         { cols: 4, rows: 1 },
-        { cols: 3, rows: 1 },
         { cols: 5, rows: 1 },
+        { cols: 6, rows: 1 },
+        { cols: 3, rows: 1 },
+        { cols: 7, rows: 1 },
+        { cols: 2, rows: 1 },
+        { cols: 8, rows: 1 },
       ];
-      const hookSizePool: PieceSize[] = [
+
+      // Hooks (width adjustable, 1 row): single peg accents through wide 6-peg entryway coat rails
+      const hookSizes: PieceSize[] = [
         { cols: 1, rows: 1 },
         { cols: 2, rows: 1 },
         { cols: 3, rows: 1 },
+        { cols: 4, rows: 1 },
+        { cols: 5, rows: 1 },
+        { cols: 6, rows: 1 },
+      ];
+      const hookRailSizes: PieceSize[] = [
+        { cols: 4, rows: 1 },
+        { cols: 5, rows: 1 },
+        { cols: 3, rows: 1 },
+        { cols: 6, rows: 1 },
+        { cols: 2, rows: 1 },
       ];
 
-      const recipeSpecs: Array<{
-        type: WallTool;
-        sizes: PieceSize[];
-      }> = [
-        { type: 'cabinet', sizes: [pickRandom(cabinetSizePool), { cols: 4, rows: 2 }] },
-        { type: 'shelf', sizes: [pickRandom(shelfSizePool), { cols: 4, rows: 2 }] },
-        { type: 'cradle', sizes: [pickRandom(cradleSizePool), { cols: 5, rows: 2 }, { cols: 4, rows: 2 }] },
-        { type: 'cubby', sizes: [pickRandom(cubbySizePool), { cols: 3, rows: 3 }] },
-        { type: 'wallShelf', sizes: [pickRandom(wallShelfSizePool), { cols: 3, rows: 2 }] },
-        { type: 'sconce', sizes: [pickRandom(sconceSizePool), { cols: 3, rows: 1 }, { cols: 2, rows: 1 }] },
-      ];
-
-      // Shuffle order so left/right distribution feels organic on every Rearrange
-      for (let i = recipeSpecs.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [recipeSpecs[i], recipeSpecs[j]] = [recipeSpecs[j], recipeSpecs[i]];
-      }
-
-      let leftCount = 0;
-      let rightCount = 0;
-      const nextSide = (): 'left' | 'right' => {
-        if (leftCount < rightCount) return 'left';
-        if (rightCount < leftCount) return 'right';
-        return Math.random() < 0.5 ? 'left' : 'right';
+      // Pick a curated subset of 3–4 practical sizes per piece so the scorer can match widths cleanly across bays
+      const makeSpec = (type: WallTool, pool: PieceSize[], fallback: PieceSize): PieceRecipe => {
+        const shuffled = [...pool].sort(() => Math.random() - 0.5);
+        const sizes = shuffled.slice(0, Math.min(4, shuffled.length));
+        if (!sizes.some((s) => s.cols === fallback.cols && s.rows === fallback.rows)) {
+          sizes.push(fallback);
+        }
+        return { type, sizes };
       };
 
-      const recordLastSide = () => {
-        const last = placedItems[placedItems.length - 1];
-        if (!last) return;
-        if (mMidX(last.gx1, last.gx2) < cssW * 0.5) leftCount++;
-        else rightCount++;
+      // Varied real-world architectural programs with NO fixed minimum piece count (organic 2–8+ piece range)
+      const buildArchetypeRecipe = (archetypeIdx: number): PieceRecipe[] => {
+        const cap = Math.max(2, Math.min(targetCount + 2, totalOpenCells >= 160 ? 9 : totalOpenCells >= 95 ? 7 : 5));
+        const maybe = (prob: number, recipe: PieceRecipe): PieceRecipe[] =>
+          Math.random() < prob ? [recipe] : [];
+
+        const archetypes: Array<() => PieceRecipe[]> = [
+          // 0: Minimalist Sculptural Duo / Trio (2–4 pieces — architectural restraint & generous negative space)
+          () => [
+            makeSpec('cabinet', cabinetCredenzaSizes, { cols: 6, rows: 3 }),
+            makeSpec('sconce', sconceSizes, { cols: 4, rows: 1 }),
+            ...maybe(0.7, makeSpec('cubby', cubbySizes, { cols: 4, rows: 3 })),
+            ...maybe(0.4, makeSpec('hook', hookSizes, { cols: 1, rows: 1 })),
+          ],
+          // 1: Entryway & Mudroom Drop Zone (3–5 pieces — coat rod, wide peg rail, drop cabinet, task light)
+          () => [
+            makeSpec('shelf', shelfSizes, { cols: 5, rows: 2 }),
+            makeSpec('cabinet', cabinetAllSizes, { cols: 5, rows: 3 }),
+            makeSpec('hook', hookRailSizes, { cols: 3, rows: 1 }),
+            ...maybe(0.75, makeSpec('sconce', sconceSizes, { cols: 4, rows: 1 })),
+            ...maybe(0.45, makeSpec('wallShelf', wallShelfSizes, { cols: 5, rows: 2 })),
+          ],
+          // 2: Living / Reading Library Wall (4–6 pieces — wide credenza, book trough, LP open cube, plant ledge, sconce)
+          () => [
+            makeSpec('cabinet', cabinetCredenzaSizes, { cols: 6, rows: 3 }),
+            makeSpec('cradle', cradleSizes, { cols: 6, rows: 2 }),
+            makeSpec('cubby', cubbySizes, { cols: 4, rows: 3 }),
+            makeSpec('sconce', sconceSizes, { cols: 5, rows: 1 }),
+            ...maybe(0.8, makeSpec('wallShelf', wallShelfSizes, { cols: 5, rows: 2 })),
+            ...maybe(0.4, makeSpec('hook', hookSizes, { cols: 2, rows: 1 })),
+          ],
+          // 3: Gallery Display & Light Study (2–5 pieces — open cube vitrines, long floating ledge, linear sconce)
+          () => [
+            makeSpec('cubby', cubbySizes, { cols: 5, rows: 4 }),
+            makeSpec('wallShelf', wallShelfSizes, { cols: 6, rows: 2 }),
+            ...maybe(0.85, makeSpec('sconce', sconceSizes, { cols: 5, rows: 1 })),
+            ...maybe(0.55, makeSpec('cubby', cubbySizes, { cols: 4, rows: 3 })),
+            ...maybe(0.4, makeSpec('hook', hookSizes, { cols: 1, rows: 1 })),
+          ],
+          // 4: Studio Wardrobe & Everyday Carry (4–6 pieces — wardrobe rod, tall cabinet, peg rail, plant shelf)
+          () => [
+            makeSpec('cabinet', cabinetFlankSizes, { cols: 5, rows: 4 }),
+            makeSpec('shelf', shelfSizes, { cols: 6, rows: 2 }),
+            makeSpec('hook', hookRailSizes, { cols: 4, rows: 1 }),
+            makeSpec('wallShelf', wallShelfSizes, { cols: 5, rows: 2 }),
+            ...maybe(0.75, makeSpec('sconce', sconceSizes, { cols: 4, rows: 1 })),
+            ...maybe(0.4, makeSpec('cradle', cradleSizes, { cols: 5, rows: 2 })),
+          ],
+          // 5: Full Home / Studio Feature Wall (6–8 pieces — complete balanced architectural program)
+          () => [
+            makeSpec('cabinet', cabinetAllSizes, { cols: 6, rows: 3 }),
+            makeSpec('cubby', cubbySizes, { cols: 4, rows: 3 }),
+            makeSpec('shelf', shelfSizes, { cols: 5, rows: 2 }),
+            makeSpec('cradle', cradleSizes, { cols: 6, rows: 2 }),
+            makeSpec('wallShelf', wallShelfSizes, { cols: 5, rows: 2 }),
+            makeSpec('sconce', sconceSizes, { cols: 4, rows: 1 }),
+            ...maybe(0.85, makeSpec('hook', hookSizes, { cols: 3, rows: 1 })),
+            ...maybe(0.4, makeSpec('sconce', sconceSizes, { cols: 3, rows: 1 })),
+          ],
+          // 6: Compact Architectural Study (3–4 pieces — book shelf, linear sconce, open cube, optional peg)
+          () => [
+            makeSpec('cradle', cradleSizes, { cols: 6, rows: 2 }),
+            makeSpec('cubby', cubbySizes, { cols: 4, rows: 3 }),
+            makeSpec('sconce', sconceSizes, { cols: 5, rows: 1 }),
+            ...maybe(0.6, makeSpec('hook', hookSizes, { cols: 2, rows: 1 })),
+          ],
+          // 7: Dual-Cabinet Credenza & Shelving Composition (4–7 pieces — complementary tall + wide cabinets)
+          () => [
+            makeSpec('cabinet', cabinetCredenzaSizes, { cols: 7, rows: 3 }),
+            makeSpec('cabinet', cabinetFlankSizes, { cols: 5, rows: 4 }),
+            makeSpec('wallShelf', wallShelfSizes, { cols: 6, rows: 2 }),
+            makeSpec('sconce', sconceSizes, { cols: 5, rows: 1 }),
+            ...maybe(0.75, makeSpec('cradle', cradleSizes, { cols: 5, rows: 2 })),
+            ...maybe(0.55, makeSpec('cubby', cubbySizes, { cols: 4, rows: 3 })),
+            ...maybe(0.45, makeSpec('hook', hookRailSizes, { cols: 3, rows: 1 })),
+          ],
+        ];
+
+        return archetypes[archetypeIdx % archetypes.length]().slice(0, cap);
       };
 
-      for (const spec of recipeSpecs) {
-        if (placedItems.length >= targetCount) break;
-        let placed = false;
-        const side = nextSide();
+      // Rotate archetypes so consecutive Rearrange clicks explore diverse densities & room functions
+      const archetypeCount = 8;
+      let chosenArchetype = Math.floor(Math.random() * archetypeCount);
+      if (chosenArchetype === lastArrangementArchetype) {
+        chosenArchetype = (chosenArchetype + 1 + Math.floor(Math.random() * (archetypeCount - 1))) % archetypeCount;
+      }
+      lastArrangementArchetype = chosenArchetype;
 
-        for (const sz of spec.sizes) {
-          if (tryPlaceRandomOfSize(spec.type, sz.cols, sz.rows, side)) {
-            placed = true;
-            recordLastSide();
-            break;
+      // Construct & evaluate 36 candidate layouts, allowing controlled room for error
+      const TRIAL_COUNT = 36;
+      const evaluatedLayouts: Array<{
+        items: LayoutPiece[];
+        aestheticScore: number;
+        functionalScore: number;
+        totalScore: number;
+      }> = [];
+
+      for (let trial = 0; trial < TRIAL_COUNT; trial++) {
+        // Most trials refine the chosen room archetype; a few explore neighboring archetypes
+        const trialArchetype =
+          trial < 26 ? chosenArchetype : (chosenArchetype + 1 + (trial % (archetypeCount - 1))) % archetypeCount;
+        const recipe = buildArchetypeRecipe(trialArchetype);
+
+        // Mildly vary anchor order across trials for natural layout diversity
+        if (recipe.length >= 2 && Math.random() < 0.5) {
+          [recipe[0], recipe[1]] = [recipe[1], recipe[0]];
+        }
+
+        const usedCells = new Set<string>();
+        const isFree = (r: CandidateRect) => {
+          for (let gy = r.gy1; gy <= r.gy2; gy++) {
+            for (let gx = r.gx1; gx <= r.gx2; gx++) {
+              if (usedCells.has(keyOf(gx, gy))) return false;
+            }
+          }
+          return true;
+        };
+        const markUsed = (r: CandidateRect) => {
+          for (let gy = r.gy1; gy <= r.gy2; gy++) {
+            for (let gx = r.gx1; gx <= r.gx2; gx++) {
+              usedCells.add(keyOf(gx, gy));
+            }
+          }
+        };
+
+        const trialItems: LayoutPiece[] = [];
+        // Per-trial room-for-error jitter (between 5 and 11 pts) so human imperfections can emerge
+        const localErrorBand = 5.5 + Math.random() * 5.5;
+        let nextBayBias: WallBay = Math.random() < 0.5 ? 'left' : 'right';
+
+        for (const spec of recipe) {
+          const bestChoices: Array<{ rect: CandidateRect; score: number }> = [];
+
+          // Evaluate all sampled practical sizes for every piece so widths & heights align naturally with neighboring objects
+          for (const sz of spec.sizes) {
+            const rects = getValidRects(sz.cols, sz.rows);
+            for (let i = 0; i < rects.length; i++) {
+              const r = rects[i];
+              if (!isFree(r)) continue;
+              const s = scoreLocalPlacement(
+                spec.type,
+                r,
+                trialItems,
+                dualBayWall ? nextBayBias : null,
+                localErrorBand
+              );
+              bestChoices.push({ rect: r, score: s });
+            }
+          }
+
+          if (bestChoices.length === 0) continue;
+          bestChoices.sort((a, b) => b.score - a.score);
+
+          // Sample from top 3 local placements to preserve organic architectural variety
+          const topLocal = bestChoices.slice(0, Math.min(3, bestChoices.length));
+          const picked =
+            topLocal.length === 1 || Math.random() < 0.62
+              ? topLocal[0].rect
+              : topLocal[Math.floor(Math.random() * topLocal.length)].rect;
+
+          trialItems.push({ ...picked, type: spec.type });
+          markUsed(picked);
+
+          // Alternate bay bias toward whichever flank currently has lighter visual mass
+          if (dualBayWall) {
+            let lM = 0;
+            let rM = 0;
+            for (const it of trialItems) {
+              const m = pieceVisualMass(it);
+              if (it.bay === 'left') lM += m;
+              else if (it.bay === 'right') rM += m;
+            }
+            nextBayBias = lM <= rM ? 'left' : 'right';
           }
         }
-        if (!placed) {
-          const fallbackSize = pickRandom(hookSizePool);
-          if (
-            tryPlaceRandomOfSize('hook', fallbackSize.cols, fallbackSize.rows, side) ||
-            tryPlaceRandomOfSize('hook', 1, 1)
-          ) {
-            recordLastSide();
-          }
-        }
+
+        if (trialItems.length === 0) continue;
+        const scores = evaluateComposition(trialItems);
+        evaluatedLayouts.push({ items: trialItems, ...scores });
       }
 
-      // Fill remaining slots up to targetCount with varied CNC J-Hooks
-      let guard = 0;
-      while (placedItems.length < targetCount && guard < 24) {
-        guard++;
-        const side = nextSide();
-        const sz = pickRandom(hookSizePool);
-        if (
-          tryPlaceRandomOfSize('hook', sz.cols, sz.rows, side) ||
-          tryPlaceRandomOfSize('hook', 1, 1, side) ||
-          tryPlaceRandomOfSize('hook', 1, 1)
-        ) {
-          recordLastSide();
-        } else {
+      if (evaluatedLayouts.length === 0) return;
+      evaluatedLayouts.sort((a, b) => b.totalScore - a.totalScore);
+
+      // Filter strictly to compositions passing practical + aesthetic standards, with safe fallback
+      const passing = evaluatedLayouts.filter(
+        (c) => c.functionalScore >= 60 && c.aestheticScore >= 62
+      );
+      const pool = passing.length >= 3 ? passing : evaluatedLayouts;
+
+      // Allow controlled room for error: sample via softmax from top tier within 10 pts of the peak score
+      const peakScore = pool[0].totalScore;
+      const finalistBand = pool
+        .filter((c) => c.totalScore >= peakScore - 10)
+        .slice(0, 8);
+
+      let weightSum = 0;
+      const weights = finalistBand.map((c) => {
+        const w = Math.exp((c.totalScore - peakScore) / 4.8);
+        weightSum += w;
+        return w;
+      });
+      let roll = Math.random() * weightSum;
+      let winner = finalistBand[0];
+      for (let i = 0; i < finalistBand.length; i++) {
+        roll -= weights[i];
+        if (roll <= 0) {
+          winner = finalistBand[i];
           break;
         }
+      }
+
+      for (const item of winner.items) {
+        addPlacedItem(item.type, item.gx1, item.gx2, item.gy1, item.gy2, withPulse);
       }
 
       if (withPulse) triggerRipple(0.5, 0.5);
@@ -3237,6 +5691,8 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
         toolSizes,
         motionOn,
         showProps,
+        warmLightingOn,
+        lightKelvin,
         isModalOpen: modalActive,
         canInteract: interactiveActive,
       } = stateRef.current;
@@ -3259,6 +5715,15 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       for (let i = 0; i < placedItems.length; i++) {
         const item = placedItems[i];
         item.lift = motionOn ? item.lift + (1 - item.lift) * 0.2 : 1;
+        if (item.type === 'cabinet') {
+          const targetOpen = item.doorOpen ? 1 : 0;
+          const cur = item.doorProgress ?? 0;
+          if (!motionOn || Math.abs(targetOpen - cur) < 0.002) {
+            item.doorProgress = targetOpen;
+          } else {
+            item.doorProgress = cur + (targetOpen - cur) * 0.18;
+          }
+        }
         if (item.id === draggedItemId) {
           draggedItem = item;
           continue;
@@ -3391,7 +5856,7 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
           hoveredPlacementCandidate !== null
       );
 
-      // Pass 0: Draw warm architectural Wall Sconce light washes onto the white mortise wall (behind slots & hardware)
+      // Pass 0: Draw Kelvin-matched architectural light washes for Wall Sconces (Open Cube lighting stays strictly interior)
       for (let i = 0; i < placedItems.length; i++) {
         const item = placedItems[i];
         if (item.id === draggedItemId || !isItemVisible(item) || item.type !== 'sconce') continue;
@@ -3404,7 +5869,8 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
           item.lift,
           0,
           0,
-          item.lit ?? true
+          item.lit ?? warmLightingOn,
+          lightKelvin
         );
       }
 
@@ -3437,12 +5903,13 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
           ctx.globalAlpha = 1;
         }
 
+        const bevelShift = Math.max(0.85, Math.min(1.4, m.slotW * 0.11));
         ctx.save();
         drawRoundRect(x, y, m.slotW, m.slotH, m.slotR);
         ctx.clip();
         ctx.strokeStyle = 'rgba(203, 203, 203, 0.72)';
-        ctx.lineWidth = 1.75;
-        drawRoundRect(x + 1.4, y + 1.4, m.slotW, m.slotH, m.slotR);
+        ctx.lineWidth = Math.max(1.05, Math.min(1.75, m.slotW * 0.135));
+        drawRoundRect(x + bevelShift, y + bevelShift, m.slotW, m.slotH, m.slotR);
         ctx.stroke();
         ctx.restore();
 
@@ -3453,7 +5920,10 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
             : isHov || s.hoverHeat > 0.38
               ? COLORS.black
               : COLORS.gray;
-        ctx.lineWidth = isHov || isDragSnapSlot ? 1.9 : 1.4;
+        ctx.lineWidth =
+          isHov || isDragSnapSlot
+            ? Math.max(1.35, Math.min(1.9, m.slotW * 0.15))
+            : Math.max(1.0, Math.min(1.4, m.slotW * 0.11));
         ctx.stroke();
         ctx.restore();
       }
@@ -3495,8 +5965,11 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
           oy,
           false,
           item.seed,
-          item.lit ?? true,
-          item.hasProps ?? showProps
+          item.lit ?? warmLightingOn,
+          item.hasProps ?? showProps,
+          item.doorProgress ?? 0,
+          item.doorOpenSide ?? 'left',
+          lightKelvin
         );
       }
 
@@ -3504,6 +5977,7 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       if (activeDrag && draggedItem) {
         const snap = activeDrag.snapRect;
         const draggedProps = draggedItem.hasProps ?? showProps;
+        const draggedLit = draggedItem.lit ?? warmLightingOn;
         drawItemBody(
           draggedItem.type,
           snap.gx1,
@@ -3516,8 +5990,11 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
           0,
           true,
           draggedItem.seed,
-          draggedItem.lit ?? true,
-          draggedProps
+          draggedLit,
+          draggedProps,
+          0,
+          draggedItem.doorOpenSide ?? 'left',
+          lightKelvin
         );
 
         const dragOx = pointerX - activeDrag.startX;
@@ -3534,7 +6011,8 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
             1,
             dragOx,
             dragOy,
-            draggedItem.lit ?? true
+            draggedLit,
+            lightKelvin
           );
         }
 
@@ -3563,8 +6041,11 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
           dragOy,
           false,
           draggedItem.seed,
-          draggedItem.lit ?? true,
-          draggedProps
+          draggedLit,
+          draggedProps,
+          draggedItem.doorProgress ?? 0,
+          draggedItem.doorOpenSide ?? 'left',
+          lightKelvin
         );
       }
 
@@ -3590,8 +6071,11 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
           hs.oy * 0.4,
           true,
           0,
-          true,
-          showProps
+          warmLightingOn,
+          showProps,
+          0,
+          'left',
+          lightKelvin
         );
       }
     };
@@ -3657,8 +6141,23 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       setAllProps: (show: boolean) => {
         for (let i = 0; i < placedItems.length; i++) {
           const item = placedItems[i];
-          if (item.type === 'wallShelf' || item.type === 'cradle') {
+          if (
+            item.type === 'wallShelf' ||
+            item.type === 'cradle' ||
+            item.type === 'shelf' ||
+            item.type === 'hook'
+          ) {
             item.hasProps = show;
+          }
+        }
+        if (!stateRef.current.motionOn) renderFrame(performance.now());
+        else ensureLoop();
+      },
+      setAllLighting: (on: boolean) => {
+        for (let i = 0; i < placedItems.length; i++) {
+          const item = placedItems[i];
+          if (item.type === 'sconce' || item.type === 'cubby') {
+            item.lit = on;
           }
         }
         if (!stateRef.current.motionOn) renderFrame(performance.now());
@@ -3830,13 +6329,29 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       const clickX = e.clientX;
       const clickY = e.clientY;
 
-      // Clicking directly on an existing piece without dragging toggles Wall Sconce light or piece props
+      // Clicking directly on an existing piece without dragging toggles lighting, sliding cabinet doors, or props
       const hitExisting = findItemAtPoint(clickX, clickY);
       if (hitExisting) {
-        if (hitExisting.type === 'sconce') {
-          hitExisting.lit = !(hitExisting.lit ?? true);
+        if (hitExisting.type === 'sconce' || hitExisting.type === 'cubby') {
+          hitExisting.lit = !(hitExisting.lit ?? stateRef.current.warmLightingOn);
           hitExisting.lift = 0.88;
-        } else if (hitExisting.type === 'wallShelf' || hitExisting.type === 'cradle') {
+        } else if (hitExisting.type === 'cabinet') {
+          const wasOpen = Boolean(hitExisting.doorOpen);
+          if (!wasOpen) {
+            const leftCx = gridMeta.centerX + hitExisting.gx1 * gridMeta.pitchX;
+            const rightCx = gridMeta.centerX + hitExisting.gx2 * gridMeta.pitchX;
+            const midX = (leftCx + rightCx) * 0.5;
+            hitExisting.doorOpenSide = clickX > midX ? 'right' : 'left';
+            hitExisting.doorOpen = true;
+          } else {
+            hitExisting.doorOpen = false;
+          }
+        } else if (
+          hitExisting.type === 'wallShelf' ||
+          hitExisting.type === 'cradle' ||
+          hitExisting.type === 'shelf' ||
+          hitExisting.type === 'hook'
+        ) {
           hitExisting.hasProps = !(hitExisting.hasProps ?? stateRef.current.showProps);
           hitExisting.lift = 0.88;
         } else {
@@ -3944,20 +6459,33 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       document.removeEventListener('pointerleave', onPointerLeave);
       document.removeEventListener('click', onClick);
       document.removeEventListener('contextmenu', onContextMenu);
+      const cleanupHero = heroSelector
+        ? (document.querySelector(heroSelector) as HTMLElement | null)
+        : null;
+      if (cleanupHero) {
+        cleanupHero.style.transform = '';
+        cleanupHero.style.transformOrigin = '';
+      }
     };
-  }, [controller.registerActions, heroSelector, headerSelector, footerSelector]);
+  }, [desktopInteractive, controller.registerActions, heroSelector, headerSelector, footerSelector]);
 
   useEffect(() => {
+    if (!desktopInteractive) return;
     syncLoopRef.current();
   }, [
+    desktopInteractive,
     controller.motionOn,
     controller.showProps,
+    controller.warmLightingOn,
+    controller.lightKelvin,
     controller.activePillar,
     controller.activeTool,
     controller.toolSizes,
     isModalOpen,
     canInteract,
   ]);
+
+  if (!desktopInteractive) return null;
 
   return <canvas ref={canvasRef} className="mortise-wall-canvas" aria-hidden="true" />;
 };
@@ -4068,11 +6596,11 @@ const renderToolIcon = (tool: WallTool) => {
           aria-hidden="true"
         >
           <path d="M2.5 7.5 V18.5 H21.5 V7.5" />
-          <line x1="5.8" y1="5" x2="5.8" y2="18.5" />
-          <line x1="8.6" y1="5" x2="8.6" y2="18.5" />
-          <line x1="11.4" y1="5" x2="11.4" y2="18.5" />
-          <line x1="14.2" y1="5" x2="14.2" y2="18.5" />
-          <line x1="16.4" y1="5.6" x2="18.4" y2="18.5" />
+          <rect x="5" y="5" width="2.8" height="13.5" strokeWidth="1.35" />
+          <rect x="7.8" y="8" width="2.2" height="10.5" strokeWidth="1.35" />
+          <rect x="10" y="6.2" width="3.2" height="12.3" strokeWidth="1.35" />
+          <rect x="13.2" y="9.2" width="2.4" height="9.3" strokeWidth="1.35" />
+          <line x1="16.4" y1="7.2" x2="18.6" y2="18.5" />
         </svg>
       );
     case 'sconce':
@@ -4087,14 +6615,15 @@ const renderToolIcon = (tool: WallTool) => {
           strokeLinejoin="round"
           aria-hidden="true"
         >
-          <rect x="2.5" y="9.5" width="19" height="5" rx="0.8" />
-          <line x1="5" y1="12" x2="19" y2="12" strokeWidth="1.35" />
-          <line x1="8" y1="6.2" x2="8" y2="4.4" strokeWidth="1.3" />
-          <line x1="12" y1="6.2" x2="12" y2="4" strokeWidth="1.3" />
-          <line x1="16" y1="6.2" x2="16" y2="4.4" strokeWidth="1.3" />
-          <line x1="8" y1="17.8" x2="8" y2="19.6" strokeWidth="1.3" />
-          <line x1="12" y1="17.8" x2="12" y2="20" strokeWidth="1.3" />
-          <line x1="16" y1="17.8" x2="16" y2="19.6" strokeWidth="1.3" />
+          {/* Left & right vertical 3/4" Baltic Birch side cheeks with ears above recessed shelf */}
+          <rect x="2.5" y="5" width="3" height="12.5" rx="0.6" />
+          <rect x="18.5" y="5" width="3" height="12.5" rx="0.6" />
+          {/* Recessed horizontal shelf */}
+          <rect x="5.5" y="7.4" width="13" height="3.2" />
+          {/* Downward architectural light rays from under-shelf routed LED channel */}
+          <line x1="9" y1="13.8" x2="8.2" y2="18.5" strokeWidth="1.35" />
+          <line x1="12" y1="13.8" x2="12" y2="19.5" strokeWidth="1.35" />
+          <line x1="15" y1="13.8" x2="15.8" y2="18.5" strokeWidth="1.35" />
         </svg>
       );
   }
@@ -4118,9 +6647,14 @@ export const MortiseWallToolbar: React.FC<{
     adjustToolSize,
     showProps,
     toggleProps,
+    warmLightingOn,
+    toggleWarmLighting,
+    lightKelvin,
+    setLightKelvin,
     rearrange,
     clearWall,
   } = controller;
+  const activeLightSwatch = LIGHT_KELVIN_PRESETS[lightKelvin].uiBg;
   const currentSize = toolSizes[activeTool];
   const currentLimits = TOOL_SIZE_LIMITS[activeTool];
   const activeLabel = TOOL_LABELS[activeTool];
@@ -4230,17 +6764,59 @@ export const MortiseWallToolbar: React.FC<{
               </button>
             </div>
           )}
-        </div>
 
-        {variant === 'default' && (
-          <span className="wall-micro-hint">
-            {activeTool === 'sconce'
-              ? 'Click slot to add · Click sconce to toggle light · Drag to move · Right-click to remove'
-              : activeTool === 'wallShelf' || activeTool === 'cradle'
-                ? 'Click slot to add · Click piece to toggle props · Drag to move · Right-click to remove'
-                : 'Click slot to add · Drag to move · Right-click piece to remove'}
-          </span>
-        )}
+          <div
+            className={`wall-light-group${warmLightingOn ? '' : ' wall-light-group--off'}`}
+            role="group"
+            aria-label="Toggle lighting and select color temperature"
+          >
+            <button
+              type="button"
+              className="wall-light-btn"
+              aria-pressed={warmLightingOn}
+              onClick={toggleWarmLighting}
+              style={{ '--light-swatch': activeLightSwatch } as React.CSSProperties}
+              title={`Toggle ${lightKelvin}K ambient lighting for Open Cube and Wall Sconce objects`}
+            >
+              <svg
+                className="wall-light-icon"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.9"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <circle cx="12" cy="12" r="4" />
+                <line x1="12" y1="2.5" x2="12" y2="5.2" />
+                <line x1="12" y1="18.8" x2="12" y2="21.5" />
+                <line x1="2.5" y1="12" x2="5.2" y2="12" />
+                <line x1="18.8" y1="12" x2="21.5" y2="12" />
+                <line x1="5.3" y1="5.3" x2="7.2" y2="7.2" />
+                <line x1="16.8" y1="16.8" x2="18.7" y2="18.7" />
+                <line x1="18.7" y1="5.3" x2="16.8" y2="7.2" />
+                <line x1="7.2" y1="16.8" x2="5.3" y2="18.7" />
+              </svg>
+              <span>Lighting</span>
+            </button>
+            <div className="wall-kelvin-group" role="group" aria-label="Lighting color temperature">
+              {LIGHT_KELVIN_OPTIONS.map((k) => (
+                <button
+                  key={k}
+                  type="button"
+                  className="wall-kelvin-btn"
+                  aria-pressed={lightKelvin === k}
+                  onClick={() => setLightKelvin(k)}
+                  style={{ '--kelvin-swatch': LIGHT_KELVIN_PRESETS[k].uiBg } as React.CSSProperties}
+                  title={`Set ambient light color temperature to ${k}K`}
+                >
+                  {k}K
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
 
         <div className="mortise-actions">
           <button
@@ -4248,7 +6824,7 @@ export const MortiseWallToolbar: React.FC<{
             className="text-action-link"
             aria-pressed={showProps}
             onClick={toggleProps}
-            title="Toggle shelf plant and vinyl record props on or off"
+            title="Toggle plant, hangers, books, and hook backpack/hat props on or off"
           >
             Props: {showProps ? 'On' : 'Off'}
           </button>

@@ -146,6 +146,18 @@ body.wall-dragging * {
   pointer-events: auto;
 }
 
+/* Keep the interactive mortise pegboard strictly desktop-only */
+@media (max-width: 639px), (hover: none), (pointer: coarse) {
+  .mortise-wall-canvas,
+  .wall-toolbar {
+    display: none !important;
+  }
+
+  .mortise-page-shell {
+    pointer-events: auto;
+  }
+}
+
 /* Frameless Bauhaus Wall Control Strip — Flush with Hero Stack Above */
 .wall-toolbar {
   display: flex;
@@ -255,19 +267,21 @@ body.wall-dragging * {
   font-weight: 700;
 }
 
-/* Controls strip kept cleanly on one line below the tool grid */
+/* Controls strip below the tool grid — wraps cleanly on narrower desktop panes */
 .wall-controls-panel {
   width: 100%;
   min-width: 0;
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px 12px;
   padding: 0;
 }
 
 .wall-micro-hint {
+  flex: 1 1 0;
+  min-width: 0;
   font-size: 0.63rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -278,10 +292,160 @@ body.wall-dragging * {
   user-select: none;
 }
 
+.wall-stl-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 34px;
+  padding: 0 10px;
+  border: 1.5px solid var(--cg-black);
+  border-radius: 6px;
+  background-color: var(--cg-yellow);
+  color: var(--cg-black);
+  font-size: 0.64rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.wall-stl-btn:hover {
+  background-color: var(--cg-black);
+  color: var(--cg-white);
+}
+
+.wall-toolbar--compact .wall-stl-btn {
+  height: 32px;
+  padding: 0 8px;
+  font-size: 0.6rem;
+}
+
+.wall-light-group {
+  display: inline-flex;
+  align-items: center;
+  height: 34px;
+  border: 1.5px solid var(--cg-black);
+  border-radius: 6px;
+  background-color: var(--cg-white);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.wall-light-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 100%;
+  padding: 0 10px;
+  border: none;
+  border-right: 1px solid rgba(0, 0, 0, 0.22);
+  background-color: var(--cg-white);
+  color: var(--cg-black);
+  font-size: 0.62rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.wall-light-btn:hover {
+  background-color: var(--cg-black);
+  color: var(--cg-white);
+}
+
+.wall-light-btn[aria-pressed="true"] {
+  background-color: var(--light-swatch, var(--cg-yellow));
+  color: var(--cg-black);
+  font-weight: 600;
+}
+
+.wall-light-btn[aria-pressed="true"]:hover {
+  background-color: var(--cg-black);
+  color: var(--light-swatch, var(--cg-yellow));
+}
+
+.wall-light-btn:focus-visible,
+.wall-kelvin-btn:focus-visible {
+  outline: 2px solid var(--cg-black);
+  outline-offset: -2px;
+}
+
+.wall-light-icon {
+  width: 13px;
+  height: 13px;
+  display: block;
+  flex-shrink: 0;
+}
+
+.wall-kelvin-group {
+  display: inline-flex;
+  align-items: center;
+  height: 100%;
+}
+
+.wall-kelvin-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 0 7px;
+  border: none;
+  border-right: 1px solid rgba(0, 0, 0, 0.14);
+  background-color: var(--cg-white);
+  color: var(--cg-black);
+  font-size: 0.58rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 130ms ease, color 130ms ease;
+}
+
+.wall-kelvin-btn:last-child {
+  border-right: none;
+}
+
+.wall-kelvin-btn:hover {
+  background-color: rgba(0, 0, 0, 0.08);
+}
+
+.wall-kelvin-btn[aria-pressed="true"] {
+  background-color: var(--kelvin-swatch, var(--cg-yellow));
+  color: var(--cg-black);
+  font-weight: 700;
+}
+
+.wall-light-group--off .wall-kelvin-btn[aria-pressed="true"] {
+  background-color: rgba(0, 0, 0, 0.1);
+  color: var(--cg-black);
+}
+
+.wall-toolbar--compact .wall-light-group {
+  height: 32px;
+}
+
+.wall-toolbar--compact .wall-light-btn {
+  padding: 0 8px;
+  font-size: 0.58rem;
+  letter-spacing: 0.06em;
+}
+
+.wall-toolbar--compact .wall-kelvin-btn {
+  padding: 0 6px;
+  font-size: 0.55rem;
+}
+
 /* Compact Inline Width & Height Cell Variance Steppers */
 .wall-size-controls {
   display: inline-flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
   flex-shrink: 0;

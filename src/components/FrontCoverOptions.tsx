@@ -36,7 +36,7 @@ export const FrontCoverOptions: React.FC<FrontCoverOptionsProps> = ({
     <section
       id="hero-center-stack"
       aria-label="casegoods — handcrafted in omaha"
-      className="w-full max-w-[780px] mx-auto py-4 sm:py-6 flex flex-col gap-4 sm:gap-5"
+      className="w-full max-w-[780px] mx-auto py-4 sm:py-0 flex flex-col gap-4 sm:gap-5"
     >
       {/* 1. Full-Width Logo (No Outline — Scaled to Line Up Flush with the Lower Text Bubble Edges) */}
       <div className="w-full ui-surface">

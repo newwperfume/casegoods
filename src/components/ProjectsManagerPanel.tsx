@@ -982,14 +982,18 @@ export const ProjectsManagerPanel: React.FC = () => {
                   >
                     {/* Preview Stage */}
                     <div
-                      className={`relative h-48 border-b border-black flex items-center justify-center overflow-hidden ${
-                        sheet.type === 'cad' ? 'cad-grid-bg p-3' : 'bg-white'
+                      className={`relative h-48 border-b border-black flex items-center justify-center overflow-hidden bg-white ${
+                        sheet.type === 'cad' ? 'p-3' : ''
                       }`}
                     >
                       <img
                         src={sheet.src}
                         alt={sheet.alt}
-                        className="max-w-full max-h-full object-contain"
+                        className={
+                          sheet.type === 'cad'
+                            ? 'max-w-full max-h-full object-contain block'
+                            : 'w-full h-full object-cover object-center block'
+                        }
                       />
 
                       {idx === 0 && (

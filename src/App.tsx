@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { ProposedStudio } from './components/ProposedStudio.tsx';
 import { PrivateInvoiceStudio } from './components/PrivateInvoiceStudio.tsx';
 import { MobileBusinessCard } from './components/MobileBusinessCard.tsx';
+import { SconceConceptsModal } from './components/SconceConceptsModal.tsx';
 import { AuthProvider } from './context/AuthContext.tsx';
 
 function getCurrentRoute() {
@@ -47,6 +48,8 @@ export default function App() {
     route.path.startsWith('/card') ||
     route.path.startsWith('/mobile-card') ||
     route.hash === '#card';
+  const isSconceConceptsRoute =
+    route.path.startsWith('/sconce-concepts') || route.hash === '#sconce-concepts';
 
   return (
     <AuthProvider>
@@ -55,6 +58,8 @@ export default function App() {
           <PrivateInvoiceStudio />
         ) : isMobileCardRoute ? (
           <MobileBusinessCard />
+        ) : isSconceConceptsRoute ? (
+          <SconceConceptsModal standalone />
         ) : (
           <ProposedStudio />
         )}

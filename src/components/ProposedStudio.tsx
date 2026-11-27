@@ -667,7 +667,7 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
       <main
         className={`flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 ${
           activePage === 'cover'
-            ? 'py-4 sm:py-6 flex flex-col justify-center'
+            ? 'py-4 sm:py-0 flex flex-col justify-center'
             : 'pt-8 pb-16 flex flex-col justify-between'
         }`}
       >
@@ -771,11 +771,11 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
                         <span>DWG-1070MCG</span>
                       </div>
 
-                      <div className="cad-grid-bg border-b border-black/15 px-4 py-3 flex items-center justify-center h-[280px] sm:h-[320px]">
+                      <div className="bg-white border-b border-black p-3 sm:p-4 flex items-center justify-center h-[280px] sm:h-[320px] overflow-hidden">
                         <img
                           src={ASSETS.kidsKitchen.elevationA1}
                           alt="Rhino 2D CAD Elevation Shop Drawing with Fractional Callouts"
-                          className="w-full h-full object-contain select-none"
+                          className="w-full h-full object-contain block select-none"
                           referrerPolicy="no-referrer"
                         />
                       </div>
@@ -795,11 +795,11 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
                         <span>DWG-1064HEM</span>
                       </div>
 
-                      <div className="bg-white border-b border-black/15 overflow-hidden flex items-center justify-center h-[280px] sm:h-[320px]">
+                      <div className="bg-white border-b border-black overflow-hidden flex items-center justify-center h-[280px] sm:h-[320px]">
                         <img
                           src={ASSETS.familyRoom.sheet4JoineryDetail}
                           alt="3D Design Proposal showing exposed finger-jointed white oak and fluted walnut"
-                          className="w-full h-full object-cover select-none"
+                          className="w-full h-full object-cover object-center block select-none"
                           referrerPolicy="no-referrer"
                         />
                       </div>
@@ -847,15 +847,15 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-stretch pt-1">
                       <div
                         onClick={() => navigateToPage('work', currentLens.targetProjectId)}
-                        className={`lg:col-span-6 h-[250px] sm:h-[290px] rounded-[9px] border-[0.75px] border-black overflow-hidden cursor-pointer flex items-center justify-center ${
-                          currentLens.isCad ? 'cad-grid-bg p-4' : 'bg-white'
+                        className={`lg:col-span-6 h-[250px] sm:h-[290px] rounded-[9px] border-[0.75px] border-black overflow-hidden cursor-pointer flex items-center justify-center bg-white ${
+                          currentLens.isCad ? 'p-3 sm:p-4' : ''
                         }`}
                       >
                         <img
                           src={currentLens.image}
                           alt={currentLens.imageAlt}
-                          className={`w-full h-full block ${
-                            currentLens.isCad ? 'object-contain' : 'object-cover'
+                          className={`w-full h-full block select-none ${
+                            currentLens.isCad ? 'object-contain' : 'object-cover object-center'
                           }`}
                           referrerPolicy="no-referrer"
                         />
@@ -993,12 +993,8 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
 
                           {/* Commission Sheet Body */}
                           <div className="p-5 sm:p-6 space-y-5">
-                            {/* Top Control Strip: Materials Tag + Sheet Switcher Buttons */}
-                            <div className="flex flex-wrap items-center justify-between gap-3">
-                              <div className="bg-[#CBCBCB] text-black border border-black rounded-[9px] py-2 px-4 text-[0.72rem] tracking-cad uppercase font-medium select-none">
-                                {project.materials}
-                              </div>
-
+                            {/* Top Control Strip: Sheet Switcher Buttons + Spec Schedule + Fullscreen */}
+                            <div className="flex flex-wrap items-center justify-between gap-2">
                               <div className="flex flex-wrap items-center gap-2">
                                 {project.images.map((img, idx) => {
                                   const isSheetActive = !isSpecsOpen && currentIdx === idx;
@@ -1034,90 +1030,111 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
                                 >
                                   SPEC SCHEDULE
                                 </button>
-
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    setLightboxState({
-                                      project,
-                                      imageIndex: currentIdx,
-                                      showSpecs: isSpecsOpen,
-                                    })
-                                  }
-                                  className="text-[0.70rem] tracking-cad uppercase px-3.5 py-2 rounded-[9px] border border-black bg-black text-white hover:bg-[#EF6922] hover:text-black transition-colors cursor-pointer flex items-center gap-1.5 font-medium"
-                                  title="Open High-Resolution Fullscreen Viewer"
-                                >
-                                  <Maximize2 className="w-3.5 h-3.5" />
-                                  <span className="hidden md:inline">FULLSCREEN</span>
-                                </button>
                               </div>
+
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setLightboxState({
+                                    project,
+                                    imageIndex: currentIdx,
+                                    showSpecs: isSpecsOpen,
+                                  })
+                                }
+                                className="text-[0.70rem] tracking-cad uppercase px-3.5 py-2 rounded-[9px] border border-black bg-black text-white hover:bg-[#EF6922] hover:text-black transition-colors cursor-pointer flex items-center gap-1.5 font-medium"
+                                title="Open High-Resolution Fullscreen Viewer"
+                              >
+                                <Maximize2 className="w-3.5 h-3.5" />
+                                <span className="hidden md:inline">FULLSCREEN</span>
+                              </button>
                             </div>
 
-                            {/* Visual Stage or Spec Schedule Table */}
+                            {/* Visual Stage (Page 01 CAD Sheet Card Style) or Spec Schedule Table */}
                             {!isSpecsOpen && currentImg ? (
                               <div className="space-y-4">
-                                <div
-                                  className={`relative w-full rounded-[9px] border-[0.75px] border-black overflow-hidden flex items-center justify-center ${
-                                    currentImg.type === 'cad'
-                                      ? 'cad-grid-bg p-4 sm:p-8'
-                                      : 'bg-white'
-                                  }`}
-                                >
-                                  <div
-                                    onClick={() =>
-                                      setLightboxState({ project, imageIndex: currentIdx })
-                                    }
-                                    className="w-full cursor-zoom-in flex items-center justify-center"
-                                  >
-                                    <img
-                                      src={currentImg.src}
-                                      alt={currentImg.alt}
-                                      loading="lazy"
-                                      decoding="async"
-                                      className="w-full max-h-[540px] object-contain select-none"
-                                      referrerPolicy="no-referrer"
-                                    />
+                                <div className="border border-black rounded-[9px] bg-white overflow-hidden flex flex-col">
+                                  {/* Flush Grey Header Bar: Materials (Left) + Active Image Title (Right) */}
+                                  <div className="bg-[#CBCBCB] text-black border-b border-black px-4 py-2.5 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-[0.70rem] tracking-cad uppercase font-medium select-none">
+                                    <span>{project.materials}</span>
+                                    <span className="text-right">
+                                      {currentImg.sheetNumber} · {currentImg.label}
+                                    </span>
                                   </div>
 
-                                  {project.images.length > 1 && (
-                                    <>
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          setSheetIndex(
-                                            project.id,
-                                            currentIdx === 0
-                                              ? project.images.length - 1
-                                              : currentIdx - 1
-                                          )
+                                  {/* Framed Image Stage */}
+                                  <div
+                                    className={`relative w-full border-b border-black overflow-hidden flex items-center justify-center bg-white ${
+                                      currentImg.type === 'cad' ? 'p-4 sm:p-6' : ''
+                                    }`}
+                                  >
+                                    <div
+                                      onClick={() =>
+                                        setLightboxState({ project, imageIndex: currentIdx })
+                                      }
+                                      className="w-full cursor-zoom-in flex items-center justify-center"
+                                    >
+                                      <img
+                                        src={currentImg.src}
+                                        alt={currentImg.alt}
+                                        loading="lazy"
+                                        decoding="async"
+                                        className={
+                                          currentImg.type === 'cad'
+                                            ? 'w-full max-h-[540px] object-contain block select-none'
+                                            : 'w-full h-auto max-h-[540px] object-cover object-center block select-none'
                                         }
-                                        aria-label="Previous sheet"
-                                        className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-[9px] bg-white hover:bg-[#CBCBCB] text-black border-[0.75px] border-black flex items-center justify-center transition-colors cursor-pointer shadow-sm"
-                                      >
-                                        <ChevronLeft className="w-4 h-4" />
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          setSheetIndex(
-                                            project.id,
-                                            currentIdx === project.images.length - 1
-                                              ? 0
-                                              : currentIdx + 1
-                                          )
-                                        }
-                                        aria-label="Next sheet"
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-[9px] bg-white hover:bg-[#CBCBCB] text-black border-[0.75px] border-black flex items-center justify-center transition-colors cursor-pointer shadow-sm"
-                                      >
-                                        <ChevronRight className="w-4 h-4" />
-                                      </button>
-                                    </>
-                                  )}
+                                        referrerPolicy="no-referrer"
+                                      />
+                                    </div>
+
+                                    {project.images.length > 1 && (
+                                      <>
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            setSheetIndex(
+                                              project.id,
+                                              currentIdx === 0
+                                                ? project.images.length - 1
+                                                : currentIdx - 1
+                                            )
+                                          }
+                                          aria-label="Previous sheet"
+                                          className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-[9px] bg-white hover:bg-[#CBCBCB] text-black border-[0.75px] border-black flex items-center justify-center transition-colors cursor-pointer shadow-sm"
+                                        >
+                                          <ChevronLeft className="w-4 h-4" />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            setSheetIndex(
+                                              project.id,
+                                              currentIdx === project.images.length - 1
+                                                ? 0
+                                                : currentIdx + 1
+                                            )
+                                          }
+                                          aria-label="Next sheet"
+                                          className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-[9px] bg-white hover:bg-[#CBCBCB] text-black border-[0.75px] border-black flex items-center justify-center transition-colors cursor-pointer shadow-sm"
+                                        >
+                                          <ChevronRight className="w-4 h-4" />
+                                        </button>
+                                      </>
+                                    )}
+                                  </div>
+
+                                  {/* Integrated Bottom Description Strip (Matches Page 01 Sheet Cards) */}
+                                  <p className="text-[0.88rem] font-light text-black leading-relaxed text-left px-4 py-3.5 bg-white">
+                                    <strong className="font-medium uppercase tracking-cad-tight text-[0.74rem] mr-2">
+                                      {project.dimensions} · {project.tolerance}:
+                                    </strong>
+                                    {project.description}
+                                  </p>
                                 </div>
 
-                                {/* Open Thumbnail Strip (No Outer Box Outline) */}
-                                {project.images.length > 1 && (
-                                  <div className="w-full pt-0.5 flex flex-wrap items-center justify-between gap-4">
+                                {/* Open Bottom Row: Thumbnail Strip + Commission Inquiry Action */}
+                                <div className="w-full pt-0.5 flex flex-wrap items-center justify-between gap-4">
+                                  {project.images.length > 1 && (
                                     <div className="flex items-center gap-3 overflow-x-auto py-0.5">
                                       {project.images.map((thumb, idx) => {
                                         const isSelected = currentIdx === idx;
@@ -1143,60 +1160,63 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
                                         );
                                       })}
                                     </div>
-                                    <span className="text-[0.82rem] font-normal text-black">
-                                      {currentImg.sheetNumber} — {currentImg.label}
-                                    </span>
-                                  </div>
-                                )}
+                                  )}
+
+                                  <button
+                                    type="button"
+                                    onClick={() => navigateToPage('inquire')}
+                                    className={`ml-auto shrink-0 ${project.pillarBg} text-black hover:bg-black hover:text-white text-[0.74rem] tracking-cad uppercase py-3 px-5 rounded-[9px] border-[0.75px] border-black transition-colors cursor-pointer font-medium whitespace-nowrap`}
+                                  >
+                                    INQUIRE ABOUT THIS BUILD →
+                                  </button>
+                                </div>
                               </div>
                             ) : (
                               /* Spec Schedule View */
-                              <div className="border border-black rounded-[9px] overflow-hidden bg-white">
-                                <div
-                                  className={`${project.pillarBg} text-black border-b border-black px-5 py-3 text-[0.76rem] tracking-cad uppercase font-medium flex flex-wrap items-center justify-between gap-2`}
-                                >
-                                  <span>
-                                    ARCHITECTURAL MATERIAL &amp; JOINERY SCHEDULE — {project.code}
-                                  </span>
-                                  <span>{project.dimensions}</span>
+                              <div className="space-y-4">
+                                <div className="border border-black rounded-[9px] overflow-hidden bg-white">
+                                  <div
+                                    className="bg-[#CBCBCB] text-black border-b border-black px-4 py-2.5 text-[0.70rem] tracking-cad uppercase font-medium flex flex-wrap items-center justify-between gap-2"
+                                  >
+                                    <span>{project.materials}</span>
+                                    <span>
+                                      SPEC SCHEDULE · {project.dimensions}
+                                    </span>
+                                  </div>
+                                  <div className="divide-y divide-black bg-white">
+                                    {project.specs.map((item, idx) => (
+                                      <div
+                                        key={idx}
+                                        className="p-4 sm:px-6 grid grid-cols-1 sm:grid-cols-3 gap-2 text-left"
+                                      >
+                                        <span className="text-[0.74rem] tracking-cad uppercase font-medium text-black">
+                                          {item.label}
+                                        </span>
+                                        <span className="sm:col-span-2 text-[0.92rem] font-light text-black">
+                                          {item.value}
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                  <p className="border-t border-black text-[0.88rem] font-light text-black leading-relaxed text-left px-4 py-3.5 bg-white">
+                                    <strong className="font-medium uppercase tracking-cad-tight text-[0.74rem] mr-2">
+                                      {project.dimensions} · {project.tolerance}:
+                                    </strong>
+                                    {project.description}
+                                  </p>
                                 </div>
-                                <div className="divide-y divide-black bg-white">
-                                  {project.specs.map((item, idx) => (
-                                    <div
-                                      key={idx}
-                                      className="p-4 sm:px-6 grid grid-cols-1 sm:grid-cols-3 gap-2 text-left"
-                                    >
-                                      <span className="text-[0.74rem] tracking-cad uppercase font-medium text-black">
-                                        {item.label}
-                                      </span>
-                                      <span className="sm:col-span-2 text-[0.92rem] font-light text-black">
-                                        {item.value}
-                                      </span>
-                                    </div>
-                                  ))}
+
+                                <div className="w-full flex justify-end">
+                                  <button
+                                    type="button"
+                                    onClick={() => navigateToPage('inquire')}
+                                    className={`shrink-0 ${project.pillarBg} text-black hover:bg-black hover:text-white text-[0.74rem] tracking-cad uppercase py-3 px-5 rounded-[9px] border-[0.75px] border-black transition-colors cursor-pointer font-medium whitespace-nowrap`}
+                                  >
+                                    INQUIRE ABOUT THIS BUILD →
+                                  </button>
                                 </div>
                               </div>
                             )}
-
-                            {/* Open Bottom Project Notes & Action Row (No Outer Box Outline) */}
-                            <div className="w-full border-t border-black/20 pt-5 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5 text-left">
-                              <div className="space-y-1">
-                                <div className="text-[0.70rem] tracking-cad uppercase font-medium text-black">
-                                  PROJECT NOTES · {project.dimensions} · {project.tolerance}
-                                </div>
-                                <p className="text-[0.94rem] font-light text-black leading-relaxed max-w-[65ch]">
-                                  {project.description}
-                                </p>
-                              </div>
-
-                              <button
-                                type="button"
-                                onClick={() => navigateToPage('inquire')}
-                                className={`shrink-0 ${project.pillarBg} text-black hover:bg-black hover:text-white text-[0.74rem] tracking-cad uppercase py-3 px-5 rounded-[9px] border-[0.75px] border-black transition-colors cursor-pointer font-medium whitespace-nowrap`}
-                              >
-                                INQUIRE ABOUT THIS BUILD →
-                              </button>
-                            </div>
                           </div>
                         </article>
                       );
@@ -1436,13 +1456,13 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
                             imageIndex: 1,
                           })
                         }
-                        className="cad-grid-bg p-4 flex items-center justify-center cursor-zoom-in h-[240px]"
+                        className="bg-white p-4 flex items-center justify-center cursor-zoom-in h-[240px]"
                       >
                         <img
                           src={ASSETS.kidsKitchen.sectionB1}
                           alt="Sample Rhino 2D CAD Section & Plumbing Submittal"
                           loading="lazy"
-                          className="w-full h-full object-contain select-none"
+                          className="w-full h-full object-contain block select-none"
                           referrerPolicy="no-referrer"
                         />
                       </div>

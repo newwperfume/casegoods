@@ -57,7 +57,7 @@ const LazyPortfolioImage: React.FC<LazyPortfolioImageProps> = ({
       {!isLoaded && (
         <div
           aria-hidden="true"
-          className="absolute inset-0 cad-grid-bg flex flex-col items-center justify-center gap-2 animate-pulse"
+          className="absolute inset-0 bg-white flex flex-col items-center justify-center gap-2 animate-pulse"
         >
           <div className="w-8 h-8 rounded-[6px] border border-black/30 flex items-center justify-center text-[0.65rem] tracking-cad text-black/75">
             CG

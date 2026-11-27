@@ -32,6 +32,25 @@ const __dirname = path.dirname(__filename);
 
 const GENERATED_DIR = path.join(__dirname, 'public', 'generated-concepts');
 const LOG_FILE = path.join(GENERATED_DIR, 'concepts-log.json');
+const CUSTOM_SCONCES_DIR = path.resolve(__dirname, 'public', 'downloads', 'sconces', 'custom');
+const CUSTOM_SCONCES_CATALOG = path.join(CUSTOM_SCONCES_DIR, 'catalog.json');
+const MAX_CUSTOM_STL_BYTES = 15 * 1024 * 1024;
+const SAFE_STL_FILENAME_RE = /^[a-z0-9][a-z0-9-]{0,80}\.stl$/;
+
+export interface CustomSconceRecord {
+  id: string;
+  filename: string;
+  title: string;
+  notes: string;
+  publicUrl: string;
+  format: 'binary' | 'ascii';
+  triangleCount: number;
+  sizeX: number;
+  sizeY: number;
+  sizeZ: number;
+  bytes: number;
+  uploadedAt: string;
+}
 
 function ensureGeneratedDir() {
   if (!fs.existsSync(GENERATED_DIR)) {
@@ -40,6 +59,103 @@ function ensureGeneratedDir() {
   if (!fs.existsSync(LOG_FILE)) {
     fs.writeFileSync(LOG_FILE, JSON.stringify([], null, 2), 'utf-8');
   }
+  if (!fs.existsSync(CUSTOM_SCONCES_DIR)) {
+    fs.mkdirSync(CUSTOM_SCONCES_DIR, { recursive: true });
+  }
+  if (!fs.existsSync(CUSTOM_SCONCES_CATALOG)) {
+    fs.writeFileSync(CUSTOM_SCONCES_CATALOG, JSON.stringify([], null, 2), 'utf-8');
+  }
+}
+
+function readCustomSconcesCatalog(): CustomSconceRecord[] {
+  ensureGeneratedDir();
+  try {
+    const raw = fs.readFileSync(CUSTOM_SCONCES_CATALOG, 'utf-8');
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeCustomSconcesCatalog(records: CustomSconceRecord[]) {
+  ensureGeneratedDir();
+  fs.writeFileSync(CUSTOM_SCONCES_CATALOG, JSON.stringify(records.slice(0, 20), null, 2), 'utf-8');
+}
+
+function inspectStlBuffer(buf: Buffer): {
+  format: 'binary' | 'ascii';
+  triangleCount: number;
+  sizeX: number;
+  sizeY: number;
+  sizeZ: number;
+} | null {
+  if (buf.length < 84 || buf.length > MAX_CUSTOM_STL_BYTES) return null;
+
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  let minZ = Infinity;
+  let maxZ = -Infinity;
+
+  const triCount = buf.readUInt32LE(80);
+  if (triCount > 0 && 84 + triCount * 50 === buf.length) {
+    let off = 84;
+    for (let i = 0; i < triCount; i++) {
+      for (let v = 0; v < 3; v++) {
+        const vx = buf.readFloatLE(off + 12 + v * 12);
+        const vy = buf.readFloatLE(off + 16 + v * 12);
+        const vz = buf.readFloatLE(off + 20 + v * 12);
+        if (!Number.isFinite(vx) || !Number.isFinite(vy) || !Number.isFinite(vz)) return null;
+        if (vx < minX) minX = vx;
+        if (vx > maxX) maxX = vx;
+        if (vy < minY) minY = vy;
+        if (vy > maxY) maxY = vy;
+        if (vz < minZ) minZ = vz;
+        if (vz > maxZ) maxZ = vz;
+      }
+      off += 50;
+    }
+    return {
+      format: 'binary',
+      triangleCount: triCount,
+      sizeX: Number((maxX - minX).toFixed(2)),
+      sizeY: Number((maxY - minY).toFixed(2)),
+      sizeZ: Number((maxZ - minZ).toFixed(2)),
+    };
+  }
+
+  // Fallback: ASCII STL validation
+  const text = buf.toString('utf8');
+  if (!/^\s*solid\b/i.test(text) || !/facet\s+normal/i.test(text)) return null;
+  const vertexRe =
+    /vertex\s+([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)\s+([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)\s+([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)/gi;
+  let vertCount = 0;
+  let match: RegExpExecArray | null;
+  while ((match = vertexRe.exec(text)) !== null) {
+    const vx = Number(match[1]);
+    const vy = Number(match[2]);
+    const vz = Number(match[3]);
+    if (!Number.isFinite(vx) || !Number.isFinite(vy) || !Number.isFinite(vz)) continue;
+    if (vx < minX) minX = vx;
+    if (vx > maxX) maxX = vx;
+    if (vy < minY) minY = vy;
+    if (vy > maxY) maxY = vy;
+    if (vz < minZ) minZ = vz;
+    if (vz > maxZ) maxZ = vz;
+    vertCount++;
+  }
+  const asciiTris = Math.floor(vertCount / 3);
+  if (asciiTris < 1) return null;
+
+  return {
+    format: 'ascii',
+    triangleCount: asciiTris,
+    sizeX: Number((maxX - minX).toFixed(2)),
+    sizeY: Number((maxY - minY).toFixed(2)),
+    sizeZ: Number((maxZ - minZ).toFixed(2)),
+  };
 }
 
 export interface LoggedConceptRecord {
@@ -785,6 +901,141 @@ async function startServer() {
       next();
     });
   };
+
+  // Serve uploaded custom sconce STL files statically
+  app.use('/downloads/sconces/custom', express.static(CUSTOM_SCONCES_DIR));
+
+  // GET /api/custom-sconces — Lists custom sconce STLs saved to the studio
+  app.get('/api/custom-sconces', (_req, res) => {
+    try {
+      const records = readCustomSconcesCatalog().filter((rec) => {
+        if (!SAFE_STL_FILENAME_RE.test(rec.filename)) return false;
+        const resolved = path.resolve(CUSTOM_SCONCES_DIR, rec.filename);
+        return resolved.startsWith(CUSTOM_SCONCES_DIR + path.sep) && fs.existsSync(resolved);
+      });
+      res.json({ sconces: records });
+    } catch (err) {
+      console.warn('Unable to list custom sconces:', err);
+      res.status(500).json({ error: 'Failed to load uploaded sconces.' });
+    }
+  });
+
+  // GET /api/custom-sconces/download/:filename — Attachment download for an uploaded custom STL
+  app.get('/api/custom-sconces/download/:filename', (req, res) => {
+    const safeName = path.basename(req.params.filename || '');
+    if (!SAFE_STL_FILENAME_RE.test(safeName)) {
+      res.status(400).send('Invalid STL filename.');
+      return;
+    }
+    const resolved = path.resolve(CUSTOM_SCONCES_DIR, safeName);
+    if (!resolved.startsWith(CUSTOM_SCONCES_DIR + path.sep) || !fs.existsSync(resolved)) {
+      res.status(404).send('Custom STL file not found.');
+      return;
+    }
+    res.download(resolved, safeName);
+  });
+
+  // POST /api/custom-sconces/upload — Owner-only upload of a custom Binary or ASCII .STL
+  app.post('/api/custom-sconces/upload', requireOwner, (req: AuthRequest, res) => {
+    try {
+      const { filename = '', title = '', notes = '', stlBase64 = '' } = req.body || {};
+      if (typeof stlBase64 !== 'string' || !stlBase64.trim()) {
+        res.status(400).json({ error: 'Missing STL file data.' });
+        return;
+      }
+
+      const cleanBase64 = stlBase64.includes(',') ? stlBase64.split(',').pop() || '' : stlBase64;
+      const buffer = Buffer.from(cleanBase64, 'base64');
+      if (buffer.length > MAX_CUSTOM_STL_BYTES) {
+        res.status(413).json({ error: 'STL file exceeds the 15 MB upload limit.' });
+        return;
+      }
+
+      const inspected = inspectStlBuffer(buffer);
+      if (!inspected) {
+        res.status(400).json({
+          error: 'Invalid .STL file. Please export a valid Binary or ASCII .STL mesh from your CAD software.',
+        });
+        return;
+      }
+
+      const rawBase = path
+        .basename(String(filename || title || 'custom-sconce'))
+        .replace(/\.stl$/i, '');
+      const slug =
+        rawBase
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '')
+          .slice(0, 48) || 'custom-sconce';
+
+      const id = `${slug}-${Date.now()}`;
+      const safeFilename = `${id}.stl`;
+      if (!SAFE_STL_FILENAME_RE.test(safeFilename)) {
+        res.status(400).json({ error: 'Unable to derive a valid STL filename.' });
+        return;
+      }
+
+      const resolvedPath = path.resolve(CUSTOM_SCONCES_DIR, safeFilename);
+      if (!resolvedPath.startsWith(CUSTOM_SCONCES_DIR + path.sep)) {
+        res.status(400).json({ error: 'Invalid storage path.' });
+        return;
+      }
+
+      ensureGeneratedDir();
+      fs.writeFileSync(resolvedPath, buffer);
+
+      const record: CustomSconceRecord = {
+        id,
+        filename: safeFilename,
+        title: String(title || rawBase || 'Custom Wall Sconce').trim().slice(0, 120),
+        notes: String(notes || '').trim().slice(0, 500),
+        publicUrl: `/downloads/sconces/custom/${safeFilename}`,
+        format: inspected.format,
+        triangleCount: inspected.triangleCount,
+        sizeX: inspected.sizeX,
+        sizeY: inspected.sizeY,
+        sizeZ: inspected.sizeZ,
+        bytes: buffer.length,
+        uploadedAt: new Date().toLocaleString('en-US', { timeZone: 'America/Chicago' }),
+      };
+
+      const existing = readCustomSconcesCatalog();
+      writeCustomSconcesCatalog([record, ...existing]);
+
+      res.status(201).json({ sconce: record });
+    } catch (err: unknown) {
+      console.error('Error uploading custom sconce STL:', err);
+      const message = err instanceof Error ? err.message : 'Failed to upload custom STL.';
+      res.status(500).json({ error: message });
+    }
+  });
+
+  // DELETE /api/custom-sconces/:filename — Owner-only delete of an uploaded custom STL
+  app.delete('/api/custom-sconces/:filename', requireOwner, (req: AuthRequest, res) => {
+    try {
+      const safeName = path.basename(req.params.filename || '');
+      if (!SAFE_STL_FILENAME_RE.test(safeName)) {
+        res.status(400).json({ error: 'Invalid STL filename.' });
+        return;
+      }
+      const resolvedPath = path.resolve(CUSTOM_SCONCES_DIR, safeName);
+      if (!resolvedPath.startsWith(CUSTOM_SCONCES_DIR + path.sep)) {
+        res.status(400).json({ error: 'Invalid storage path.' });
+        return;
+      }
+
+      if (fs.existsSync(resolvedPath)) {
+        fs.unlinkSync(resolvedPath);
+      }
+      const updated = readCustomSconcesCatalog().filter((r) => r.filename !== safeName);
+      writeCustomSconcesCatalog(updated);
+      res.json({ ok: true });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to delete custom STL.';
+      res.status(500).json({ error: message });
+    }
+  });
 
   // GET /api/projects — Public endpoint returning published portfolio projects
   app.get('/api/projects', async (_req, res) => {
