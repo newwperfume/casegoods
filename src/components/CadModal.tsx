@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { ZoomIn, ZoomOut, X, ChevronLeft, ChevronRight, Download } from 'lucide-react';
-import { ASSETS } from '../assets/index.ts';
 import { downloadWatermarkedSheet } from '../utils/watermarkSheet.ts';
 
 export interface ProjectImage {
@@ -102,10 +101,15 @@ export const CadModal: React.FC<CadModalProps> = ({
 
   if (!project) return null;
 
+  const categoryTheme: SheetColorTheme =
+    project.categoryTag === 'commercial'
+      ? CLOSER_INSPECTION_THEMES[1] // Wet Bars & Islands — Fabrication Blue (#27AAE0)
+      : project.categoryTag === 'furniture'
+      ? CLOSER_INSPECTION_THEMES[2] // Heirloom & CAD — Golden Yellow (#FDCB33)
+      : CLOSER_INSPECTION_THEMES[0]; // Architectural — Bauhaus Orange (#EF6922)
+
   const activeImage = project.images[currentIndex] || project.images[0];
-  const activeTheme = isSpecsOpen
-    ? CLOSER_INSPECTION_THEMES[3]
-    : CLOSER_INSPECTION_THEMES[currentIndex % CLOSER_INSPECTION_THEMES.length];
+  const activeTheme = categoryTheme;
 
   const handleZoom = (delta: number) => {
     setZoomLevel((prev) => Math.min(Math.max(0.75, prev + delta), 2.5));
@@ -131,12 +135,6 @@ export const CadModal: React.FC<CadModalProps> = ({
       : activeImage?.type === 'photo'
       ? 'FINISHED PHOTO'
       : '3D RENDERING';
-
-  const drawingTypeLabel = isSpecsOpen
-    ? 'SPECIFICATION SCHEDULE'
-    : activeImage
-    ? `${activeImage.sheetNumber} · ${imageTypeBadge}`
-    : 'COMMISSION SHEET';
 
   const handleSavePortfolioSheet = async () => {
     if (!activeImage) return;
@@ -168,48 +166,28 @@ export const CadModal: React.FC<CadModalProps> = ({
       onClick={onClose}
     >
       <div
-        className={`relative w-full max-w-6xl bg-white border-[1.5px] border-black rounded-[9px] p-3 sm:p-4 shadow-2xl flex flex-col gap-3 max-h-[96vh] transition-colors duration-300`}
+        className="relative w-full max-w-6xl bg-white border-[1.5px] border-black rounded-[9px] p-3 sm:p-4 shadow-2xl flex flex-col gap-2.5 max-h-[96vh] transition-colors duration-300"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Modal Top 3-Zone Architectural Header:
-            [Left Box: Project Name/Number] — [Center: Casegoods Logo] — [Right Box: Drawing/Rendering Name] */}
-        <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] items-center gap-3 select-none">
-          {/* Left Box: Project Name or Number */}
+        {/* Compact Top Header: [Project Name/Number] — [Close Button] */}
+        <div className="flex items-center justify-between gap-2.5 select-none">
           <div
-            className={`${activeTheme.barBg} ${activeTheme.barText} border border-black rounded-[9px] px-4 py-2.5 flex items-center justify-start text-left overflow-hidden`}
+            className={`flex-1 min-w-0 ${activeTheme.barBg} ${activeTheme.barText} border border-black rounded-[9px] px-4 py-2 flex items-center justify-start text-left overflow-hidden`}
           >
             <span className="text-[0.74rem] tracking-cad uppercase font-medium truncate">
               {project.code} — {project.title}
             </span>
           </div>
 
-          {/* Center: Casegoods Logo */}
-          <div className="flex items-center justify-center px-2">
-            <img
-              src={ASSETS.brand.logoFull}
-              alt="casegoods — handcrafted in omaha"
-              className="h-12 sm:h-14 w-auto object-contain select-none"
-              referrerPolicy="no-referrer"
-            />
-          </div>
-
-          {/* Right Box: What Drawing or Rendering It Is + Close Button */}
-          <div className="flex items-center justify-end gap-2">
-            <div className="flex-1 bg-[#FDCB33] text-black border border-black rounded-[9px] px-4 py-2.5 flex items-center justify-center text-center overflow-hidden">
-              <span className="text-[0.72rem] tracking-cad uppercase font-medium truncate">
-                {drawingTypeLabel}
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-3 py-2.5 rounded-[9px] border-[0.75px] border-black bg-white text-black text-[0.70rem] tracking-cad uppercase hover:bg-black hover:text-white transition-all cursor-pointer flex items-center gap-1 font-medium shrink-0"
-              aria-label="Close high-resolution viewer"
-            >
-              <span>CLOSE</span>
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-3.5 py-2 rounded-[9px] border border-black bg-white text-black text-[0.70rem] tracking-cad uppercase hover:bg-black hover:text-white transition-all cursor-pointer flex items-center gap-1 font-medium shrink-0"
+            aria-label="Close high-resolution viewer"
+          >
+            <span>CLOSE</span>
+            <X className="w-3.5 h-3.5" />
+          </button>
         </div>
 
         {/* High-Resolution Image or Spec Sheet Stage — Edge-to-Edge Framed */}
@@ -217,7 +195,7 @@ export const CadModal: React.FC<CadModalProps> = ({
           style={
             isStandardCadSheet
               ? {
-                  width: 'min(100%, calc((96vh - 175px) * 1560 / 960))',
+                  width: 'min(100%, calc((96vh - 125px) * 1560 / 960))',
                   aspectRatio: '1560 / 960',
                 }
               : undefined
@@ -257,14 +235,14 @@ export const CadModal: React.FC<CadModalProps> = ({
                 className={
                   isStandardCadSheet
                     ? 'shrink-0 object-fill select-none block'
-                    : 'w-full h-full max-h-[calc(96vh-175px)] object-contain select-none block'
+                    : 'w-full h-full max-h-[calc(96vh-125px)] object-contain select-none block'
                 }
                 referrerPolicy="no-referrer"
               />
             ) : (
               <div className="w-full max-w-4xl bg-white">
                 <div
-                  className={`border-[0.75px] border-black rounded-[9px] overflow-hidden`}
+                  className="border-[0.75px] border-black rounded-[9px] overflow-hidden"
                 >
                   <div
                     className={`${activeTheme.barBg} ${activeTheme.barText} px-5 py-3 text-[0.76rem] tracking-cad uppercase font-light flex flex-wrap items-center justify-between gap-2`}
@@ -315,16 +293,14 @@ export const CadModal: React.FC<CadModalProps> = ({
           )}
         </div>
 
-        {/* Modal Bottom Controls & Sheet Selector Bar */}
-        <div
-          className={`p-3 sm:px-5 sm:py-3.5 bg-white border border-black rounded-[9px] flex flex-wrap items-center justify-between gap-3 text-[0.74rem] tracking-cad transition-colors duration-300`}
-        >
+        {/* Borderless Bottom Controls & Sheet Selector Bar */}
+        <div className="pt-0.5 flex flex-wrap items-center justify-between gap-2.5 text-[0.74rem] tracking-cad transition-colors duration-300">
           <div className="flex items-center gap-2">
             <span className="text-black/75 uppercase hidden sm:inline font-light">ZOOM:</span>
             <button
               type="button"
               onClick={() => handleZoom(0.25)}
-              className={`p-2 border-[0.75px] border-black rounded-[9px] bg-white text-black ${activeTheme.hoverBg} ${activeTheme.hoverText} transition-all cursor-pointer`}
+              className={`p-2 border border-black rounded-[9px] bg-white text-black ${activeTheme.hoverBg} ${activeTheme.hoverText} transition-all cursor-pointer`}
               title="Zoom In"
             >
               <ZoomIn className="w-3.5 h-3.5" />
@@ -332,7 +308,7 @@ export const CadModal: React.FC<CadModalProps> = ({
             <button
               type="button"
               onClick={() => handleZoom(-0.25)}
-              className={`p-2 border-[0.75px] border-black rounded-[9px] bg-white text-black ${activeTheme.hoverBg} ${activeTheme.hoverText} transition-all cursor-pointer`}
+              className={`p-2 border border-black rounded-[9px] bg-white text-black ${activeTheme.hoverBg} ${activeTheme.hoverText} transition-all cursor-pointer`}
               title="Zoom Out"
             >
               <ZoomOut className="w-3.5 h-3.5" />
@@ -340,7 +316,7 @@ export const CadModal: React.FC<CadModalProps> = ({
             <button
               type="button"
               onClick={resetZoom}
-              className={`px-3 py-1.5 border-[0.75px] border-black rounded-[9px] bg-white text-black ${activeTheme.hoverBg} ${activeTheme.hoverText} transition-all cursor-pointer text-[0.70rem] font-light`}
+              className={`px-3 py-1.5 border border-black rounded-[9px] bg-white text-black ${activeTheme.hoverBg} ${activeTheme.hoverText} transition-all cursor-pointer text-[0.70rem] font-light`}
               title="Reset Zoom"
             >
               {Math.round(zoomLevel * 100)}%
@@ -349,7 +325,7 @@ export const CadModal: React.FC<CadModalProps> = ({
               <button
                 type="button"
                 onClick={handleSavePortfolioSheet}
-                className="px-3 py-1.5 border-[0.75px] border-black rounded-[9px] bg-[#FDCB33] hover:bg-black text-black hover:text-white transition-all cursor-pointer text-[0.70rem] font-medium inline-flex items-center gap-1.5"
+                className="px-3 py-1.5 border border-black rounded-[9px] bg-[#FDCB33] hover:bg-black text-black hover:text-white transition-all cursor-pointer text-[0.70rem] font-medium inline-flex items-center gap-1.5"
                 title="Save Watermarked Sheet PNG"
               >
                 <Download className="w-3.5 h-3.5" />
@@ -358,11 +334,9 @@ export const CadModal: React.FC<CadModalProps> = ({
             )}
           </div>
 
-          {/* Sheet Selector Buttons + SPEC SHEET Button Matching Main Portfolio Page */}
+          {/* Sheet Selector Buttons + SPEC SHEET Button — Black Outline/Text Until Selected */}
           <div className="flex flex-wrap items-center gap-2">
             {project.images.map((img, idx) => {
-              const sheetTheme =
-                CLOSER_INSPECTION_THEMES[idx % CLOSER_INSPECTION_THEMES.length];
               const isSheetActive = !isSpecsOpen && currentIndex === idx;
               return (
                 <button
@@ -373,10 +347,10 @@ export const CadModal: React.FC<CadModalProps> = ({
                     setZoomLevel(1);
                     setCurrentIndex(idx);
                   }}
-                  className={`px-3.5 py-2 rounded-[9px] border-[0.75px] text-[0.70rem] tracking-cad uppercase font-light transition-all cursor-pointer ${
+                  className={`px-3.5 py-2 rounded-[9px] border border-black text-[0.70rem] tracking-cad uppercase transition-all cursor-pointer ${
                     isSheetActive
-                      ? `${sheetTheme.barBg} ${sheetTheme.barText} ${sheetTheme.borderColor}`
-                      : `bg-white text-black ${sheetTheme.borderColor} hover:opacity-80`
+                      ? `${activeTheme.barBg} text-black font-medium`
+                      : `bg-white text-black font-light ${activeTheme.hoverBg} ${activeTheme.hoverText}`
                   }`}
                 >
                   {img.sheetNumber}
@@ -390,10 +364,10 @@ export const CadModal: React.FC<CadModalProps> = ({
                 setIsSpecsOpen((prev) => !prev);
                 setZoomLevel(1);
               }}
-              className={`px-3.5 py-2 rounded-[9px] border-[0.75px] text-[0.70rem] tracking-cad uppercase font-light transition-all cursor-pointer ${
+              className={`px-3.5 py-2 rounded-[9px] border border-black text-[0.70rem] tracking-cad uppercase transition-all cursor-pointer ${
                 isSpecsOpen
-                  ? 'bg-[#CBCBCB] text-black border-[#CBCBCB]'
-                  : 'bg-white text-black border-[#CBCBCB] hover:opacity-80'
+                  ? `${activeTheme.barBg} text-black font-medium`
+                  : `bg-white text-black font-light ${activeTheme.hoverBg} ${activeTheme.hoverText}`
               }`}
             >
               SPEC SHEET

@@ -939,10 +939,26 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
                   {/* Filter Control Row (4 Symmetric rounded-[9px] border border-black Buttons) */}
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     {[
-                      { id: 'all', label: '01 / ALL COMMISSIONS' },
-                      { id: 'architectural', label: '02 / ARCHITECTURAL' },
-                      { id: 'commercial', label: '03 / WET BARS & ISLANDS' },
-                      { id: 'furniture', label: '04 / HEIRLOOM & CAD' },
+                      {
+                        id: 'all',
+                        label: '01 / ALL COMMISSIONS',
+                        activeClass: 'bg-black text-white border-black font-medium',
+                      },
+                      {
+                        id: 'architectural',
+                        label: '02 / ARCHITECTURAL',
+                        activeClass: 'bg-[#EF6922] text-black border-black font-medium',
+                      },
+                      {
+                        id: 'commercial',
+                        label: '03 / WET BARS & ISLANDS',
+                        activeClass: 'bg-[#27AAE0] text-black border-black font-medium',
+                      },
+                      {
+                        id: 'furniture',
+                        label: '04 / HEIRLOOM & CAD',
+                        activeClass: 'bg-[#FDCB33] text-black border-black font-medium',
+                      },
                     ].map((tab) => {
                       const isSelected = filter === tab.id;
                       return (
@@ -956,7 +972,7 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
                           }
                           className={`py-2.5 px-3 text-[0.72rem] tracking-cad uppercase rounded-[9px] border border-black transition-colors cursor-pointer text-center ${
                             isSelected
-                              ? 'bg-[#27AAE0] text-black font-medium'
+                              ? tab.activeClass
                               : 'bg-white text-black hover:bg-[#CBCBCB] font-normal'
                           }`}
                         >
