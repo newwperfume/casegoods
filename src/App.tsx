@@ -21,24 +21,12 @@ export default function App() {
   useEffect(() => {
     const syncRoute = () => setRoute(getCurrentRoute());
 
-    const onKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'l') {
-        e.preventDefault();
-        if (window.location.pathname !== '/invoice-studio') {
-          window.history.pushState({}, '', '/invoice-studio');
-          syncRoute();
-        }
-      }
-    };
-
     window.addEventListener('popstate', syncRoute);
     window.addEventListener('hashchange', syncRoute);
-    window.addEventListener('keydown', onKeyDown);
 
     return () => {
       window.removeEventListener('popstate', syncRoute);
       window.removeEventListener('hashchange', syncRoute);
-      window.removeEventListener('keydown', onKeyDown);
     };
   }, []);
 

@@ -64,6 +64,15 @@ export const portfolioProjects = pgTable('portfolio_projects', {
   updatedAt: timestamp('updated_at').defaultNow(),
 });
 
+export const studioSecurity = pgTable('studio_security', {
+  id: serial('id').primaryKey(),
+  key: text('key').notNull().unique(),
+  passcodeHash: text('passcode_hash').notNull(),
+  updatedBy: text('updated_by').notNull(),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
 export const usersRelations = relations(users, ({ many }) => ({
   concepts: many(concepts),
   inquiries: many(inquiries),

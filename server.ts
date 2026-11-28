@@ -3,7 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, Type } from '@google/genai';
 import { requireAuth, optionalAuth, type AuthRequest } from './src/middleware/auth.ts';
 import {
   getOrCreateUser,
@@ -22,6 +22,17 @@ import {
   reorderPortfolioProjects,
 } from './src/db/portfolio.ts';
 import { DEFAULT_PORTFOLIO_PROJECTS } from './src/data/defaultProjects.ts';
+import {
+  checkStudioRateLimit,
+  claimFirstRunStudioPasscode,
+  clearStudioRateLimit,
+  getStudioPasscodeMode,
+  issueStudioUnlockToken,
+  recordFailedStudioAttempt,
+  revokeStudioUnlockToken,
+  verifyStudioUnlockToken,
+  verifySubmittedStudioPasscode,
+} from './src/lib/studioAuth.ts';
 
 dotenv.config();
 
@@ -902,6 +913,126 @@ async function startServer() {
     });
   };
 
+  // Second-factor Studio Passcode middleware for Private Studio admin APIs
+  const requireStudioUnlocked = (
+    req: AuthRequest,
+    res: express.Response,
+    next: express.NextFunction
+  ) => {
+    requireOwner(req, res, () => {
+      const studioToken = req.header('x-studio-token') || undefined;
+      const verified = verifyStudioUnlockToken(
+        studioToken,
+        req.user!.uid,
+        req.user!.email!
+      );
+      if (!verified) {
+        res.status(403).json({
+          error: 'Studio passcode unlock required.',
+          code: 'STUDIO_LOCKED',
+        });
+        return;
+      }
+      next();
+    });
+  };
+
+  // GET /api/studio-auth/status — Check passcode configuration state & whether caller's studio token is active
+  app.get('/api/studio-auth/status', requireOwner, async (req: AuthRequest, res) => {
+    try {
+      const mode = await getStudioPasscodeMode();
+      const studioToken = req.header('x-studio-token') || undefined;
+      const verified = verifyStudioUnlockToken(
+        studioToken,
+        req.user!.uid,
+        req.user!.email!
+      );
+      res.json({
+        mode,
+        configured: mode !== 'unclaimed',
+        unlocked: Boolean(verified),
+        expiresAt: verified?.exp ?? null,
+      });
+    } catch (err) {
+      console.error('Error checking studio auth status:', err);
+      res.status(500).json({ error: 'Unable to check studio security status.' });
+    }
+  });
+
+  // POST /api/studio-auth/setup — Atomic one-time first-run passcode setup (only when env secret is unset & no hash claimed)
+  app.post('/api/studio-auth/setup', requireOwner, async (req: AuthRequest, res) => {
+    try {
+      const passcode = typeof req.body?.passcode === 'string' ? req.body.passcode : '';
+      const result = await claimFirstRunStudioPasscode(passcode, req.user!.email!);
+      if (!result.ok) {
+        res.status(result.status).json({ error: result.error });
+        return;
+      }
+      clearStudioRateLimit(req.user!.uid);
+      const issued = issueStudioUnlockToken(req.user!.uid, req.user!.email!);
+      res.status(201).json({
+        ok: true,
+        mode: 'claimed',
+        studioToken: issued.token,
+        expiresAt: issued.expiresAt,
+      });
+    } catch (err) {
+      console.error('Error setting up studio passcode:', err);
+      res.status(500).json({ error: 'Failed to save studio passcode.' });
+    }
+  });
+
+  // POST /api/studio-auth/verify — Verify Studio Passcode on server with rate limiting & issue signed unlock token
+  app.post('/api/studio-auth/verify', requireOwner, async (req: AuthRequest, res) => {
+    try {
+      const uid = req.user!.uid;
+      const limit = checkStudioRateLimit(uid);
+      if (!limit.allowed) {
+        res.status(429).json({
+          error: `Too many failed attempts. Try again in ${Math.ceil(limit.retryAfterSeconds / 60)} minute(s).`,
+          retryAfterSeconds: limit.retryAfterSeconds,
+        });
+        return;
+      }
+
+      const passcode = typeof req.body?.passcode === 'string' ? req.body.passcode : '';
+      const check = await verifySubmittedStudioPasscode(passcode);
+
+      if (check.mode === 'unclaimed') {
+        res.status(409).json({
+          error: 'No studio passcode has been set yet. Complete first-run setup first.',
+          code: 'STUDIO_UNCLAIMED',
+        });
+        return;
+      }
+
+      if (!check.ok) {
+        recordFailedStudioAttempt(uid);
+        res.status(401).json({ error: 'Incorrect studio passcode.' });
+        return;
+      }
+
+      clearStudioRateLimit(uid);
+      const issued = issueStudioUnlockToken(uid, req.user!.email!);
+      res.json({
+        ok: true,
+        mode: check.mode,
+        studioToken: issued.token,
+        expiresAt: issued.expiresAt,
+      });
+    } catch (err) {
+      console.error('Error verifying studio passcode:', err);
+      res.status(500).json({ error: 'Failed to verify studio passcode.' });
+    }
+  });
+
+  // POST /api/studio-auth/lock — Revoke active Studio Unlock Token immediately
+  app.post('/api/studio-auth/lock', requireOwner, (req: AuthRequest, res) => {
+    const studioToken = req.header('x-studio-token') || undefined;
+    revokeStudioUnlockToken(studioToken, req.user!.uid, req.user!.email!);
+    res.json({ ok: true });
+  });
+
   // Serve uploaded custom sconce STL files statically
   app.use('/downloads/sconces/custom', express.static(CUSTOM_SCONCES_DIR));
 
@@ -1048,8 +1179,8 @@ async function startServer() {
     }
   });
 
-  // GET /api/admin/projects — Owner-only list of all projects (published + drafts)
-  app.get('/api/admin/projects', requireOwner, async (_req: AuthRequest, res) => {
+  // GET /api/admin/projects — Owner + Passcode unlocked list of all projects (published + drafts)
+  app.get('/api/admin/projects', requireStudioUnlocked, async (_req: AuthRequest, res) => {
     try {
       const projects = await listAllPortfolioProjects();
       res.json({ projects });
@@ -1059,8 +1190,8 @@ async function startServer() {
     }
   });
 
-  // POST /api/admin/projects — Owner-only create project
-  app.post('/api/admin/projects', requireOwner, async (req: AuthRequest, res) => {
+  // POST /api/admin/projects — Owner + Passcode unlocked create project
+  app.post('/api/admin/projects', requireStudioUnlocked, async (req: AuthRequest, res) => {
     try {
       const body = req.body || {};
       if (!String(body.title || '').trim() || !String(body.code || '').trim()) {
@@ -1094,8 +1225,8 @@ async function startServer() {
     }
   });
 
-  // POST /api/admin/projects/reorder — Owner-only reorder projects
-  app.post('/api/admin/projects/reorder', requireOwner, async (req: AuthRequest, res) => {
+  // POST /api/admin/projects/reorder — Owner + Passcode unlocked reorder projects
+  app.post('/api/admin/projects/reorder', requireStudioUnlocked, async (req: AuthRequest, res) => {
     try {
       const orderedIds = Array.isArray(req.body?.orderedIds) ? req.body.orderedIds : [];
       const projects = await reorderPortfolioProjects(orderedIds);
@@ -1106,8 +1237,8 @@ async function startServer() {
     }
   });
 
-  // PUT /api/admin/projects/:id — Owner-only update project
-  app.put('/api/admin/projects/:id', requireOwner, async (req: AuthRequest, res) => {
+  // PUT /api/admin/projects/:id — Owner + Passcode unlocked update project
+  app.put('/api/admin/projects/:id', requireStudioUnlocked, async (req: AuthRequest, res) => {
     try {
       const dbId = Number(req.params.id);
       if (!Number.isFinite(dbId)) {
@@ -1128,8 +1259,8 @@ async function startServer() {
     }
   });
 
-  // DELETE /api/admin/projects/:id — Owner-only delete project
-  app.delete('/api/admin/projects/:id', requireOwner, async (req: AuthRequest, res) => {
+  // DELETE /api/admin/projects/:id — Owner + Passcode unlocked delete project
+  app.delete('/api/admin/projects/:id', requireStudioUnlocked, async (req: AuthRequest, res) => {
     try {
       const dbId = Number(req.params.id);
       if (!Number.isFinite(dbId)) {
@@ -1147,6 +1278,294 @@ async function startServer() {
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Failed to delete project';
       res.status(500).json({ error: message });
+    }
+  });
+
+  // POST /api/admin/projects/analyze-images — Owner + Passcode unlocked multimodal analysis of CAD drawings, 3D renders, and project photos
+  app.post('/api/admin/projects/analyze-images', requireStudioUnlocked, async (req: AuthRequest, res) => {
+    try {
+      const apiKey = getGeminiApiKey();
+      if (!apiKey) {
+        res.status(503).json({
+          error:
+            'GEMINI_API_KEY is not configured on the server. Add your Gemini API key in Settings > Secrets to enable automatic photo and drawing analysis.',
+        });
+        return;
+      }
+
+      const rawImages = Array.isArray(req.body?.images) ? req.body.images : [];
+      if (rawImages.length === 0) {
+        res.status(400).json({ error: 'Upload at least one drawing, rendering, or photograph to analyze.' });
+        return;
+      }
+      if (rawImages.length > 10) {
+        res.status(400).json({ error: 'Please analyze up to 10 images at a time.' });
+        return;
+      }
+
+      const notesHint =
+        typeof req.body?.notesHint === 'string' ? req.body.notesHint.trim().slice(0, 600) : '';
+
+      const DATA_URL_RE = /^data:(image\/(?:jpeg|jpg|png|webp));base64,([A-Za-z0-9+/=\r\n]+)$/;
+      const parts: Array<
+        | { inlineData: { mimeType: string; data: string } }
+        | { text: string }
+      > = [];
+
+      const sheetManifest: string[] = [];
+
+      for (let i = 0; i < rawImages.length; i++) {
+        const item = rawImages[i] || {};
+        const dataUrl = typeof item.dataUrl === 'string' ? item.dataUrl.trim() : '';
+        const match = dataUrl.match(DATA_URL_RE);
+        if (!match) {
+          res.status(400).json({
+            error: `Image #${i + 1} is not a supported JPG, PNG, or WebP image payload.`,
+          });
+          return;
+        }
+        const rawMime = match[1].toLowerCase();
+        const mimeType = rawMime === 'image/jpg' ? 'image/jpeg' : rawMime;
+        const base64Data = match[2].replace(/\s+/g, '');
+        if (base64Data.length > 8 * 1024 * 1024) {
+          res.status(413).json({ error: `Image #${i + 1} exceeds the maximum size for analysis.` });
+          return;
+        }
+
+        const filename =
+          typeof item.filename === 'string' ? item.filename.trim().slice(0, 120) : `image-${i + 1}`;
+        sheetManifest.push(`Image index ${i}: "${filename}"`);
+
+        parts.push({ text: `--- IMAGE INDEX ${i} (filename: ${filename}) ---` });
+        parts.push({ inlineData: { mimeType, data: base64Data } });
+      }
+
+      const userPrompt = [
+        `Analyze the ${rawImages.length} uploaded Casegoods project file(s) below (${sheetManifest.join(', ')}).`,
+        notesHint ? `Maker's optional context note: "${notesHint}"` : '',
+        'Extract all readable text, dimensions, job/DWG codes, materials, hardware, joinery, and visual details across every drawing, 3D rendering, and photograph.',
+        'Return structured JSON matching the schema so the Casegoods Portfolio Manager form can be pre-filled accurately.',
+      ]
+        .filter(Boolean)
+        .join('\n');
+
+      parts.push({ text: userPrompt });
+
+      const ai = new GoogleGenAI({
+        apiKey,
+        httpOptions: {
+          headers: {
+            'User-Agent': 'aistudio-build',
+          },
+        },
+      });
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-4-hydrogen',
+        contents: { parts },
+        config: {
+          systemInstruction:
+            'You are the senior architectural millwork estimator and portfolio archivist for casegoods (Omaha, Nebraska — custom furniture, architectural millwork, and specialty commissions). ' +
+            'Inspect uploaded 2D CAD/Rhino shop drawings, 3D renderings, and finished build photographs to accurately fill out a portfolio project record.\n' +
+            'Rules:\n' +
+            '1. Read exact numbers, fractional inches, job codes (like 1070MCG, 1064HEM), or material callouts whenever visible on 2D CAD drawings or title blocks.\n' +
+            '2. Never invent fake client names or fake drawing codes. Only populate "recipient" if a client or location is explicitly visible or provided in the maker note; leave "recipient" empty string otherwise. If no job/DWG code is visible in the drawings or filenames, suggest a clean short code like "CG-BUILD" or leave empty string.\n' +
+            '3. Classify "categoryTag" strictly as one of: "architectural" (built-ins, cabinetry, credenzas, mudrooms, wall systems, residential millwork), "commercial" (wet bars, kitchen islands, reception desks, hospitality/retail fixtures), or "furniture" (standalone tables, heirloom furniture, specialty pieces, play kitchens).\n' +
+            '4. Keep "title", "category", "materials", "dimensions", and "tolerance" crisp and uppercase-ready. Separate items in "materials" with " · " (e.g. "SOLID AMERICAN BLACK WALNUT · RIFT WHITE OAK · SOFT-CLOSE HARDWARE").\n' +
+            '5. Write "description" as 2-3 understated, craft-focused sentences describing the joinery, wood species, proportions, and architectural integration — no hype or marketing clichés.\n' +
+            '6. Provide 3 to 5 concise "specs" rows (e.g. PRIMARY HARDWOODS, FINISH, JOINERY & HARDWARE, DIMENSIONS / CLEARANCES).\n' +
+            '7. For EVERY uploaded image (matching each 0-based index), return an entry in "sheets" classifying "type" as "cad" (2D technical line drawing/elevation/plan/section), "render" (3D computer rendering), or "photo" (real photograph of a built piece or installation), a crisp "sheetNumber" (e.g. "PHOTO 01", "SHEET 01", "CAD A1"), and a concise 1-sentence "caption" describing that specific view.',
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              code: {
+                type: Type.STRING,
+                description:
+                  'Job or DWG code read from CAD title block or filename (e.g. 1070MCG), or empty string if none visible.',
+              },
+              title: {
+                type: Type.STRING,
+                description: 'Concise uppercase project title (e.g. FLUTED WALNUT CREDENZA & WINDOW BENCH).',
+              },
+              recipient: {
+                type: Type.STRING,
+                description:
+                  'Client or location ONLY if explicitly visible in drawings or notes; otherwise empty string.',
+              },
+              category: {
+                type: Type.STRING,
+                description: 'Short uppercase category label (e.g. ARCHITECTURAL BUILT-IN, CUSTOM WET BAR, HEIRLOOM FURNITURE).',
+              },
+              categoryTag: {
+                type: Type.STRING,
+                description: 'Must be exactly one of: architectural, commercial, furniture.',
+              },
+              dimensions: {
+                type: Type.STRING,
+                description:
+                  'Exact overall dimensions read from CAD drawings (e.g. 101" H × 72 3/4" W × 20" D), or empty string if not determinable.',
+              },
+              tolerance: {
+                type: Type.STRING,
+                description:
+                  'Build status & tolerance tag (e.g. FINISHED BUILD · ± 1/32" or 3D DESIGN PROPOSAL · ± 1/32").',
+              },
+              materials: {
+                type: Type.STRING,
+                description:
+                  'Materials highlight bar separated by middle dots (e.g. SOLID BLACK WALNUT · WHITE OAK · BRASS PULLS).',
+              },
+              description: {
+                type: Type.STRING,
+                description:
+                  '2-3 understated, craft-focused sentences describing design, hardwoods, joinery, and finished installation.',
+              },
+              specs: {
+                type: Type.ARRAY,
+                description: '3 to 5 technical specification rows.',
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    label: { type: Type.STRING },
+                    value: { type: Type.STRING },
+                  },
+                  required: ['label', 'value'],
+                },
+              },
+              sheets: {
+                type: Type.ARRAY,
+                description: 'Per-image classification and caption matching every uploaded image index.',
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    index: { type: Type.INTEGER },
+                    type: {
+                      type: Type.STRING,
+                      description: 'Must be exactly one of: photo, render, cad.',
+                    },
+                    sheetNumber: {
+                      type: Type.STRING,
+                      description: 'Short uppercase tab label like PHOTO 01, SHEET 01, or CAD A1.',
+                    },
+                    caption: {
+                      type: Type.STRING,
+                      description: 'Concise 1-sentence description of this specific view.',
+                    },
+                  },
+                  required: ['index', 'type', 'sheetNumber', 'caption'],
+                },
+              },
+              confidenceNote: {
+                type: Type.STRING,
+                description:
+                  'Brief 1-sentence note flagging anything uncertain or estimated so the maker can double-check (e.g. dimensions estimated or code left blank).',
+              },
+            },
+            required: [
+              'code',
+              'title',
+              'recipient',
+              'category',
+              'categoryTag',
+              'dimensions',
+              'tolerance',
+              'materials',
+              'description',
+              'specs',
+              'sheets',
+              'confidenceNote',
+            ],
+          },
+        },
+      });
+
+      const rawText = (response.text ?? '').trim();
+      if (!rawText) {
+        res.status(502).json({ error: 'Analysis returned an empty response. Please try again.' });
+        return;
+      }
+
+      let parsed: Record<string, unknown>;
+      try {
+        parsed = JSON.parse(rawText);
+      } catch {
+        res.status(502).json({ error: 'Unable to parse structured analysis response. Please retry.' });
+        return;
+      }
+
+      const rawTag = String(parsed.categoryTag || '').toLowerCase().trim();
+      const categoryTag =
+        rawTag === 'commercial' || rawTag === 'furniture' || rawTag === 'architectural'
+          ? rawTag
+          : 'architectural';
+
+      const specs = Array.isArray(parsed.specs)
+        ? parsed.specs
+            .map((s: unknown) => {
+              const obj = (s && typeof s === 'object' ? s : {}) as Record<string, unknown>;
+              return {
+                label: String(obj.label || '').trim().toUpperCase(),
+                value: String(obj.value || '').trim(),
+              };
+            })
+            .filter((s) => s.label && s.value)
+            .slice(0, 8)
+        : [];
+
+      const sheets = Array.isArray(parsed.sheets)
+        ? parsed.sheets
+            .map((s: unknown) => {
+              const obj = (s && typeof s === 'object' ? s : {}) as Record<string, unknown>;
+              const t = String(obj.type || '').toLowerCase().trim();
+              const type: 'photo' | 'render' | 'cad' =
+                t === 'cad' || t === 'render' || t === 'photo' ? t : 'photo';
+              return {
+                index: Number(obj.index),
+                type,
+                sheetNumber: String(obj.sheetNumber || '').trim().toUpperCase(),
+                caption: String(obj.caption || '').trim(),
+              };
+            })
+            .filter((s) => Number.isInteger(s.index) && s.index >= 0 && s.index < rawImages.length)
+        : [];
+
+      res.json({
+        analysis: {
+          code: String(parsed.code || '').trim().toUpperCase(),
+          title: String(parsed.title || '').trim().toUpperCase(),
+          recipient: String(parsed.recipient || '').trim().toUpperCase(),
+          category: String(parsed.category || '').trim().toUpperCase(),
+          categoryTag,
+          dimensions: String(parsed.dimensions || '').trim().toUpperCase(),
+          tolerance: String(parsed.tolerance || '').trim().toUpperCase(),
+          materials: String(parsed.materials || '').trim().toUpperCase(),
+          description: String(parsed.description || '').trim(),
+          specs,
+          sheets,
+          confidenceNote: String(parsed.confidenceNote || '').trim(),
+        },
+      });
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error || '');
+      console.error('Error in /api/admin/projects/analyze-images:', error);
+      if (msg.includes('API_KEY_INVALID') || msg.includes('PERMISSION_DENIED')) {
+        res.status(403).json({
+          error:
+            'Gemini API key was rejected. Check your GEMINI_API_KEY in Settings > Secrets and try again.',
+        });
+        return;
+      }
+      if (msg.includes('RESOURCE_EXHAUSTED') || msg.includes('429')) {
+        res.status(429).json({
+          error:
+            'Gemini API quota limit reached. Try again shortly or attach a billed API key in Settings > Secrets.',
+        });
+        return;
+      }
+      res.status(500).json({
+        error: msg || 'Failed to analyze project images.',
+      });
     }
   });
 

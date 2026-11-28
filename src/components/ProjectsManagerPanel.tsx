@@ -15,6 +15,8 @@ import {
   Image as ImageIcon,
   ExternalLink,
   Layers,
+  ScanSearch,
+  Loader2,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.tsx';
 import {
@@ -132,13 +134,75 @@ async function compressImageFileToDataUrl(file: File): Promise<string> {
   });
 }
 
+async function imageSrcToAnalysisDataUrl(src: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      try {
+        const MAX_DIM = 1280;
+        let { width, height } = img;
+        if (width > MAX_DIM || height > MAX_DIM) {
+          if (width >= height) {
+            height = Math.round((height * MAX_DIM) / width);
+            width = MAX_DIM;
+          } else {
+            width = Math.round((width * MAX_DIM) / height);
+            height = MAX_DIM;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          reject(new Error('Unable to prepare image for analysis.'));
+          return;
+        }
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, width, height);
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', 0.85));
+      } catch (err) {
+        reject(err);
+      }
+    };
+    img.onerror = () => reject(new Error('Unable to read image for analysis.'));
+    img.src = src;
+  });
+}
+
+interface AnalyzedProjectPayload {
+  code: string;
+  title: string;
+  recipient: string;
+  category: string;
+  categoryTag: PortfolioCategoryTag;
+  dimensions: string;
+  tolerance: string;
+  materials: string;
+  description: string;
+  specs: { label: string; value: string }[];
+  sheets: Array<{
+    index: number;
+    type: 'photo' | 'render' | 'cad';
+    sheetNumber: string;
+    caption: string;
+  }>;
+  confidenceNote: string;
+}
+
 export const ProjectsManagerPanel: React.FC = () => {
-  const { user } = useAuth();
+  const { user, studioToken, clearStudioToken } = useAuth();
   const [projects, setProjects] = useState<PortfolioProject[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [reordering, setReordering] = useState(false);
   const [uploadingCount, setUploadingCount] = useState(0);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analysisNote, setAnalysisNote] = useState<string | null>(null);
+  const [analysisHint, setAnalysisHint] = useState('');
+  const [overwriteExisting, setOverwriteExisting] = useState(true);
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [statusBanner, setStatusBanner] = useState<string | null>(null);
@@ -155,17 +219,23 @@ export const ProjectsManagerPanel: React.FC = () => {
       const token = await user.getIdToken();
       const headers = new Headers(init.headers);
       headers.set('Authorization', `Bearer ${token}`);
+      if (studioToken) {
+        headers.set('X-Studio-Token', studioToken);
+      }
       if (init.body && !headers.has('Content-Type')) {
         headers.set('Content-Type', 'application/json');
       }
       const res = await fetch(url, { ...init, headers });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
+        if (res.status === 403 && data?.code === 'STUDIO_LOCKED') {
+          clearStudioToken();
+        }
         throw new Error(data.error || `Request failed (${res.status})`);
       }
       return data;
     },
-    [user]
+    [user, studioToken, clearStudioToken]
   );
 
   const loadProjects = useCallback(async () => {
@@ -194,6 +264,9 @@ export const ProjectsManagerPanel: React.FC = () => {
 
   const openNewProjectForm = () => {
     setError(null);
+    setAnalysisNote(null);
+    setAnalysisHint('');
+    setOverwriteExisting(true);
     setConfirmDeleteId(null);
     setForm({
       ...EMPTY_PROJECT_FORM,
@@ -210,6 +283,9 @@ export const ProjectsManagerPanel: React.FC = () => {
 
   const openEditProjectForm = (project: PortfolioProject) => {
     setError(null);
+    setAnalysisNote(null);
+    setAnalysisHint('');
+    setOverwriteExisting(false);
     setConfirmDeleteId(null);
     setForm({
       dbId: project.dbId,
@@ -287,6 +363,108 @@ export const ProjectsManagerPanel: React.FC = () => {
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
+    }
+  };
+
+  const handleAnalyzeUploadedImages = async () => {
+    if (form.images.length === 0 || analyzing) return;
+    setError(null);
+    setAnalysisNote(null);
+    setAnalyzing(true);
+
+    try {
+      const targetImages = form.images.slice(0, 10);
+      const prepared = await Promise.all(
+        targetImages.map(async (sheet, idx) => ({
+          index: idx,
+          dataUrl: await imageSrcToAnalysisDataUrl(sheet.src),
+          filename: sheet.label || sheet.sheetNumber || `sheet-${idx + 1}`,
+        }))
+      );
+
+      const res = await authFetch('/api/admin/projects/analyze-images', {
+        method: 'POST',
+        body: JSON.stringify({
+          images: prepared,
+          notesHint: analysisHint.trim(),
+        }),
+      });
+
+      const analysis = res?.analysis as AnalyzedProjectPayload | undefined;
+      if (!analysis) {
+        throw new Error('No analysis details were returned. Please retry.');
+      }
+
+      const matchedPreset =
+        PILLAR_PRESETS.find((p) => p.categoryTag === analysis.categoryTag) || PILLAR_PRESETS[0];
+
+      setForm((prev) => {
+        const pick = (currentVal: string, nextVal: string) => {
+          if (!nextVal) return currentVal;
+          if (overwriteExisting || !currentVal.trim()) return nextVal;
+          return currentVal;
+        };
+
+        const shouldUpdatePillar =
+          overwriteExisting || (!prev.title.trim() && !prev.materials.trim() && !prev.description.trim());
+
+        const nextTitle = pick(prev.title, analysis.title);
+
+        const nextImages = prev.images.map((sheet, idx) => {
+          const sheetAnalysis = analysis.sheets.find((s) => s.index === idx);
+          if (!sheetAnalysis) return sheet;
+          const nextLabel =
+            overwriteExisting || !sheet.label.trim() || sheet.label.startsWith('Project view ')
+              ? sheetAnalysis.caption || sheet.label
+              : sheet.label;
+          const nextSheetNum =
+            overwriteExisting || !sheet.sheetNumber.trim()
+              ? sheetAnalysis.sheetNumber || sheet.sheetNumber
+              : sheet.sheetNumber;
+          return {
+            ...sheet,
+            type: sheetAnalysis.type,
+            sheetNumber: nextSheetNum,
+            label: nextLabel,
+            alt: `${nextTitle || 'Casegoods project'} — ${nextLabel}`,
+          };
+        });
+
+        const hasManualSpecs = prev.specs.some((s) => s.value.trim().length > 0);
+        const nextSpecs =
+          analysis.specs.length > 0 && (overwriteExisting || !hasManualSpecs)
+            ? analysis.specs
+            : prev.specs;
+
+        return {
+          ...prev,
+          code: pick(prev.code, analysis.code),
+          title: nextTitle,
+          recipient: pick(prev.recipient, analysis.recipient),
+          category: pick(prev.category, analysis.category),
+          categoryTag: shouldUpdatePillar ? matchedPreset.categoryTag : prev.categoryTag,
+          pillarBg: shouldUpdatePillar ? matchedPreset.pillarBg : prev.pillarBg,
+          pillarCode: shouldUpdatePillar ? matchedPreset.pillarCode : prev.pillarCode,
+          dimensions: pick(prev.dimensions, analysis.dimensions),
+          tolerance: pick(prev.tolerance, analysis.tolerance),
+          materials: pick(prev.materials, analysis.materials),
+          description: pick(prev.description, analysis.description),
+          specs: nextSpecs,
+          images: nextImages,
+        };
+      });
+
+      const noteText = analysis.confidenceNote
+        ? `Analyzed ${targetImages.length} ${targetImages.length === 1 ? 'file' : 'files'}: ${analysis.confidenceNote}`
+        : `Analyzed ${targetImages.length} ${targetImages.length === 1 ? 'file' : 'files'} and filled project details below. Review and adjust any field before saving.`;
+      setAnalysisNote(noteText);
+      showToast(
+        `AUTO-FILLED FROM ${targetImages.length} ${targetImages.length === 1 ? 'SHEET' : 'SHEETS'} — REVIEW FIELDS BELOW`
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to analyze uploaded images.');
+    } finally {
+      setAnalyzing(false);
     }
   };
 
@@ -768,10 +946,255 @@ export const ProjectsManagerPanel: React.FC = () => {
       ===================================================================== */}
       {mode === 'edit' && (
         <form onSubmit={handleSaveProject} className="space-y-5">
-          {/* SECTION 01: PROJECT IDENTITY & PILLAR */}
-          <div className="border-[1.5px] border-black rounded-[9px] p-4 sm:p-6 bg-white space-y-4">
+          {/* SECTION 01: MULTI-IMAGE UPLOAD, SHEETS & AUTO-FILL ANALYSIS */}
+          <div className="border border-black rounded-[9px] p-4 sm:p-6 bg-white space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-[0.74rem] tracking-cad uppercase font-medium">
+                01 / PROJECT DRAWINGS, 3D RENDERS &amp; PHOTOGRAPHS ({form.images.length})
+              </span>
+              <span className="text-[0.66rem] tracking-cad uppercase text-black/70">
+                FIRST SHEET = COVER PHOTO · UPLOAD TO AUTO-FILL OR ENTER MANUALLY BELOW
+              </span>
+            </div>
+
+            {/* Drag & Drop Zone */}
+            <div
+              onDragOver={(e) => {
+                e.preventDefault();
+                setIsDragging(true);
+              }}
+              onDragLeave={() => setIsDragging(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setIsDragging(false);
+                handleFilesSelected(e.dataTransfer.files);
+              }}
+              onClick={() => fileInputRef.current?.click()}
+              className={`border border-dashed border-black rounded-[9px] p-6 sm:p-7 text-center cursor-pointer transition-colors ${
+                isDragging ? 'bg-[#27AAE0]/20' : 'bg-[#CBCBCB]/15 hover:bg-[#CBCBCB]/30'
+              }`}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={(e) => handleFilesSelected(e.target.files)}
+              />
+              <Upload className="w-6 h-6 mx-auto mb-2 text-black" />
+              <div className="text-[0.76rem] tracking-cad uppercase font-medium text-black">
+                {uploadingCount > 0
+                  ? `OPTIMIZING ${uploadingCount} IMAGE${uploadingCount > 1 ? 'S' : ''}...`
+                  : 'DROP CAD DRAWINGS, 3D RENDERS, OR FINISHED PHOTOS HERE — OR CLICK TO BROWSE'}
+              </div>
+              <p className="text-[0.78rem] font-light text-black/70 mt-1">
+                Select multiple JPG, PNG, or WebP files at once. After uploading, analyze them to auto-fill title, dimensions, materials, specs, and captions.
+              </p>
+            </div>
+
+            {/* Smart Auto-Fill Control Bar (Appears once images are added) */}
+            {form.images.length > 0 && (
+              <div className="border border-black rounded-[9px] overflow-hidden bg-white">
+                <div className="bg-[#CBCBCB] text-black border-b border-black px-4 py-2 flex flex-wrap items-center justify-between gap-2 text-[0.66rem] tracking-cad uppercase font-medium">
+                  <span className="inline-flex items-center gap-1.5">
+                    <ScanSearch className="w-3.5 h-3.5" />
+                    <span>AUTO-FILL PROJECT DETAILS FROM UPLOADED FILES</span>
+                  </span>
+                  <span className="text-black/75">
+                    {form.images.length > 10
+                      ? 'ANALYZES FIRST 10 SHEETS'
+                      : `${form.images.length} ${form.images.length === 1 ? 'SHEET' : 'SHEETS'} READY`}
+                  </span>
+                </div>
+
+                <div className="p-3.5 sm:p-4 space-y-3">
+                  <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2.5">
+                    <input
+                      type="text"
+                      value={analysisHint}
+                      onChange={(e) => setAnalysisHint(e.target.value)}
+                      placeholder="Optional note before analyzing (e.g. client name, wood species, job code, or room)..."
+                      className="flex-1 px-3 py-2 border border-black rounded-[9px] text-[0.82rem]"
+                    />
+                    <button
+                      type="button"
+                      disabled={analyzing || uploadingCount > 0}
+                      onClick={handleAnalyzeUploadedImages}
+                      className="shrink-0 px-4 py-2.5 rounded-[9px] border border-black bg-[#27AAE0] hover:bg-black text-black hover:text-white disabled:opacity-50 text-[0.70rem] tracking-cad uppercase font-medium inline-flex items-center justify-center gap-2 transition-colors cursor-pointer whitespace-nowrap"
+                    >
+                      {analyzing ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <span>ANALYZING SHEETS...</span>
+                        </>
+                      ) : (
+                        <>
+                          <ScanSearch className="w-3.5 h-3.5" />
+                          <span>
+                            ANALYZE {Math.min(form.images.length, 10)}{' '}
+                            {form.images.length === 1 ? 'SHEET' : 'SHEETS'} &amp; AUTO-FILL
+                          </span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-[0.68rem] text-black/80">
+                    <label className="inline-flex items-center gap-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={overwriteExisting}
+                        onChange={(e) => setOverwriteExisting(e.target.checked)}
+                        className="accent-black w-3.5 h-3.5 cursor-pointer"
+                      />
+                      <span className="tracking-cad uppercase text-[0.64rem]">
+                        OVERWRITE FIELDS THAT ALREADY HAVE TEXT
+                      </span>
+                    </label>
+                    <span className="text-[0.72rem] font-light text-black/70">
+                      Every field below stays fully editable after auto-fill.
+                    </span>
+                  </div>
+
+                  {analysisNote && (
+                    <div className="bg-[#FDCB33]/25 border border-black rounded-[9px] px-3.5 py-2.5 text-[0.78rem] text-black leading-relaxed">
+                      {analysisNote}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Uploaded Sheets List */}
+            {form.images.length > 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+                {form.images.map((sheet, idx) => (
+                  <div
+                    key={`${sheet.sheetNumber}-${idx}`}
+                    className="border border-black rounded-[9px] overflow-hidden bg-white flex flex-col"
+                  >
+                    {/* Preview Stage */}
+                    <div
+                      className={`relative h-48 border-b border-black flex items-center justify-center overflow-hidden bg-white ${
+                        sheet.type === 'cad' ? 'p-3' : ''
+                      }`}
+                    >
+                      <img
+                        src={sheet.src}
+                        alt={sheet.alt}
+                        className={
+                          sheet.type === 'cad'
+                            ? 'max-w-full max-h-full object-contain block'
+                            : 'w-full h-full object-cover object-center block'
+                        }
+                      />
+
+                      {idx === 0 && (
+                        <span className="absolute top-2 left-2 px-2.5 py-1 rounded-[6px] border border-black bg-[#EF6922] text-black text-[0.60rem] tracking-cad uppercase font-medium">
+                          COVER PHOTO
+                        </span>
+                      )}
+
+                      <div className="absolute top-2 right-2 flex items-center gap-1">
+                        <button
+                          type="button"
+                          disabled={idx === 0}
+                          onClick={() => moveSheet(idx, -1)}
+                          title="Move sheet left"
+                          className="w-7 h-7 rounded-[6px] border border-black bg-white hover:bg-[#CBCBCB] disabled:opacity-35 flex items-center justify-center cursor-pointer disabled:cursor-not-allowed"
+                        >
+                          <ArrowLeft className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          disabled={idx === form.images.length - 1}
+                          onClick={() => moveSheet(idx, 1)}
+                          title="Move sheet right"
+                          className="w-7 h-7 rounded-[6px] border border-black bg-white hover:bg-[#CBCBCB] disabled:opacity-35 flex items-center justify-center cursor-pointer disabled:cursor-not-allowed"
+                        >
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => removeSheet(idx)}
+                          title="Remove sheet"
+                          className="w-7 h-7 rounded-[6px] border border-black bg-white hover:bg-[#EF6922] flex items-center justify-center cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Sheet Metadata Inputs */}
+                    <div className="p-3 space-y-2.5 bg-white">
+                      <div className="grid grid-cols-12 gap-2">
+                        <div className="col-span-5">
+                          <label className="block text-[0.58rem] tracking-cad uppercase text-black/70 mb-0.5">
+                            SHEET TAB LABEL
+                          </label>
+                          <input
+                            type="text"
+                            value={sheet.sheetNumber}
+                            onChange={(e) => updateSheet(idx, { sheetNumber: e.target.value })}
+                            placeholder="SHEET 01"
+                            className="w-full px-2.5 py-1.5 border border-black rounded-[7px] text-[0.74rem] uppercase"
+                          />
+                        </div>
+                        <div className="col-span-7">
+                          <label className="block text-[0.58rem] tracking-cad uppercase text-black/70 mb-0.5">
+                            SHEET TYPE
+                          </label>
+                          <div className="grid grid-cols-3 rounded-[7px] border border-black overflow-hidden">
+                            {(
+                              [
+                                { id: 'photo', label: 'PHOTO' },
+                                { id: 'render', label: '3D' },
+                                { id: 'cad', label: '2D CAD' },
+                              ] as const
+                            ).map((t, tIdx) => (
+                              <button
+                                key={t.id}
+                                type="button"
+                                onClick={() => updateSheet(idx, { type: t.id })}
+                                className={`py-1.5 text-[0.60rem] tracking-cad uppercase font-medium cursor-pointer transition-colors ${
+                                  tIdx > 0 ? 'border-l border-black' : ''
+                                } ${
+                                  sheet.type === t.id
+                                    ? 'bg-[#27AAE0] text-black'
+                                    : 'bg-white text-black hover:bg-[#CBCBCB]'
+                                }`}
+                              >
+                                {t.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[0.58rem] tracking-cad uppercase text-black/70 mb-0.5">
+                          CAPTION
+                        </label>
+                        <input
+                          type="text"
+                          value={sheet.label}
+                          onChange={(e) => updateSheet(idx, { label: e.target.value })}
+                          placeholder="e.g. Installed elevation — solid black walnut doors"
+                          className="w-full px-2.5 py-1.5 border border-black rounded-[7px] text-[0.78rem]"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* SECTION 02: PROJECT IDENTITY & PILLAR */}
+          <div className="border border-black rounded-[9px] p-4 sm:p-6 bg-white space-y-4">
             <span className="block text-[0.74rem] tracking-cad uppercase font-medium">
-              01 / PROJECT IDENTITY &amp; COLOR PILLAR
+              02 / PROJECT IDENTITY &amp; COLOR PILLAR
             </span>
 
             {/* Pillar Color Selector */}
@@ -787,7 +1210,7 @@ export const ProjectsManagerPanel: React.FC = () => {
                       key={preset.id}
                       type="button"
                       onClick={() => handleSelectPillar(preset)}
-                      className={`px-3.5 py-2.5 rounded-[9px] border-[1.5px] border-black text-[0.66rem] tracking-cad uppercase font-medium transition-all cursor-pointer text-left flex items-center gap-2.5 ${
+                      className={`px-3.5 py-2.5 rounded-[9px] border border-black text-[0.66rem] tracking-cad uppercase font-medium transition-all cursor-pointer text-left flex items-center gap-2.5 ${
                         isActive
                           ? `${preset.pillarBg} text-black`
                           : 'bg-white text-black hover:bg-[#CBCBCB]/40'
@@ -925,180 +1348,8 @@ export const ProjectsManagerPanel: React.FC = () => {
             </div>
           </div>
 
-          {/* SECTION 02: MULTI-IMAGE UPLOAD & SHEETS */}
-          <div className="border-[1.5px] border-black rounded-[9px] p-4 sm:p-6 bg-white space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="text-[0.74rem] tracking-cad uppercase font-medium">
-                02 / PROJECT PHOTOS, 3D RENDERS &amp; 2D CAD SHEETS ({form.images.length})
-              </span>
-              <span className="text-[0.66rem] tracking-cad uppercase text-black/70">
-                FIRST SHEET = COVER PHOTO · AUTO-OPTIMIZED ON UPLOAD
-              </span>
-            </div>
-
-            {/* Drag & Drop Zone */}
-            <div
-              onDragOver={(e) => {
-                e.preventDefault();
-                setIsDragging(true);
-              }}
-              onDragLeave={() => setIsDragging(false)}
-              onDrop={(e) => {
-                e.preventDefault();
-                setIsDragging(false);
-                handleFilesSelected(e.dataTransfer.files);
-              }}
-              onClick={() => fileInputRef.current?.click()}
-              className={`border-[1.5px] border-dashed border-black rounded-[9px] p-6 sm:p-8 text-center cursor-pointer transition-colors ${
-                isDragging ? 'bg-[#27AAE0]/20' : 'bg-[#CBCBCB]/15 hover:bg-[#CBCBCB]/30'
-              }`}
-            >
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                multiple
-                className="hidden"
-                onChange={(e) => handleFilesSelected(e.target.files)}
-              />
-              <Upload className="w-6 h-6 mx-auto mb-2 text-black" />
-              <div className="text-[0.76rem] tracking-cad uppercase font-medium text-black">
-                {uploadingCount > 0
-                  ? `OPTIMIZING ${uploadingCount} IMAGE${uploadingCount > 1 ? 'S' : ''}...`
-                  : 'DROP PHOTOS, RENDERS, OR CAD DRAWINGS HERE — OR CLICK TO BROWSE'}
-              </div>
-              <p className="text-[0.78rem] font-light text-black/70 mt-1">
-                Select multiple JPG, PNG, or WebP files at once from your computer or phone.
-              </p>
-            </div>
-
-            {/* Uploaded Sheets List */}
-            {form.images.length > 0 && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
-                {form.images.map((sheet, idx) => (
-                  <div
-                    key={`${sheet.sheetNumber}-${idx}`}
-                    className="border border-black rounded-[9px] overflow-hidden bg-white flex flex-col"
-                  >
-                    {/* Preview Stage */}
-                    <div
-                      className={`relative h-48 border-b border-black flex items-center justify-center overflow-hidden bg-white ${
-                        sheet.type === 'cad' ? 'p-3' : ''
-                      }`}
-                    >
-                      <img
-                        src={sheet.src}
-                        alt={sheet.alt}
-                        className={
-                          sheet.type === 'cad'
-                            ? 'max-w-full max-h-full object-contain block'
-                            : 'w-full h-full object-cover object-center block'
-                        }
-                      />
-
-                      {idx === 0 && (
-                        <span className="absolute top-2 left-2 px-2.5 py-1 rounded-[6px] border border-black bg-[#EF6922] text-black text-[0.60rem] tracking-cad uppercase font-medium">
-                          COVER PHOTO
-                        </span>
-                      )}
-
-                      <div className="absolute top-2 right-2 flex items-center gap-1">
-                        <button
-                          type="button"
-                          disabled={idx === 0}
-                          onClick={() => moveSheet(idx, -1)}
-                          title="Move sheet left"
-                          className="w-7 h-7 rounded-[6px] border border-black bg-white hover:bg-[#CBCBCB] disabled:opacity-35 flex items-center justify-center cursor-pointer disabled:cursor-not-allowed"
-                        >
-                          <ArrowLeft className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          disabled={idx === form.images.length - 1}
-                          onClick={() => moveSheet(idx, 1)}
-                          title="Move sheet right"
-                          className="w-7 h-7 rounded-[6px] border border-black bg-white hover:bg-[#CBCBCB] disabled:opacity-35 flex items-center justify-center cursor-pointer disabled:cursor-not-allowed"
-                        >
-                          <ArrowRight className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => removeSheet(idx)}
-                          title="Remove sheet"
-                          className="w-7 h-7 rounded-[6px] border border-black bg-white hover:bg-[#EF6922] flex items-center justify-center cursor-pointer"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Sheet Metadata Inputs */}
-                    <div className="p-3 space-y-2.5 bg-white">
-                      <div className="grid grid-cols-12 gap-2">
-                        <div className="col-span-5">
-                          <label className="block text-[0.58rem] tracking-cad uppercase text-black/70 mb-0.5">
-                            SHEET TAB LABEL
-                          </label>
-                          <input
-                            type="text"
-                            value={sheet.sheetNumber}
-                            onChange={(e) => updateSheet(idx, { sheetNumber: e.target.value })}
-                            placeholder="SHEET 01"
-                            className="w-full px-2.5 py-1.5 border border-black rounded-[7px] text-[0.74rem] uppercase"
-                          />
-                        </div>
-                        <div className="col-span-7">
-                          <label className="block text-[0.58rem] tracking-cad uppercase text-black/70 mb-0.5">
-                            SHEET TYPE
-                          </label>
-                          <div className="grid grid-cols-3 rounded-[7px] border border-black overflow-hidden">
-                            {(
-                              [
-                                { id: 'photo', label: 'PHOTO' },
-                                { id: 'render', label: '3D' },
-                                { id: 'cad', label: '2D CAD' },
-                              ] as const
-                            ).map((t, tIdx) => (
-                              <button
-                                key={t.id}
-                                type="button"
-                                onClick={() => updateSheet(idx, { type: t.id })}
-                                className={`py-1.5 text-[0.60rem] tracking-cad uppercase font-medium cursor-pointer transition-colors ${
-                                  tIdx > 0 ? 'border-l border-black' : ''
-                                } ${
-                                  sheet.type === t.id
-                                    ? 'bg-[#27AAE0] text-black'
-                                    : 'bg-white text-black hover:bg-[#CBCBCB]'
-                                }`}
-                              >
-                                {t.label}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-[0.58rem] tracking-cad uppercase text-black/70 mb-0.5">
-                          CAPTION
-                        </label>
-                        <input
-                          type="text"
-                          value={sheet.label}
-                          onChange={(e) => updateSheet(idx, { label: e.target.value })}
-                          placeholder="e.g. Installed elevation — solid black walnut doors"
-                          className="w-full px-2.5 py-1.5 border border-black rounded-[7px] text-[0.78rem]"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
           {/* SECTION 03: TECHNICAL SPECIFICATION SCHEDULE */}
-          <div className="border-[1.5px] border-black rounded-[9px] p-4 sm:p-6 bg-white space-y-3.5">
+          <div className="border border-black rounded-[9px] p-4 sm:p-6 bg-white space-y-3.5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-[0.74rem] tracking-cad uppercase font-medium">
                 03 / SPECIFICATION SCHEDULE ROWS (OPTIONAL)
@@ -1150,7 +1401,7 @@ export const ProjectsManagerPanel: React.FC = () => {
           </div>
 
           {/* SECTION 04: VISIBILITY & SAVE BAR */}
-          <div className="border-[1.5px] border-black rounded-[9px] p-4 sm:p-5 bg-white flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+          <div className="border border-black rounded-[9px] p-4 sm:p-5 bg-white flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
             <div className="inline-flex rounded-[9px] border-[1.5px] border-black overflow-hidden">
               <button
                 type="button"
