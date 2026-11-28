@@ -128,7 +128,7 @@ async function backfillStandardizedCadSheets(): Promise<void> {
 }
 
 /** Default projects added after the original seed that should be inserted into existing databases. */
-const LATE_DEFAULT_PROJECT_SLUGS = ['residential-kitchen-cad'];
+const LATE_DEFAULT_PROJECT_SLUGS = ['residential-kitchen-cad', 'coffee-table'];
 
 /**
  * Inserts any LATE_DEFAULT_PROJECT_SLUGS project that is missing from an already-seeded database.
