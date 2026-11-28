@@ -711,18 +711,274 @@ function drawCoffeeTablePlan(page: PDFPage, font: PDFFont, box: ViewportCard) {
   );
 }
 
-/** Detailed 30° Exploded Part Drawing on Sheet A-102 matching Untitled.PNG Exploded Perspective! */
+/**
+ * High-detail Exploded Part Drawing on Sheet A-102.
+ * Uses a clean low-angle architectural axonometric (matching Untitled.PNG's Exploded Perspective)
+ * so every exploded layer, stepped L-leg, twin dowel, corner-notched shelf, and 1/2"×1"×1/2" tenon
+ * is 100% unobstructed and crystal clear.
+ */
 function drawExplodedPartDrawingA102(page: PDFPage, font: PDFFont, box: ViewportCard) {
-  const cos30 = Math.cos(Math.PI / 6);
-  const sin30 = 0.5;
-  const sc = 5.1;
-  const ox = box.innerX + box.innerW * 0.48;
-  const oy = box.innerYTop + box.innerH * 0.43;
+  // Clean low-angle axonometric: X goes right-and-slightly-down, Y goes left-and-down, Z goes straight up
+  const sc = 6.75;
+  const ox = box.innerX + box.innerW * 0.415;
+  const oy = box.innerYTop + box.innerH * 0.515;
 
-  const iso = (x: number, y: number, z: number): [number, number] => [
-    ox + (x - y) * cos30 * sc,
-    oy + (x + y) * sin30 * sc - z * sc,
+  // Low-elevation projection vectors (shows vertical faces & under-table structure cleanly!)
+  const vxX = 0.88;
+  const vxY = 0.24;
+  const vyX = -0.58;
+  const vyY = 0.30;
+
+  const p3 = (x: number, y: number, z: number): [number, number] => [
+    ox + (x * vxX + y * vyX) * sc,
+    oy + (x * vxY + y * vyY - z) * sc,
   ];
+
+  // Subtle 3-tone architectural shading so top, front, and side faces read immediately
+  const shadeTop = C.white;
+  const shadeFront = C.oakTint;
+  const shadeSide = C.walnutTint;
+
+  /** Draw a 3D rectangular prism with optional 1/4" roundover edge lines */
+  const drawBox = (
+    x: number,
+    y: number,
+    z: number,
+    w: number,
+    d: number,
+    h: number,
+    opts: { top?: ReturnType<typeof rgb>; front?: ReturnType<typeof rgb>; side?: ReturnType<typeof rgb>; sw?: number; roundover?: boolean } = {}
+  ) => {
+    const sw = opts.sw ?? 0.78;
+    // Front face (y = y + d)
+    polygon(page, [p3(x, y + d, z), p3(x + w, y + d, z), p3(x + w, y + d, z + h), p3(x, y + d, z + h)], {
+      fill: opts.front ?? shadeFront,
+      stroke: C.black,
+      strokeWidth: sw,
+    });
+    // Right face (x = x + w)
+    polygon(page, [p3(x + w, y, z), p3(x + w, y + d, z), p3(x + w, y + d, z + h), p3(x + w, y, z + h)], {
+      fill: opts.side ?? shadeSide,
+      stroke: C.black,
+      strokeWidth: sw,
+    });
+    // Top face (z = z + h)
+    polygon(page, [p3(x, y, z + h), p3(x + w, y, z + h), p3(x + w, y + d, z + h), p3(x, y + d, z + h)], {
+      fill: opts.top ?? shadeTop,
+      stroke: C.black,
+      strokeWidth: sw,
+    });
+    if (opts.roundover && w > 1 && d > 1) {
+      const r = 0.25;
+      // Top surface 1/4" roundover tangent line
+      polygon(page, [p3(x + r, y + r, z + h), p3(x + w - r, y + r, z + h), p3(x + w - r, y + d - r, z + h), p3(x + r, y + d - r, z + h)], {
+        stroke: C.inkLight,
+        strokeWidth: 0.35,
+      });
+      if (h >= 0.75) {
+        line(page, ...p3(x, y + d, z + h - r), ...p3(x + w, y + d, z + h - r), 0.32, C.inkLight);
+        line(page, ...p3(x + w, y, z + h - r), ...p3(x + w, y + d, z + h - r), 0.32, C.inkLight);
+      }
+    }
+  };
+
+  /** Draw a true 12-vertex corner-notched 0.75" lower shelf slab */
+  const drawNotchedShelf = (x0: number, y0: number, z: number, lenX: number, lenY: number, thk: number, notch = 1.7) => {
+    // 12-point perimeter (notched at all 4 corners around the 1.5" legs)
+    const pts2d: Array<[number, number]> = [
+      [x0 + notch, y0],
+      [x0 + lenX - notch, y0],
+      [x0 + lenX - notch, y0 + notch],
+      [x0 + lenX, y0 + notch],
+      [x0 + lenX, y0 + lenY - notch],
+      [x0 + lenX - notch, y0 + lenY - notch],
+      [x0 + lenX - notch, y0 + lenY],
+      [x0 + notch, y0 + lenY],
+      [x0 + notch, y0 + lenY - notch],
+      [x0, y0 + lenY - notch],
+      [x0, y0 + notch],
+      [x0 + notch, y0 + notch],
+    ];
+    // Visible front & right vertical thickness skirts
+    const skirtEdges: Array<[number, number]> = [
+      [3, 4],
+      [4, 5],
+      [5, 6],
+      [6, 7],
+      [7, 8],
+      [8, 9],
+    ];
+    for (const [a, b] of skirtEdges) {
+      const [ax, ay] = pts2d[a];
+      const [bx, by] = pts2d[b];
+      polygon(page, [p3(ax, ay, z), p3(bx, by, z), p3(bx, by, z + thk), p3(ax, ay, z + thk)], {
+        fill: a === 3 ? shadeSide : shadeFront,
+        stroke: C.black,
+        strokeWidth: 0.72,
+      });
+    }
+    // Top face of notched shelf
+    polygon(
+      page,
+      pts2d.map(([px, pyv]) => p3(px, pyv, z + thk)),
+      { fill: shadeTop, stroke: C.black, strokeWidth: 0.85 }
+    );
+  };
+
+  /** Draw a 1.50" H × 0.75" W cross-slat along Y with crisp 1/2" L × 1" H × 1/2" W tenons on BOTH ends */
+  const drawSlatY = (x: number, y0: number, lenY: number, z: number) => {
+    // Back tenon (1/2" L × 1" H × 1/2" W)
+    drawBox(x + 0.125, y0 - 0.5, z + 0.25, 0.5, 0.5, 1.0, { top: C.white, front: C.white, side: C.wallFill, sw: 0.58 });
+    // Main slat body (0.75" W × lenY × 1.50" H)
+    drawBox(x, y0, z, 0.75, lenY, 1.5, { sw: 0.72 });
+    // Front tenon (1/2" L × 1" H × 1/2" W)
+    drawBox(x + 0.125, y0 + lenY, z + 0.25, 0.5, 0.5, 1.0, { top: C.white, front: C.white, side: C.wallFill, sw: 0.58 });
+  };
+
+  /** Draw a 1.50" H × 0.75" W long rail along X with end tenons & 5× inner mortise slots */
+  const drawLongRailX = (x0: number, lenX: number, y: number, z: number, showMortisesOnFront = false) => {
+    drawBox(x0 - 0.5, y + 0.125, z + 0.25, 0.5, 0.5, 1.0, { top: C.white, front: C.white, side: C.wallFill, sw: 0.58 });
+    drawBox(x0, y, z, lenX, 0.75, 1.5, { sw: 0.78 });
+    drawBox(x0 + lenX, y + 0.125, z + 0.25, 0.5, 0.5, 1.0, { top: C.white, front: C.white, side: C.wallFill, sw: 0.58 });
+    if (showMortisesOnFront) {
+      for (let i = 1; i <= 5; i++) {
+        const mx = x0 + (lenX * i) / 6 - 0.25;
+        polygon(
+          page,
+          [p3(mx, y + 0.75, z + 0.25), p3(mx + 0.5, y + 0.75, z + 0.25), p3(mx + 0.5, y + 0.75, z + 1.25), p3(mx, y + 0.75, z + 1.25)],
+          { fill: C.inkMid, stroke: C.black, strokeWidth: 0.45 }
+        );
+      }
+    }
+  };
+
+  /** Draw an authentic Stepped L-Shaped Leg (1.5" shaft + 3.0" upper ear + lower mortise slot) */
+  const drawSteppedLeg = (x: number, yOuter: number, zBase: number, earDirY: 1 | -1) => {
+    // Draw back part first for painter's order
+    const yEar = earDirY === 1 ? yOuter + 1.5 : yOuter - 1.5;
+    if (earDirY === -1) {
+      // Back ear first, then front shaft
+      drawBox(x, yEar, zBase + 12.0, 1.5, 1.5, 3.0, { sw: 0.85 });
+      drawBox(x, yOuter, zBase, 1.5, 1.5, 13.5, { sw: 0.85 });
+    } else {
+      // Back shaft first, then front ear
+      drawBox(x, yOuter, zBase, 1.5, 1.5, 13.5, { sw: 0.85 });
+      drawBox(x, yEar, zBase + 12.0, 1.5, 1.5, 3.0, { sw: 0.85 });
+    }
+    // Lower rail mortise slot on inside face
+    polygon(
+      page,
+      [p3(x + 1.5, yOuter + 0.5, zBase + 4.3), p3(x + 1.5, yOuter + 1.0, zBase + 4.3), p3(x + 1.5, yOuter + 1.0, zBase + 5.3), p3(x + 1.5, yOuter + 0.5, zBase + 5.3)],
+      { fill: C.inkMid, stroke: C.black, strokeWidth: 0.45 }
+    );
+  };
+
+  // =========================================================================
+  // BACK-TO-FRONT PAINTER'S ORDER EXPLODED ASSEMBLY
+  // =========================================================================
+
+  // 1. Back-Left & Back-Right Stepped L-Legs (exploded left x=-9 and right x=67.5)
+  drawSteppedLeg(-9, 1.5, -5, 1);
+  drawBox(-8.8, 1.7, -9.2, 1.1, 1.1, 0.45, { top: C.steelTint, front: C.steelTint, side: C.gray, sw: 0.6 });
+  line(page, ...p3(-8.25, 2.25, -8.7), ...p3(-8.25, 2.25, -5.2), 0.45, C.inkLight, [2, 2]);
+
+  drawSteppedLeg(67.5, 1.5, -5, 1);
+  drawBox(67.7, 1.7, -9.2, 1.1, 1.1, 0.45, { top: C.steelTint, front: C.steelTint, side: C.gray, sw: 0.6 });
+  line(page, ...p3(68.25, 2.25, -8.7), ...p3(68.25, 2.25, -5.2), 0.45, C.inkLight, [2, 2]);
+
+  // 2. Lower Ladder Frame (z = -12): back rail, 5× tenoned slats, front rail pushed slightly forward (+3.5 in Y)
+  drawLongRailX(4.5, 47, 0.0, -12, true);
+  for (let i = 1; i <= 5; i++) {
+    const sx = 4.5 + (47 * i) / 6 - 0.375;
+    drawSlatY(sx, 3.0, 24.5, -12);
+  }
+  drawLongRailX(4.5, 47, 31.5, -12, false);
+
+  // 3. 0.75" Corner-Notched Lower Shelf (z = 0)
+  drawNotchedShelf(3.0, 1.0, 0, 50.0, 30.0, 0.75, 1.75);
+
+  // 4. Left 23" × 3" End Apron + Twin Floating Dowels (exploded at x=-3.5)
+  drawBox(-3.5, 4.5, 7.0, 1.5, 23.0, 3.0, { sw: 0.85, roundover: true });
+  for (const dz of [7.9, 9.1]) {
+    line(page, ...p3(-7.4, 4.5, dz), ...p3(-3.8, 4.5, dz), 1.35, C.black);
+    line(page, ...p3(-7.4, 27.5, dz), ...p3(-3.8, 27.5, dz), 1.35, C.black);
+  }
+
+  // 5. Upper Ladder Frame (z = 12): back rail (y=2.5), 5× tenoned slats (y=5.5..24.5), front rail (y=28.5)
+  drawLongRailX(4.5, 47, 2.5, 12, true);
+  for (let i = 1; i <= 5; i++) {
+    const sx = 4.5 + (47 * i) / 6 - 0.375;
+    drawSlatY(sx, 5.5, 19.0, 12);
+  }
+  drawLongRailX(4.5, 47, 28.5, 12, false);
+
+  // 6. Right 3.00" End Apron + Twin Floating Dowels (exploded cleanly past right shelf edge at x=61.5)
+  drawBox(61.5, 4.5, 7.0, 1.5, 23.0, 3.0, { sw: 0.85, roundover: true });
+  for (const dz of [7.9, 9.1]) {
+    line(page, ...p3(63.3, 4.5, dz), ...p3(67.1, 4.5, dz), 1.35, C.black);
+    line(page, ...p3(63.3, 27.5, dz), ...p3(67.1, 27.5, dz), 1.35, C.black);
+  }
+
+  // 7. Front-Left & Front-Right Stepped L-Legs + Leveling Glides
+  drawSteppedLeg(-9, 29.0, -5, -1);
+  drawBox(-8.8, 29.2, -9.2, 1.1, 1.1, 0.45, { top: C.steelTint, front: C.steelTint, side: C.gray, sw: 0.6 });
+  line(page, ...p3(-8.25, 29.75, -8.7), ...p3(-8.25, 29.75, -5.2), 0.45, C.inkLight, [2, 2]);
+
+  drawSteppedLeg(67.5, 29.0, -5, -1);
+  drawBox(67.7, 29.2, -9.2, 1.1, 1.1, 0.45, { top: C.steelTint, front: C.steelTint, side: C.gray, sw: 0.6 });
+  line(page, ...p3(68.25, 29.75, -8.7), ...p3(68.25, 29.75, -5.2), 0.45, C.inkLight, [2, 2]);
+
+  // 8. Lifted 56.00" × 32.00" × 1.50" Solid White Oak Tabletop (z = 27) w/ 1/4" Roundover Tangent Lines
+  drawBox(0, 0, 27, 56, 32, 1.5, { sw: 1.0, roundover: true });
+
+  // Clean Leader-Lined Part Callouts!
+  const callout = (lines: string[], tx: number, ty: number, px: number, pyv: number, align: 'left' | 'right' = 'left') => {
+    drawCadLabel(page, font, lines, tx, ty, { size: 6.0, align, color: C.inkDark });
+    const startX = align === 'left' ? tx + 132 : tx - 132;
+    line(page, startX, ty - 2, px, pyv, 0.45, C.inkLight);
+    page.drawCircle({ x: px, y: py(pyv), size: 1.8, color: C.black });
+  };
+
+  callout(['01 · 1.50" OAK TOP (R 1/4" EDGES)'], box.innerX + 18, box.innerYTop + 42, ...p3(6, 12, 28.5), 'left');
+  callout(['02 · UPPER LADDER FRAME', '     5× SLATS (1.5"×3/4") W/ TENONS'], box.innerX + 18, box.innerYTop + 134, ...p3(12, 18, 13.5), 'left');
+  callout(['03 · 0.75" CORNER-NOTCHED SHELF'], box.innerX + 18, box.innerYTop + 236, ...p3(12, 18, 0.75), 'left');
+  callout(['04 · LOWER LADDER FRAME', '     5× SLATS (1.5"×3/4") W/ TENONS'], box.innerX + 18, box.innerYTop + 378, ...p3(14, 31.5, -11.2), 'left');
+
+  drawCadLabel(
+    page,
+    font,
+    ['05 · 4× STEPPED L-LEGS (3.00" EAR)', '06 · 2× 3.00" APRONS + TWIN DOWELS', '07 · 4× ADJUSTABLE LEVELING GLIDES'],
+    box.innerX + box.innerW - 18,
+    box.innerYTop + 576,
+    { size: 6.0, align: 'right', color: C.inkDark }
+  );
+}
+
+// =============================================================================
+// SHEET A-103 — HIGH-DETAIL ASSEMBLED ISOMETRIC & 1:1 JOINERY DETAILS
+// =============================================================================
+
+function drawAssembledIsometricA103(page: PDFPage, font: PDFFont, box: ViewportCard) {
+  // Low-angle architectural 3/4 view matching Untitled.PNG Perspective & IMG_2954.jpg!
+  // Shows tabletop 1/4" roundover edges, stepped L-leg floating corner reveals, end apron,
+  // corner-notched overhanging shelf with edge dowels, lower rails, and leveling glides.
+  const sc = 6.45;
+  const ox = box.innerX + box.innerW * 0.44;
+  const oy = box.innerYTop + box.innerH * 0.47;
+
+  const vxX = 0.88;
+  const vxY = 0.22;
+  const vyX = -0.58;
+  const vyY = 0.28;
+
+  const p3 = (x: number, y: number, z: number): [number, number] => [
+    ox + (x * vxX + y * vyX) * sc,
+    oy + (x * vxY + y * vyY - z) * sc,
+  ];
+
+  const shadeTop = C.white;
+  const shadeFront = C.oakTint;
+  const shadeSide = C.walnutTint;
 
   const drawBox = (
     x: number,
@@ -731,212 +987,122 @@ function drawExplodedPartDrawingA102(page: PDFPage, font: PDFFont, box: Viewport
     w: number,
     d: number,
     h: number,
-    fill = C.oakTint,
-    sw = 0.78
+    opts: { top?: ReturnType<typeof rgb>; front?: ReturnType<typeof rgb>; side?: ReturnType<typeof rgb>; sw?: number; roundover?: boolean } = {}
   ) => {
-    polygon(page, [iso(x, y, z), iso(x, y + d, z), iso(x, y + d, z + h), iso(x, y, z + h)], {
-      fill,
+    const sw = opts.sw ?? 0.82;
+    polygon(page, [p3(x, y + d, z), p3(x + w, y + d, z), p3(x + w, y + d, z + h), p3(x, y + d, z + h)], {
+      fill: opts.front ?? shadeFront,
       stroke: C.black,
       strokeWidth: sw,
     });
-    polygon(page, [iso(x, y + d, z), iso(x + w, y + d, z), iso(x + w, y + d, z + h), iso(x, y + d, z + h)], {
-      fill,
+    polygon(page, [p3(x + w, y, z), p3(x + w, y + d, z), p3(x + w, y + d, z + h), p3(x + w, y, z + h)], {
+      fill: opts.side ?? shadeSide,
       stroke: C.black,
       strokeWidth: sw,
     });
-    polygon(page, [iso(x, y, z + h), iso(x + w, y, z + h), iso(x + w, y + d, z + h), iso(x, y + d, z + h)], {
-      fill,
+    polygon(page, [p3(x, y, z + h), p3(x + w, y, z + h), p3(x + w, y + d, z + h), p3(x, y + d, z + h)], {
+      fill: opts.top ?? shadeTop,
       stroke: C.black,
       strokeWidth: sw,
     });
+    if (opts.roundover && w > 1 && d > 1) {
+      const r = 0.25;
+      polygon(page, [p3(x + r, y + r, z + h), p3(x + w - r, y + r, z + h), p3(x + w - r, y + d - r, z + h), p3(x + r, y + d - r, z + h)], {
+        stroke: C.inkLight,
+        strokeWidth: 0.38,
+      });
+      if (h >= 0.75) {
+        line(page, ...p3(x, y + d, z + h - r), ...p3(x + w, y + d, z + h - r), 0.34, C.inkLight);
+        line(page, ...p3(x, y + d, z + r), ...p3(x + w, y + d, z + r), 0.34, C.inkLight);
+        line(page, ...p3(x + w, y, z + h - r), ...p3(x + w, y + d, z + h - r), 0.34, C.inkLight);
+        line(page, ...p3(x + w, y, z + r), ...p3(x + w, y + d, z + r), 0.34, C.inkLight);
+      }
+    }
   };
 
-  /** Draw a 1.50" H × 0.75" W slat with visible 1/2" L × 1" H × 1/2" W stepped tenons on BOTH ends! */
-  const drawTenonedSlatY = (x: number, y0: number, lenY: number, z: number) => {
-    // Back tenon (1/2" L × 1" H × 1/2" W)
-    drawBox(x + 0.125, y0 - 0.5, z + 0.25, 0.5, 0.5, 1.0, C.white, 0.62);
-    // Main slat body (0.75" W × lenY × 1.50" H)
-    drawBox(x, y0, z, 0.75, lenY, 1.5, C.oakTint, 0.72);
-    // Front tenon (1/2" L × 1" H × 1/2" W)
-    drawBox(x + 0.125, y0 + lenY, z + 0.25, 0.5, 0.5, 1.0, C.white, 0.62);
-  };
-
-  const drawTenonedLongRailX = (x0: number, lenX: number, y: number, z: number) => {
-    drawBox(x0 - 0.5, y + 0.125, z + 0.25, 0.5, 0.5, 1.0, C.white, 0.62);
-    drawBox(x0, y, z, lenX, 0.75, 1.5, C.oakTint, 0.78);
-    drawBox(x0 + lenX, y + 0.125, z + 0.25, 0.5, 0.5, 1.0, C.white, 0.62);
-  };
-
-  /** Draw an authentic Stepped L-Shaped Leg in isometric (shaft + inward stepped ear!) */
-  const drawSteppedLegIso = (x: number, yOuter: number, zBase: number, earDirY: 1 | -1) => {
-    // Main vertical shaft up to notch (1.5 × 1.5 × 13.5)
-    drawBox(x, yOuter, zBase, 1.5, 1.5, 13.5, C.oakTint, 0.85);
-    // Stepped inward ear rising 1.5" higher to meet tabletop (1.5 × 1.5 × 3.0)
-    const yEar = earDirY === 1 ? yOuter + 1.5 : yOuter - 1.5;
-    drawBox(x, yEar, zBase + 12.0, 1.5, 1.5, 3.0, C.oakTint, 0.85);
-    // Mortise slot at lower rail height
-    polygon(
-      page,
-      [iso(x + 1.5, yOuter + 0.5, zBase + 4.3), iso(x + 1.5, yOuter + 1.0, zBase + 4.3), iso(x + 1.5, yOuter + 1.0, zBase + 5.3), iso(x + 1.5, yOuter + 0.5, zBase + 5.3)],
-      { fill: C.inkMid, stroke: C.black, strokeWidth: 0.45 }
-    );
-  };
-
-  // ---- LAYER 1 (BOTTOM, z = -12): Lower Ladder Frame (2× Long Rails + 5× Tenoned Cross-Slats) ----
-  drawTenonedLongRailX(4.5, 47, 1.5, -12);
-  for (let i = 1; i <= 5; i++) {
-    const sx = 4.5 + (47 * i) / 6;
-    drawTenonedSlatY(sx, 3.5, 24.5, -12);
-  }
-  drawTenonedLongRailX(4.5, 47, 29.0, -12);
-
-  // ---- LAYER 2 (z = -2): 0.75" Corner-Notched Lower Shelf ----
-  drawBox(3.5, 1.0, -2, 49.0, 30.0, 0.75, C.oakTint, 0.85);
-
-  // ---- LAYER 3 (OUTBOARD LEFT & RIGHT): 4× Stepped L-Legs + Twin Dowels + 2× 3.00" End Aprons ----
-  // Back-left & Front-left stepped L-legs (exploded left to x = -8)
-  drawSteppedLegIso(-8, 1.5, -6, 1);
-  drawSteppedLegIso(-8, 29.0, -6, -1);
-  // Left 23" × 3" end apron (exploded at x = -2.5) + twin floating dowels
-  drawBox(-2.5, 4.5, 6.0, 1.5, 23.0, 3.0, C.oakTint, 0.85);
-  for (const dz of [6.9, 8.1]) {
-    line(page, ...iso(-6.5, 4.5, dz), ...iso(-2.8, 4.5, dz), 1.4, C.inkDark);
-    line(page, ...iso(-6.5, 27.5, dz), ...iso(-2.8, 27.5, dz), 1.4, C.inkDark);
-  }
-
-  // Back-right & Front-right stepped L-legs (exploded right to x = 62)
-  drawSteppedLegIso(62, 1.5, -6, 1);
-  drawSteppedLegIso(62, 29.0, -6, -1);
-  // Right 23" × 3" end apron (exploded at x = 56.5) + twin floating dowels
-  drawBox(56.5, 4.5, 6.0, 1.5, 23.0, 3.0, C.oakTint, 0.85);
-  for (const dz of [6.9, 8.1]) {
-    line(page, ...iso(58.3, 4.5, dz), ...iso(61.8, 4.5, dz), 1.4, C.inkDark);
-    line(page, ...iso(58.3, 27.5, dz), ...iso(61.8, 27.5, dz), 1.4, C.inkDark);
-  }
-
-  // 4× Leveling glides exploded below legs
-  for (const [gx, gy] of [
-    [-7.8, 1.7],
-    [-7.8, 29.2],
-    [62.2, 29.2],
-    [62.2, 1.7],
-  ]) {
-    drawBox(gx, gy, -10.5, 1.1, 1.1, 0.45, C.steelTint, 0.65);
-    line(page, ...iso(gx + 0.55, gy + 0.55, -10), ...iso(gx + 0.55, gy + 0.55, -6.2), 0.5, C.inkLight, [2, 2]);
-  }
-
-  // ---- LAYER 4 (z = 12): Upper Ladder Frame (2× Long Rails + 5× Tenoned Cross-Slats) ----
-  drawTenonedLongRailX(4.5, 47, 4.5, 12);
-  for (let i = 1; i <= 5; i++) {
-    const sx = 4.5 + (47 * i) / 6;
-    drawTenonedSlatY(sx, 6.5, 19.0, 12);
-  }
-  drawTenonedLongRailX(4.5, 47, 26.75, 12);
-
-  // ---- LAYER 5 (TOP, z = 25): 56.00" × 32.00" × 1.50" Tabletop w/ 1/4" Roundover Tangent Line ----
-  drawBox(0, 0, 25, 56, 32, 1.5, C.oakTint, 1.0);
-  polygon(page, [iso(0.5, 0.5, 26.5), iso(55.5, 0.5, 26.5), iso(55.5, 31.5, 26.5), iso(0.5, 31.5, 26.5)], {
-    stroke: C.inkLight,
-    strokeWidth: 0.42,
-  });
-
-  // Clean Part Callouts
-  drawCadLabel(page, font, ['01 · 1.50" SOLID OAK TOP (R 1/4" EDGES)'], box.innerX + 20, box.innerYTop + 26, {
-    size: 6.2,
-    color: C.inkDark,
-  });
-  drawCadLabel(page, font, ['02 · 2× UPPER RAILS + 5× CROSS-SLATS', '     (1.5" H × 3/4" W · 1/2"×1"×1/2" TENONS)'], box.innerX + 20, box.innerYTop + 128, {
-    size: 6.0,
-    color: C.inkMid,
-  });
-  drawCadLabel(page, font, ['03 · 0.75" CORNER-NOTCHED LOWER SHELF'], box.innerX + 20, box.innerYTop + 258, {
-    size: 6.0,
-    color: C.inkMid,
-  });
-  drawCadLabel(page, font, ['04 · 2× LOWER RAILS + 5× CROSS-SLATS'], box.innerX + 20, box.innerYTop + 370, {
-    size: 6.0,
-    color: C.inkMid,
-  });
-  drawCadLabel(
-    page,
-    font,
-    ['05 · 4× STEPPED L-LEGS (3.00" EAR)', '06 · 2× 3.00" END APRONS + TWIN DOWELS', '07 · 4× ADJUSTABLE LEVELING GLIDES'],
-    box.innerX + box.innerW - 18,
-    box.innerYTop + 530,
-    { size: 6.0, align: 'right', color: C.inkDark }
-  );
-}
-
-// =============================================================================
-// SHEET A-103 — ASSEMBLED ISOMETRIC & 1:1 MORTISE, TENON & ROUNDOVER DETAILS
-// =============================================================================
-
-function drawAssembledIsometricA103(page: PDFPage, font: PDFFont, box: ViewportCard) {
-  const cos30 = Math.cos(Math.PI / 6);
-  const sin30 = 0.5;
-  const sc = 4.25;
-  const ox = box.innerX + box.innerW * 0.44;
-  const oy = box.innerYTop + box.innerH * 0.37;
-
-  const iso = (x: number, y: number, z: number): [number, number] => [
-    ox + (x - y) * cos30 * sc,
-    oy + (x + y) * sin30 * sc - z * sc,
-  ];
-
-  const drawBox = (x: number, y: number, z: number, w: number, d: number, h: number, fill = C.oakTint, sw = 0.8) => {
-    polygon(page, [iso(x, y, z), iso(x, y + d, z), iso(x, y + d, z + h), iso(x, y, z + h)], {
-      fill,
-      stroke: C.black,
-      strokeWidth: sw,
-    });
-    polygon(page, [iso(x, y + d, z), iso(x + w, y + d, z), iso(x + w, y + d, z + h), iso(x, y + d, z + h)], {
-      fill,
-      stroke: C.black,
-      strokeWidth: sw,
-    });
-    polygon(page, [iso(x, y, z + h), iso(x + w, y, z + h), iso(x + w, y + d, z + h), iso(x, y + d, z + h)], {
-      fill,
-      stroke: C.black,
-      strokeWidth: sw,
-    });
-  };
-
-  // Back legs
+  // 1. Back-left & Back-right legs + glides
+  drawBox(3.15, 1.65, 0, 1.2, 1.2, 0.45, { top: C.steelTint, front: C.steelTint, side: C.gray, sw: 0.65 });
   drawBox(3, 1.5, 0.45, 1.5, 1.5, 14.55);
+  drawBox(51.65, 1.65, 0, 1.2, 1.2, 0.45, { top: C.steelTint, front: C.steelTint, side: C.gray, sw: 0.65 });
   drawBox(51.5, 1.5, 0.45, 1.5, 1.5, 14.55);
-  // Lower frame + overhanging 0.75" shelf
-  drawBox(4.5, 1.5, 4.5, 47, 29, 1.5);
-  drawBox(2.5, 1.0, 6.0, 51, 30, 0.75);
-  // Front stepped L-legs (1.5" shaft up to 15.0" + inward 3.0" ear up to 16.5"!)
-  drawBox(3, 29.0, 0.45, 1.5, 1.5, 14.55, C.oakTint, 0.9);
-  drawBox(3, 27.5, 13.5, 1.5, 1.5, 3.0, C.oakTint, 0.9);
-  drawBox(51.5, 29.0, 0.45, 1.5, 1.5, 14.55, C.oakTint, 0.9);
-  drawBox(51.5, 27.5, 13.5, 1.5, 1.5, 3.0, C.oakTint, 0.9);
-  // Left 3.00" end apron & front upper long rail
-  drawBox(3, 4.5, 13.5, 1.5, 23.0, 3.0, C.oakTint, 0.85);
-  drawBox(4.5, 27.5, 15.0, 47.0, 0.75, 1.5, C.oakTint, 0.85);
-  // Glides
-  for (const [lx, ly] of [
-    [3.15, 29.15],
-    [51.65, 29.15],
-    [3.15, 1.65],
+  drawBox(51.5, 3.0, 13.5, 1.5, 1.5, 3.0);
+
+  // 2. Lower sub-frame rails (z: 4.5..6.0)
+  drawBox(4.5, 29.0, 4.5, 47.0, 0.75, 1.5);
+  drawBox(51.5, 3.0, 4.5, 0.75, 26.0, 1.5);
+
+  // 3. True 12-vertex Corner-Notched Overhanging 0.75" Lower Shelf (z: 6.0..6.75)
+  const sx0 = 2.5;
+  const sy0 = 1.0;
+  const slx = 51.0;
+  const sly = 30.0;
+  const n = 2.0;
+  const sPts: Array<[number, number]> = [
+    [sx0 + n, sy0],
+    [sx0 + slx - n, sy0],
+    [sx0 + slx - n, sy0 + n],
+    [sx0 + slx, sy0 + n],
+    [sx0 + slx, sy0 + sly - n],
+    [sx0 + slx - n, sy0 + sly - n],
+    [sx0 + slx - n, sy0 + sly],
+    [sx0 + n, sy0 + sly],
+    [sx0 + n, sy0 + sly - n],
+    [sx0, sy0 + sly - n],
+    [sx0, sy0 + n],
+    [sx0 + n, sy0 + n],
+  ];
+  for (const [a, b] of [
+    [3, 4],
+    [4, 5],
+    [5, 6],
+    [6, 7],
+    [7, 8],
+    [8, 9],
   ]) {
-    drawBox(lx, ly, 0, 1.2, 1.2, 0.45, C.steelTint, 0.7);
+    const [ax, ay] = sPts[a];
+    const [bx, by] = sPts[b];
+    polygon(page, [p3(ax, ay, 6.0), p3(bx, by, 6.0), p3(bx, by, 6.75), p3(ax, ay, 6.75)], {
+      fill: a === 3 ? shadeSide : shadeFront,
+      stroke: C.black,
+      strokeWidth: 0.78,
+    });
   }
-  // 56" × 32" × 1.50" Tabletop + 1/4" roundover perimeter tangent line
-  drawBox(0, 0, 16.5, 56, 32, 1.5, C.oakTint, 1.05);
-  polygon(page, [iso(0.5, 0.5, 18), iso(55.5, 0.5, 18), iso(55.5, 31.5, 18), iso(0.5, 31.5, 18)], {
-    stroke: C.inkLight,
-    strokeWidth: 0.45,
-  });
+  polygon(
+    page,
+    sPts.map(([px, pyv]) => p3(px, pyv, 6.75)),
+    { fill: shadeTop, stroke: C.black, strokeWidth: 0.88 }
+  );
+  // 4× Flush oak edge dowels along visible right short edge of lower shelf!
+  for (let d = 0; d < 4; d++) {
+    const dy = sy0 + n + ((sly - n * 2) * (d + 0.5)) / 4;
+    const [cx, cy] = p3(sx0 + slx, dy, 6.375);
+    page.drawCircle({ x: cx, y: py(cy), size: 1.5, borderColor: C.inkDark, borderWidth: 0.55 });
+  }
+
+  // 4. Recessed Upper Long Front Rail (z: 15.0..16.5) & Right 3.00" Short End Apron (z: 13.5..16.5)
+  drawBox(4.5, 27.5, 15.0, 47.0, 0.75, 1.5, { sw: 0.8 });
+  drawBox(51.5, 4.5, 13.5, 1.5, 23.0, 3.0, { sw: 0.88 });
+
+  // 5. Front-Left & Front-Right Stepped L-Legs (showing the signature 1.50" outer floating notch!)
+  // Front-left leg
+  drawBox(3.15, 29.15, 0, 1.2, 1.2, 0.45, { top: C.steelTint, front: C.steelTint, side: C.gray, sw: 0.65 });
+  drawBox(3, 27.5, 13.5, 1.5, 1.5, 3.0, { sw: 0.88 });
+  drawBox(3, 29.0, 0.45, 1.5, 1.5, 14.55, { sw: 0.92 });
+  // Front-right leg
+  drawBox(51.65, 29.15, 0, 1.2, 1.2, 0.45, { top: C.steelTint, front: C.steelTint, side: C.gray, sw: 0.65 });
+  drawBox(51.5, 27.5, 13.5, 1.5, 1.5, 3.0, { sw: 0.88 });
+  drawBox(51.5, 29.0, 0.45, 1.5, 1.5, 14.55, { sw: 0.92 });
+
+  // 6. 56.00" × 32.00" × 1.50" Solid White Oak Tabletop w/ crisp 1/4" roundover double edge lines!
+  drawBox(0, 0, 16.5, 56, 32, 1.5, { sw: 1.05, roundover: true });
 
   drawCadLabel(
     page,
     font,
-    ['ASSEMBLED 30° ISOMETRIC · R 1/4" ROUNDOVER ON ALL EXPOSED EDGES'],
+    ['ASSEMBLED 3/4 PERSPECTIVE · STEPPED L-LEGS · CORNER-NOTCHED SHELF · R 1/4" EDGES'],
     box.innerX + box.innerW / 2,
     box.innerYTop + box.innerH - 12,
-    { size: 6.3, align: 'center', color: C.inkMid }
+    { size: 6.2, align: 'center', color: C.inkMid }
   );
 }
 
