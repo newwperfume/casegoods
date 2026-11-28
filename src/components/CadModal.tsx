@@ -217,17 +217,17 @@ export const CadModal: React.FC<CadModalProps> = ({
           style={
             isStandardCadSheet
               ? {
-                  width: 'min(100%, calc((96vh - 175px) * 1556 / 956))',
-                  aspectRatio: '1556 / 956',
+                  width: 'min(100%, calc((96vh - 175px) * 1560 / 960))',
+                  aspectRatio: '1560 / 960',
                 }
               : undefined
           }
-          className={`relative mx-auto bg-white rounded-[9px] border border-black transition-colors duration-300 flex items-center justify-center ${
+          className={`relative mx-auto bg-white rounded-[9px] transition-colors duration-300 flex items-center justify-center ${
             isSpecsOpen
-              ? 'w-full flex-1 min-h-[360px] sm:min-h-[500px] overflow-auto p-4 sm:p-8'
+              ? 'w-full flex-1 min-h-[360px] sm:min-h-[500px] overflow-auto border border-black p-4 sm:p-8'
               : isStandardCadSheet
               ? `shrink-0 p-0 ${zoomLevel > 1 ? 'overflow-auto' : 'overflow-hidden'}`
-              : `w-full flex-1 min-h-[360px] sm:min-h-[500px] p-0 ${
+              : `w-full flex-1 min-h-[360px] sm:min-h-[500px] border border-black p-0 ${
                   zoomLevel > 1 ? 'overflow-auto' : 'overflow-hidden'
                 }`
           }`}
@@ -247,8 +247,8 @@ export const CadModal: React.FC<CadModalProps> = ({
                 style={
                   isStandardCadSheet
                     ? {
-                        width: '102.83%',
-                        height: '104.6%',
+                        width: '102.56%',
+                        height: '104.17%',
                         maxWidth: 'none',
                         maxHeight: 'none',
                       }
