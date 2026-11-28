@@ -818,19 +818,19 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
                     </span>
                   </div>
 
-                  {/* Aligned 2-Column Flush Sheet Cards (Sheet A-101 & Render 04) */}
+                  {/* Aligned 2-Column Flush Sheet Cards (Elevation B & Render 04) */}
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
                     {/* Left Card: 2D Rhino CAD */}
                     <div className="border border-black rounded-[9px] bg-white overflow-hidden flex flex-col">
                       <div className="bg-[#CBCBCB] text-black border-b border-black px-4 py-2.5 flex items-center justify-between text-[0.70rem] tracking-cad uppercase font-medium">
-                        <span>SHEET A-101 · 2D RHINO CAD SUBMITTAL</span>
-                        <span>DWG-1070MCG</span>
+                        <span>02 / ELEVATION B — NORTH WALL</span>
+                        <span>DWG-1036HEI</span>
                       </div>
 
                       <div className="bg-white border-b border-black p-3 sm:p-4 flex items-center justify-center h-[280px] sm:h-[320px] overflow-hidden">
                         <img
-                          src="/downloads/drawings/casegoods-1070MCG-A101-elevations-sections.png"
-                          alt="Casegoods 2D Rhino CAD Sheet A-101 showing elevations, plumbing rough-in, and sections"
+                          src="/assets/cad_1036HEI_elevation_B_north_wall.png"
+                          alt="Residential Kitchen 2D CAD Elevation B — North Wall showing stacked Shaker uppers, vertical-grain walnut range hood, floating shelves, and buffet base cabinetry"
                           className="w-full h-full object-contain block select-none"
                           referrerPolicy="no-referrer"
                         />
