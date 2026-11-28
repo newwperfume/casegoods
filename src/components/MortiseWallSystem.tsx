@@ -689,19 +689,34 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
     };
 
     const TARGET_VERTICAL_ROWS = 14;
-    const MIN_VISIBLE_GY = -7;
-    const MAX_VISIBLE_GY = 6;
+    let minVisibleGy = -7;
+    let maxVisibleGy = 6;
 
     const measureClearanceZones = () => {
       const headerEl = headerSelector ? document.querySelector(headerSelector) : null;
       const footerEl = footerSelector ? document.querySelector(footerSelector) : null;
-      const toolbarEl = cssW < 768 ? document.querySelector('.wall-toolbar') : null;
       const edgeY = Math.max(8, Math.min(14, cssH * 0.012));
-      topSafeY = headerEl ? Math.max(edgeY, headerEl.getBoundingClientRect().bottom + 10) : edgeY;
-      const bottomEl = toolbarEl ?? footerEl;
-      const bottomElTop = bottomEl ? bottomEl.getBoundingClientRect().top - 10 : cssH - edgeY;
-      bottomSafeY = Math.min(cssH - edgeY, Math.max(topSafeY + 220, bottomElTop));
-      edgeSafeX = Math.max(8, Math.min(14, cssW * 0.008));
+
+      if (cssW < 768) {
+        const topBoundEl = document.querySelector('[data-wall-top-bound]');
+        const bottomBoundEl = document.querySelector('[data-wall-bottom-bound]');
+        const topEdge = topBoundEl
+          ? topBoundEl.getBoundingClientRect().bottom + 14
+          : headerEl
+          ? headerEl.getBoundingClientRect().bottom + 12
+          : edgeY;
+        const botEdge = bottomBoundEl
+          ? bottomBoundEl.getBoundingClientRect().top - 14
+          : cssH - edgeY;
+        topSafeY = Math.max(edgeY, topEdge);
+        bottomSafeY = Math.min(cssH - edgeY, Math.max(topSafeY + 180, botEdge));
+        edgeSafeX = Math.max(10, Math.min(16, cssW * 0.025));
+      } else {
+        topSafeY = headerEl ? Math.max(edgeY, headerEl.getBoundingClientRect().bottom + 10) : edgeY;
+        const footerTop = footerEl ? footerEl.getBoundingClientRect().top - 10 : cssH - edgeY;
+        bottomSafeY = Math.min(cssH - edgeY, Math.max(topSafeY + 220, footerTop));
+        edgeSafeX = Math.max(8, Math.min(14, cssW * 0.008));
+      }
 
       const heroEl = heroSelector ? (document.querySelector(heroSelector) as HTMLElement | null) : null;
       if (heroEl) {
@@ -731,7 +746,7 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       slotW: number,
       slotH: number
     ) => {
-      if (gy < MIN_VISIBLE_GY || gy > MAX_VISIBLE_GY) return true;
+      if (gy < minVisibleGy || gy > maxVisibleGy) return true;
       if (cx - slotW * 0.5 < edgeSafeX || cx + slotW * 0.5 > cssW - edgeSafeX) return true;
       if (heroCutout) {
         return (
@@ -741,9 +756,13 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
           gy <= heroCutout.gyMax
         );
       }
-      const halfW = slotW * 0.5 + 4;
-      const halfH = slotH * 0.5 + 4;
+      const halfW = slotW * 0.5 + 3;
+      const halfH = slotH * 0.5 + 3;
       if (cy - halfH < topSafeY || cy + halfH > bottomSafeY) return true;
+      if (cssW < 768) {
+        // Strict top/bottom thresholds already keep all mobile slots strictly between statement box and studio buttons
+        return false;
+      }
       if (blockedRects.length > 0) {
         return blockedRects.some(
           (r) =>
@@ -1079,9 +1098,16 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
     const rebuildGrid = () => {
       measureClearanceZones();
 
-      // Scale mortise grid evenly on both axes so exactly 14 vertical rows of mortise holes span the viewport
-      const usableH = Math.max(200, bottomSafeY - topSafeY);
-      const scale = usableH / (TARGET_VERTICAL_ROWS * SVG_PITCH_Y);
+      const isMobileBand = cssW < 768;
+      const usableH = Math.max(180, bottomSafeY - topSafeY);
+      const rowCount = isMobileBand
+        ? Math.max(6, Math.min(10, Math.round(usableH / 58)))
+        : TARGET_VERTICAL_ROWS;
+      minVisibleGy = -Math.floor(rowCount / 2);
+      maxVisibleGy = minVisibleGy + rowCount - 1;
+
+      // Scale mortise grid evenly on both axes so exact rows span cleanly between topSafeY and bottomSafeY
+      const scale = usableH / (rowCount * SVG_PITCH_Y);
       const slotW = SVG_SLOT_W * scale;
       const slotH = SVG_SLOT_H * scale;
       const slotR = SVG_SLOT_R * scale;
@@ -1090,16 +1116,23 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
 
       const midX = cssW * 0.5;
       const midY = (topSafeY + bottomSafeY) * 0.5;
-      // Offset centerY by +0.5 * pitchY so the 14 even rows (gy = -7..+6) sit symmetrically around midY
-      const centerY = midY + 0.5 * pitchY;
+      // Offset centerY by +0.5 * pitchY when rowCount is even so rows sit 100% symmetrically between topSafeY & bottomSafeY
+      const centerY = rowCount % 2 === 0 ? midY + 0.5 * pitchY : midY;
       let centerX = midX;
       heroCutout = null;
 
-      // Scale & center the middle hero stack so its 4 visual edges are strictly equidistant from the nearest mortise holes
+      if (isMobileBand) {
+        // Center columns symmetrically left-to-right across the phone screen
+        const visibleCols = Math.max(5, Math.floor((cssW - 2 * edgeSafeX) / pitchX));
+        centerX = visibleCols % 2 === 0 ? midX + 0.5 * pitchX : midX;
+        blockedRects = [];
+      }
+
+      // Scale & center the middle hero stack on desktop so its 4 visual edges are strictly equidistant from the nearest mortise holes
       const heroEl = heroSelector
         ? (document.querySelector(heroSelector) as HTMLElement | null)
         : null;
-      if (heroEl) {
+      if (heroEl && !isMobileBand) {
         const W0 = heroEl.offsetWidth;
         const H0 = heroEl.offsetHeight;
         const totalCols = Math.floor((cssW - 2 * edgeSafeX) / pitchX);
@@ -1176,7 +1209,6 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
             bottom: midY + scaledH * 0.5,
           };
         } else {
-          // Mobile / portrait layout: measure each UI surface individually so mortise holes fill in around the 50%-width buttons
           if (heroEl.style.transform) {
             heroEl.style.transform = '';
             heroEl.style.transformOrigin = '';
@@ -1201,6 +1233,13 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
               bottom: r.bottom + 4,
             }));
         }
+      } else if (heroEl && isMobileBand) {
+        if (heroEl.style.transform) {
+          heroEl.style.transform = '';
+          heroEl.style.transformOrigin = '';
+        }
+        heroAppliedDx = 0;
+        heroAppliedDy = 0;
       }
 
       const halfCols = Math.ceil((cssW * 0.5) / pitchX) + 2;
@@ -1208,8 +1247,8 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       gridMeta = {
         minGx: -halfCols,
         maxGx: halfCols,
-        minGy: MIN_VISIBLE_GY,
-        maxGy: MAX_VISIBLE_GY,
+        minGy: minVisibleGy,
+        maxGy: maxVisibleGy,
         slotW,
         slotH,
         slotR,
@@ -4796,41 +4835,163 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       );
       if (openSlots.length === 0) return;
 
-      // Simplified, uncluttered mobile wall arrangement: curated compact pieces only, no lighting or props
+      // 60% Visually Pleasing / 40% Functional mobile composition engine (curated pieces, no lighting or props)
       if (cssW < 768) {
-        const mobilePlan: Array<{ type: WallTool; cols: number; rows: number }> = [
-          { type: 'cabinet', ...MOBILE_FIXED_SIZES.cabinet },
-          { type: 'cubby', ...MOBILE_FIXED_SIZES.cubby },
-          { type: 'wallShelf', ...MOBILE_FIXED_SIZES.wallShelf },
-          { type: 'hook', ...MOBILE_FIXED_SIZES.hook },
-          { type: 'hook', ...MOBILE_FIXED_SIZES.hook },
-        ];
-        // Shuffle order slightly so Rearrange produces fresh aesthetic layouts
-        for (let i = mobilePlan.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          const tmp = mobilePlan[i];
-          mobilePlan[i] = mobilePlan[j];
-          mobilePlan[j] = tmp;
+        let mMinGy = Infinity;
+        let mMaxGy = -Infinity;
+        let mMinGx = Infinity;
+        let mMaxGx = -Infinity;
+        for (const s of openSlots) {
+          if (s.gy < mMinGy) mMinGy = s.gy;
+          if (s.gy > mMaxGy) mMaxGy = s.gy;
+          if (s.gx < mMinGx) mMinGx = s.gx;
+          if (s.gx > mMaxGx) mMaxGx = s.gx;
         }
-        const placed: Array<{ gx1: number; gx2: number; gy1: number; gy2: number }> = [];
-        for (const spec of mobilePlan) {
-          if (placed.length >= 4) break;
-          const candidates: Array<{ gx1: number; gx2: number; gy1: number; gy2: number }> = [];
-          for (const s of openSlots) {
-            const gx1 = s.gx;
-            const gx2 = gx1 + spec.cols - 1;
-            const gy1 = s.gy;
-            const gy2 = gy1 + spec.rows - 1;
-            if (!canPlaceRect(gx1, gx2, gy1, gy2)) continue;
-            const overlaps = placed.some(
-              (p) => gx1 <= p.gx2 + 1 && gx2 >= p.gx1 - 1 && gy1 <= p.gy2 + 1 && gy2 >= p.gy1 - 1
-            );
-            if (!overlaps) candidates.push({ gx1, gx2, gy1, gy2 });
+        const mRowSpan = Math.max(1, mMaxGy - mMinGy);
+        const mColSpan = Math.max(1, mMaxGx - mMinGx);
+        const mMidGx = (mMinGx + mMaxGx) * 0.5;
+        const mTotalCells = openSlots.length;
+
+        type MobilePiece = {
+          type: WallTool;
+          gx1: number;
+          gx2: number;
+          gy1: number;
+          gy2: number;
+          cols: number;
+          rows: number;
+        };
+
+        const gauss = (v: number, ideal: number, spread: number) =>
+          Math.exp(-Math.pow((v - ideal) / Math.max(0.05, spread), 2));
+
+        // Curated palettes combining focal mass, horizontal plane, sculptural cube, and functional hooks
+        const palettes: Array<Array<{ type: WallTool; cols: number; rows: number }>> = [
+          [
+            { type: 'cabinet', cols: 3, rows: 2 },
+            { type: 'wallShelf', cols: 3, rows: 1 },
+            { type: 'cubby', cols: 2, rows: 2 },
+            { type: 'wallShelf', cols: 2, rows: 1 },
+            { type: 'hook', cols: 1, rows: 1 },
+            { type: 'hook', cols: 1, rows: 1 },
+          ],
+          [
+            { type: 'cabinet', cols: 3, rows: 2 },
+            { type: 'cubby', cols: 2, rows: 2 },
+            { type: 'cubby', cols: 2, rows: 2 },
+            { type: 'wallShelf', cols: 3, rows: 1 },
+            { type: 'hook', cols: 1, rows: 1 },
+            { type: 'hook', cols: 1, rows: 1 },
+            { type: 'hook', cols: 1, rows: 1 },
+          ],
+          [
+            { type: 'cabinet', cols: 2, rows: 2 },
+            { type: 'wallShelf', cols: 3, rows: 1 },
+            { type: 'cubby', cols: 2, rows: 2 },
+            { type: 'wallShelf', cols: 2, rows: 1 },
+            { type: 'hook', cols: 1, rows: 1 },
+            { type: 'hook', cols: 1, rows: 1 },
+          ],
+        ];
+
+        const functionalScoreForPiece = (p: MobilePiece): number => {
+          const topNorm = (p.gy1 - mMinGy) / mRowSpan;
+          const midNorm = ((p.gy1 + p.gy2) * 0.5 - mMinGy) / mRowSpan;
+          const botNorm = (p.gy2 - mMinGy) / mRowSpan;
+          if (p.type === 'wallShelf') return gauss(topNorm, 0.22, 0.24);
+          if (p.type === 'cubby') return gauss(midNorm, 0.38, 0.25);
+          if (p.type === 'cabinet') return gauss(midNorm, 0.52, 0.22);
+          // Hooks work best in the reachable lower zone with breathing space below
+          return gauss(botNorm, 0.78, 0.22);
+        };
+
+        const scoreMobileLayout = (layout: MobilePiece[]): number => {
+          if (layout.length === 0) return -1;
+          let usedCells = 0;
+          let leftMass = 0;
+          let rightMass = 0;
+          let funcSum = 0;
+          const types = new Set<WallTool>();
+
+          for (const p of layout) {
+            const area = p.cols * p.rows;
+            usedCells += area;
+            const cx = (p.gx1 + p.gx2) * 0.5;
+            if (cx < mMidGx) leftMass += area;
+            else if (cx > mMidGx) rightMass += area;
+            else {
+              leftMass += area * 0.5;
+              rightMass += area * 0.5;
+            }
+            funcSum += functionalScoreForPiece(p);
+            types.add(p.type);
           }
-          if (candidates.length === 0) continue;
-          const pick = candidates[Math.floor(Math.random() * candidates.length)];
-          placed.push(pick);
-          addPlacedItem(spec.type, pick.gx1, pick.gx2, pick.gy1, pick.gy2, withPulse);
+
+          // 60% Aesthetic: left/right visual balance + target 38%–50% density + asymmetric focal counterweight + silhouette variety
+          const balanceScore = 1 - Math.abs(leftMass - rightMass) / Math.max(1, leftMass + rightMass);
+          const density = usedCells / Math.max(1, mTotalCells);
+          const densityScore = gauss(density, 0.42, 0.16);
+          const varietyScore = Math.min(1, types.size / 4);
+          const cab = layout.find((p) => p.type === 'cabinet');
+          const offCenterAnchor = cab
+            ? gauss(Math.abs((cab.gx1 + cab.gx2) * 0.5 - mMidGx) / Math.max(1, mColSpan), 0.24, 0.18)
+            : 0.6;
+          const aestheticScore =
+            0.34 * balanceScore + 0.30 * densityScore + 0.20 * varietyScore + 0.16 * offCenterAnchor;
+
+          // 40% Functional: ergonomic vertical zoning + reachable hooks
+          const functionalScore = funcSum / layout.length;
+
+          return 0.6 * aestheticScore + 0.4 * functionalScore;
+        };
+
+        let bestLayout: MobilePiece[] = [];
+        let bestScore = -Infinity;
+
+        for (let trial = 0; trial < 36; trial++) {
+          const palette = palettes[trial % palettes.length];
+          const placed: MobilePiece[] = [];
+
+          for (const spec of palette) {
+            const cands: MobilePiece[] = [];
+            for (const s of openSlots) {
+              const gx1 = s.gx;
+              const gx2 = gx1 + spec.cols - 1;
+              const gy1 = s.gy;
+              const gy2 = gy1 + spec.rows - 1;
+              if (!canPlaceRect(gx1, gx2, gy1, gy2)) continue;
+              // Require 1-cell breathing room between major pieces; allow hooks to pair side-by-side cleanly
+              const pad = spec.type === 'hook' ? 0 : 1;
+              const collides = placed.some((p) => {
+                const effPad = spec.type === 'hook' && p.type === 'hook' ? 0 : Math.max(pad, p.type === 'hook' ? 0 : 1);
+                return (
+                  gx1 <= p.gx2 + effPad &&
+                  gx2 >= p.gx1 - effPad &&
+                  gy1 <= p.gy2 + effPad &&
+                  gy2 >= p.gy1 - effPad
+                );
+              });
+              if (!collides) {
+                cands.push({ type: spec.type, gx1, gx2, gy1, gy2, cols: spec.cols, rows: spec.rows });
+              }
+            }
+            if (cands.length === 0) continue;
+            // Bias candidate selection toward ergonomic functional zone while preserving organic variety
+            cands.sort((a, b) => functionalScoreForPiece(b) - functionalScoreForPiece(a));
+            const topK = Math.max(1, Math.min(cands.length, 6));
+            const pick = cands[Math.floor(Math.random() * topK)];
+            placed.push(pick);
+          }
+
+          const sc = scoreMobileLayout(placed);
+          if (sc > bestScore) {
+            bestScore = sc;
+            bestLayout = placed;
+          }
+        }
+
+        for (const p of bestLayout) {
+          addPlacedItem(p.type, p.gx1, p.gx2, p.gy1, p.gy2, withPulse);
         }
         if (withPulse) triggerRipple(0.5, 0.5);
         return;

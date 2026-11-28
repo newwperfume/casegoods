@@ -36,10 +36,10 @@ export const FrontCoverOptions: React.FC<FrontCoverOptionsProps> = ({
     <section
       id="hero-center-stack"
       aria-label="casegoods — handcrafted in omaha"
-      className="w-full max-w-[780px] mx-auto min-h-[calc(100dvh-24px)] md:min-h-0 flex flex-col gap-2.5 md:gap-5"
+      className="w-full max-w-[780px] mx-auto min-h-[calc(100dvh-24px)] md:min-h-0 flex flex-col justify-between md:justify-start gap-2.5 md:gap-5"
     >
-      {/* Top Lockup: Logo + Thin Black Line + Black Statement Box + 3 Side-by-Side Studio Buttons */}
-      <div className="w-full flex flex-col gap-2.5 md:gap-5">
+      {/* Top Lockup: Logo + Thin Black Line + Black Statement Box */}
+      <div data-wall-top-bound className="w-full flex flex-col gap-2.5 md:gap-5">
         {/* 1. Full-Width Logo */}
         <div className="w-full ui-surface">
           <img
@@ -68,8 +68,11 @@ export const FrontCoverOptions: React.FC<FrontCoverOptionsProps> = ({
             we make the things that have never been made before
           </h1>
         </div>
+      </div>
 
-        {/* 4. 3-Column Horizontal Bauhaus Entry Doors Directly Under Statement Box */}
+      {/* Bottom Dock on Mobile (Normal Flow on Desktop): 3 Studio Buttons + Object Bar */}
+      <div data-wall-bottom-bound className="w-full mt-auto md:mt-0 pb-1 md:pb-0 flex flex-col gap-2.5 md:gap-5 relative z-30">
+        {/* 4. 3-Column Horizontal Bauhaus Entry Doors */}
         <div className="w-full grid grid-cols-3 gap-2 md:gap-3.5">
           <button
             type="button"
@@ -131,10 +134,8 @@ export const FrontCoverOptions: React.FC<FrontCoverOptionsProps> = ({
             <ArrowRight className="w-3 h-3 md:w-4 md:h-4 shrink-0 transition-transform group-hover:translate-x-1" />
           </button>
         </div>
-      </div>
 
-      {/* 5. Bottom Modular Wall Bar (Pinned to Very Bottom on Mobile) */}
-      <div className="w-full mt-auto pb-1 md:mt-0 md:pb-0 relative z-30">
+        {/* 5. Bottom Modular Wall Bar */}
         <MortiseWallToolbar controller={wall} />
       </div>
     </section>
