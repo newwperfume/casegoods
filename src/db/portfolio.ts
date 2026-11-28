@@ -55,8 +55,11 @@ function rowToPortfolioProject(
 let seedPromise: Promise<void> | null = null;
 
 /**
- * Appends the 1064HEM A-101 – A-103 construction document sheets to an already-seeded
- * `family-room` project. Skips if the row is missing or already contains any of the sheets.
+ * Places the 1064HEM A-101 – A-103 construction document sheets at the front of an
+ * already-seeded `family-room` project, ahead of the 3D renders.
+ * - If none of the sheets are present, they are prepended.
+ * - If they were previously appended at the end (earlier backfill), they are moved to the front.
+ * - Otherwise (row missing, already first, or manually rearranged) nothing is changed.
  */
 async function backfillFamilyRoomCadSheets(): Promise<void> {
   const [row] = await db
@@ -67,13 +70,33 @@ async function backfillFamilyRoomCadSheets(): Promise<void> {
 
   const images = safeParseJson<ProjectImage[]>(row.imagesJson, []);
   const current = Array.isArray(images) ? images : [];
-  const existingSrcs = new Set(current.map((img) => img?.src));
-  if (FAMILY_ROOM_CAD_SHEETS.some((sheet) => existingSrcs.has(sheet.src))) return;
+  const sheetSrcs = FAMILY_ROOM_CAD_SHEETS.map((sheet) => sheet.src);
+  const isSheet = (img: ProjectImage | undefined) => !!img && sheetSrcs.includes(img.src);
+
+  let next: ProjectImage[] | null = null;
+
+  if (!current.some(isSheet)) {
+    next = [...FAMILY_ROOM_CAD_SHEETS, ...current];
+  } else {
+    const tail = current.slice(-sheetSrcs.length).map((img) => img?.src);
+    const appendedAtEnd =
+      current.length > sheetSrcs.length &&
+      !isSheet(current[0]) &&
+      tail.every((src, i) => src === sheetSrcs[i]);
+    if (appendedAtEnd) {
+      next = [
+        ...current.slice(-sheetSrcs.length),
+        ...current.slice(0, current.length - sheetSrcs.length),
+      ];
+    }
+  }
+
+  if (!next) return;
 
   await db
     .update(portfolioProjects)
     .set({
-      imagesJson: JSON.stringify([...current, ...FAMILY_ROOM_CAD_SHEETS]),
+      imagesJson: JSON.stringify(next),
       updatedAt: new Date(),
     })
     .where(eq(portfolioProjects.id, row.id));

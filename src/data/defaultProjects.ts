@@ -82,6 +82,7 @@ export const DEFAULT_PORTFOLIO_PROJECTS: PortfolioProject[] = [
     description:
       'Vertical and horizontal fluted American Black Walnut doors paired with exposed box-jointed Rift White Oak casework, integrated window bench storage, and custom lathe-turned cylindrical pulls.',
     images: [
+      ...FAMILY_ROOM_CAD_SHEETS,
       {
         src: '/assets/render_1064HEM_1.jpg',
         sheetNumber: 'SHEET 01',
@@ -110,7 +111,6 @@ export const DEFAULT_PORTFOLIO_PROJECTS: PortfolioProject[] = [
         alt: 'Joinery detail highlighting precision 0.75-inch exposed box finger-jointed solid white oak case corners, custom scalloped drawer fronts, and concealed soft-close undermount runners',
         type: 'render',
       },
-      ...FAMILY_ROOM_CAD_SHEETS,
     ] as ProjectImage[],
     specs: [
       {
