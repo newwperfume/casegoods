@@ -3,6 +3,8 @@ import { ProposedStudio } from './components/ProposedStudio.tsx';
 import { PrivateInvoiceStudio } from './components/PrivateInvoiceStudio.tsx';
 import { MobileBusinessCard } from './components/MobileBusinessCard.tsx';
 import { SconceConceptsModal } from './components/SconceConceptsModal.tsx';
+import { KitchenDrawingsViewer } from './components/KitchenDrawingsViewer.tsx';
+import { FamilyRoomDrawingsViewer } from './components/FamilyRoomDrawingsViewer.tsx';
 import { AuthProvider } from './context/AuthContext.tsx';
 
 function getCurrentRoute() {
@@ -38,6 +40,10 @@ export default function App() {
     route.hash === '#card';
   const isSconceConceptsRoute =
     route.path.startsWith('/sconce-concepts') || route.hash === '#sconce-concepts';
+  const isKitchenDrawingsRoute =
+    route.path.startsWith('/kitchen-drawings') || route.hash === '#kitchen-drawings';
+  const isFamilyRoomDrawingsRoute =
+    route.path.startsWith('/family-room-drawings') || route.hash === '#family-room-drawings';
 
   return (
     <AuthProvider>
@@ -48,6 +54,10 @@ export default function App() {
           <MobileBusinessCard />
         ) : isSconceConceptsRoute ? (
           <SconceConceptsModal standalone />
+        ) : isKitchenDrawingsRoute ? (
+          <KitchenDrawingsViewer />
+        ) : isFamilyRoomDrawingsRoute ? (
+          <FamilyRoomDrawingsViewer />
         ) : (
           <ProposedStudio />
         )}

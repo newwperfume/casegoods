@@ -140,7 +140,7 @@ async function imageSrcToAnalysisDataUrl(src: string): Promise<string> {
     img.crossOrigin = 'anonymous';
     img.onload = () => {
       try {
-        const MAX_DIM = 1280;
+        const MAX_DIM = 896;
         let { width, height } = img;
         if (width > MAX_DIM || height > MAX_DIM) {
           if (width >= height) {
@@ -159,10 +159,12 @@ async function imageSrcToAnalysisDataUrl(src: string): Promise<string> {
           reject(new Error('Unable to prepare image for analysis.'));
           return;
         }
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
         ctx.fillStyle = '#FFFFFF';
         ctx.fillRect(0, 0, width, height);
         ctx.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/jpeg', 0.85));
+        resolve(canvas.toDataURL('image/jpeg', 0.72));
       } catch (err) {
         reject(err);
       }
@@ -373,7 +375,7 @@ export const ProjectsManagerPanel: React.FC = () => {
     setAnalyzing(true);
 
     try {
-      const targetImages = form.images.slice(0, 10);
+      const targetImages = form.images.slice(0, 4);
       const prepared = await Promise.all(
         targetImages.map(async (sheet, idx) => ({
           index: idx,
@@ -1002,8 +1004,8 @@ export const ProjectsManagerPanel: React.FC = () => {
                     <span>AUTO-FILL PROJECT DETAILS FROM UPLOADED FILES</span>
                   </span>
                   <span className="text-black/75">
-                    {form.images.length > 10
-                      ? 'ANALYZES FIRST 10 SHEETS'
+                    {form.images.length > 4
+                      ? 'ANALYZES FIRST 4 SHEETS'
                       : `${form.images.length} ${form.images.length === 1 ? 'SHEET' : 'SHEETS'} READY`}
                   </span>
                 </div>
@@ -1032,7 +1034,7 @@ export const ProjectsManagerPanel: React.FC = () => {
                         <>
                           <ScanSearch className="w-3.5 h-3.5" />
                           <span>
-                            ANALYZE {Math.min(form.images.length, 10)}{' '}
+                            ANALYZE {Math.min(form.images.length, 4)}{' '}
                             {form.images.length === 1 ? 'SHEET' : 'SHEETS'} &amp; AUTO-FILL
                           </span>
                         </>

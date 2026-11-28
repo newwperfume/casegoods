@@ -3,7 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
-import { GoogleGenAI, Type } from '@google/genai';
+import { GoogleGenAI, ThinkingLevel, Type } from '@google/genai';
 import { requireAuth, optionalAuth, type AuthRequest } from './src/middleware/auth.ts';
 import {
   getOrCreateUser,
@@ -1360,125 +1360,177 @@ async function startServer() {
         },
       });
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-4-hydrogen',
-        contents: { parts },
-        config: {
-          systemInstruction:
-            'You are the senior architectural millwork estimator and portfolio archivist for casegoods (Omaha, Nebraska — custom furniture, architectural millwork, and specialty commissions). ' +
-            'Inspect uploaded 2D CAD/Rhino shop drawings, 3D renderings, and finished build photographs to accurately fill out a portfolio project record.\n' +
-            'Rules:\n' +
-            '1. Read exact numbers, fractional inches, job codes (like 1070MCG, 1064HEM), or material callouts whenever visible on 2D CAD drawings or title blocks.\n' +
-            '2. Never invent fake client names or fake drawing codes. Only populate "recipient" if a client or location is explicitly visible or provided in the maker note; leave "recipient" empty string otherwise. If no job/DWG code is visible in the drawings or filenames, suggest a clean short code like "CG-BUILD" or leave empty string.\n' +
-            '3. Classify "categoryTag" strictly as one of: "architectural" (built-ins, cabinetry, credenzas, mudrooms, wall systems, residential millwork), "commercial" (wet bars, kitchen islands, reception desks, hospitality/retail fixtures), or "furniture" (standalone tables, heirloom furniture, specialty pieces, play kitchens).\n' +
-            '4. Keep "title", "category", "materials", "dimensions", and "tolerance" crisp and uppercase-ready. Separate items in "materials" with " · " (e.g. "SOLID AMERICAN BLACK WALNUT · RIFT WHITE OAK · SOFT-CLOSE HARDWARE").\n' +
-            '5. Write "description" as 2-3 understated, craft-focused sentences describing the joinery, wood species, proportions, and architectural integration — no hype or marketing clichés.\n' +
-            '6. Provide 3 to 5 concise "specs" rows (e.g. PRIMARY HARDWOODS, FINISH, JOINERY & HARDWARE, DIMENSIONS / CLEARANCES).\n' +
-            '7. For EVERY uploaded image (matching each 0-based index), return an entry in "sheets" classifying "type" as "cad" (2D technical line drawing/elevation/plan/section), "render" (3D computer rendering), or "photo" (real photograph of a built piece or installation), a crisp "sheetNumber" (e.g. "PHOTO 01", "SHEET 01", "CAD A1"), and a concise 1-sentence "caption" describing that specific view.',
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              code: {
-                type: Type.STRING,
-                description:
-                  'Job or DWG code read from CAD title block or filename (e.g. 1070MCG), or empty string if none visible.',
+      const systemInstruction =
+        'You are the senior architectural millwork estimator and portfolio archivist for casegoods (Omaha, Nebraska — custom furniture, architectural millwork, and specialty commissions). ' +
+        'Inspect uploaded 2D CAD/Rhino shop drawings, 3D renderings, and finished build photographs to accurately fill out a portfolio project record.\n' +
+        'Rules:\n' +
+        '1. Read exact numbers, fractional inches, job codes (like 1070MCG, 1064HEM), or material callouts whenever visible on 2D CAD drawings or title blocks.\n' +
+        '2. Never invent fake client names or fake drawing codes. Only populate "recipient" if a client or location is explicitly visible or provided in the maker note; leave "recipient" empty string otherwise. If no job/DWG code is visible in the drawings or filenames, suggest a clean short code like "CG-BUILD" or leave empty string.\n' +
+        '3. Classify "categoryTag" strictly as one of: "architectural" (built-ins, cabinetry, credenzas, mudrooms, wall systems, residential millwork), "commercial" (wet bars, kitchen islands, reception desks, hospitality/retail fixtures), or "furniture" (standalone tables, heirloom furniture, specialty pieces, play kitchens).\n' +
+        '4. Keep "title", "category", "materials", "dimensions", and "tolerance" crisp and uppercase-ready. Separate items in "materials" with " · " (e.g. "SOLID AMERICAN BLACK WALNUT · RIFT WHITE OAK · SOFT-CLOSE HARDWARE").\n' +
+        '5. Write "description" as 2-3 understated, craft-focused sentences describing the joinery, wood species, proportions, and architectural integration — no hype or marketing clichés.\n' +
+        '6. Provide 3 to 5 concise "specs" rows (e.g. PRIMARY HARDWOODS, FINISH, JOINERY & HARDWARE, DIMENSIONS / CLEARANCES).\n' +
+        '7. For EVERY uploaded image (matching each 0-based index), return an entry in "sheets" classifying "type" as "cad" (2D technical line drawing/elevation/plan/section), "render" (3D computer rendering), or "photo" (real photograph of a built piece or installation), a crisp "sheetNumber" (e.g. "PHOTO 01", "SHEET 01", "CAD A1"), and a concise 1-sentence "caption" describing that specific view.';
+
+      const responseSchema = {
+        type: Type.OBJECT,
+        properties: {
+          code: {
+            type: Type.STRING,
+            description:
+              'Job or DWG code read from CAD title block or filename (e.g. 1070MCG), or empty string if none visible.',
+          },
+          title: {
+            type: Type.STRING,
+            description: 'Concise uppercase project title (e.g. FLUTED WALNUT CREDENZA & WINDOW BENCH).',
+          },
+          recipient: {
+            type: Type.STRING,
+            description:
+              'Client or location ONLY if explicitly visible in drawings or notes; otherwise empty string.',
+          },
+          category: {
+            type: Type.STRING,
+            description: 'Short uppercase category label (e.g. ARCHITECTURAL BUILT-IN, CUSTOM WET BAR, HEIRLOOM FURNITURE).',
+          },
+          categoryTag: {
+            type: Type.STRING,
+            description: 'Must be exactly one of: architectural, commercial, furniture.',
+          },
+          dimensions: {
+            type: Type.STRING,
+            description:
+              'Exact overall dimensions read from CAD drawings (e.g. 101" H × 72 3/4" W × 20" D), or empty string if not determinable.',
+          },
+          tolerance: {
+            type: Type.STRING,
+            description:
+              'Build status & tolerance tag (e.g. FINISHED BUILD · ± 1/32" or 3D DESIGN PROPOSAL · ± 1/32").',
+          },
+          materials: {
+            type: Type.STRING,
+            description:
+              'Materials highlight bar separated by middle dots (e.g. SOLID BLACK WALNUT · WHITE OAK · BRASS PULLS).',
+          },
+          description: {
+            type: Type.STRING,
+            description:
+              '2-3 understated, craft-focused sentences describing design, hardwoods, joinery, and finished installation.',
+          },
+          specs: {
+            type: Type.ARRAY,
+            description: '3 to 5 technical specification rows.',
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                label: { type: Type.STRING },
+                value: { type: Type.STRING },
               },
-              title: {
-                type: Type.STRING,
-                description: 'Concise uppercase project title (e.g. FLUTED WALNUT CREDENZA & WINDOW BENCH).',
-              },
-              recipient: {
-                type: Type.STRING,
-                description:
-                  'Client or location ONLY if explicitly visible in drawings or notes; otherwise empty string.',
-              },
-              category: {
-                type: Type.STRING,
-                description: 'Short uppercase category label (e.g. ARCHITECTURAL BUILT-IN, CUSTOM WET BAR, HEIRLOOM FURNITURE).',
-              },
-              categoryTag: {
-                type: Type.STRING,
-                description: 'Must be exactly one of: architectural, commercial, furniture.',
-              },
-              dimensions: {
-                type: Type.STRING,
-                description:
-                  'Exact overall dimensions read from CAD drawings (e.g. 101" H × 72 3/4" W × 20" D), or empty string if not determinable.',
-              },
-              tolerance: {
-                type: Type.STRING,
-                description:
-                  'Build status & tolerance tag (e.g. FINISHED BUILD · ± 1/32" or 3D DESIGN PROPOSAL · ± 1/32").',
-              },
-              materials: {
-                type: Type.STRING,
-                description:
-                  'Materials highlight bar separated by middle dots (e.g. SOLID BLACK WALNUT · WHITE OAK · BRASS PULLS).',
-              },
-              description: {
-                type: Type.STRING,
-                description:
-                  '2-3 understated, craft-focused sentences describing design, hardwoods, joinery, and finished installation.',
-              },
-              specs: {
-                type: Type.ARRAY,
-                description: '3 to 5 technical specification rows.',
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    label: { type: Type.STRING },
-                    value: { type: Type.STRING },
-                  },
-                  required: ['label', 'value'],
-                },
-              },
-              sheets: {
-                type: Type.ARRAY,
-                description: 'Per-image classification and caption matching every uploaded image index.',
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    index: { type: Type.INTEGER },
-                    type: {
-                      type: Type.STRING,
-                      description: 'Must be exactly one of: photo, render, cad.',
-                    },
-                    sheetNumber: {
-                      type: Type.STRING,
-                      description: 'Short uppercase tab label like PHOTO 01, SHEET 01, or CAD A1.',
-                    },
-                    caption: {
-                      type: Type.STRING,
-                      description: 'Concise 1-sentence description of this specific view.',
-                    },
-                  },
-                  required: ['index', 'type', 'sheetNumber', 'caption'],
-                },
-              },
-              confidenceNote: {
-                type: Type.STRING,
-                description:
-                  'Brief 1-sentence note flagging anything uncertain or estimated so the maker can double-check (e.g. dimensions estimated or code left blank).',
-              },
+              required: ['label', 'value'],
             },
-            required: [
-              'code',
-              'title',
-              'recipient',
-              'category',
-              'categoryTag',
-              'dimensions',
-              'tolerance',
-              'materials',
-              'description',
-              'specs',
-              'sheets',
-              'confidenceNote',
-            ],
+          },
+          sheets: {
+            type: Type.ARRAY,
+            description: 'Per-image classification and caption matching every uploaded image index.',
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                index: { type: Type.INTEGER },
+                type: {
+                  type: Type.STRING,
+                  description: 'Must be exactly one of: photo, render, cad.',
+                },
+                sheetNumber: {
+                  type: Type.STRING,
+                  description: 'Short uppercase tab label like PHOTO 01, SHEET 01, or CAD A1.',
+                },
+                caption: {
+                  type: Type.STRING,
+                  description: 'Concise 1-sentence description of this specific view.',
+                },
+              },
+              required: ['index', 'type', 'sheetNumber', 'caption'],
+            },
+          },
+          confidenceNote: {
+            type: Type.STRING,
+            description:
+              'Brief 1-sentence note flagging anything uncertain or estimated so the maker can double-check (e.g. dimensions estimated or code left blank).',
           },
         },
-      });
+        required: [
+          'code',
+          'title',
+          'recipient',
+          'category',
+          'categoryTag',
+          'dimensions',
+          'tolerance',
+          'materials',
+          'description',
+          'specs',
+          'sheets',
+          'confidenceNote',
+        ],
+      };
+
+      // Try highest free-tier quota lite model first, then fall back to gemini-4-hydrogen with low thinking cost
+      const analysisCandidates: Array<{
+        model: string;
+        thinkingConfig?: { thinkingLevel: ThinkingLevel };
+      }> = [
+        { model: 'gemini-3.1-flash-lite' },
+        { model: 'gemini-4-hydrogen', thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } },
+      ];
+
+      let response: Awaited<ReturnType<typeof ai.models.generateContent>> | null = null;
+      let lastError: unknown = null;
+
+      for (const candidate of analysisCandidates) {
+        try {
+          response = await ai.models.generateContent({
+            model: candidate.model,
+            contents: { parts },
+            config: {
+              systemInstruction,
+              responseMimeType: 'application/json',
+              responseSchema,
+              ...(candidate.thinkingConfig ? { thinkingConfig: candidate.thinkingConfig } : {}),
+            },
+          });
+          if ((response.text ?? '').trim()) {
+            break;
+          }
+        } catch (candidateErr: unknown) {
+          lastError = candidateErr;
+          const cMsg =
+            candidateErr instanceof Error ? candidateErr.message : String(candidateErr || '');
+          console.warn(`Analysis model ${candidate.model} failed:`, cMsg);
+          if (
+            isBillingOrCreditError(candidateErr) ||
+            cMsg.includes('API_KEY_INVALID') ||
+            cMsg.includes('PERMISSION_DENIED')
+          ) {
+            throw candidateErr;
+          }
+          // Retry next fallback model on quota (429), model unavailable (404), or transient overload (503)
+          if (
+            cMsg.includes('RESOURCE_EXHAUSTED') ||
+            cMsg.includes('429') ||
+            cMsg.includes('NOT_FOUND') ||
+            cMsg.includes('404') ||
+            cMsg.includes('UNAVAILABLE') ||
+            cMsg.includes('503')
+          ) {
+            continue;
+          }
+          throw candidateErr;
+        }
+      }
+
+      if (!response) {
+        throw lastError ?? new Error('Analysis failed across available Gemini models.');
+      }
 
       const rawText = (response.text ?? '').trim();
       if (!rawText) {
@@ -1549,6 +1601,13 @@ async function startServer() {
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error || '');
       console.error('Error in /api/admin/projects/analyze-images:', error);
+      if (isBillingOrCreditError(error)) {
+        res.status(402).json({
+          error:
+            'Your Gemini API prepayment credits are depleted. Add credits or select a billing-enabled API key in Settings > Secrets.',
+        });
+        return;
+      }
       if (msg.includes('API_KEY_INVALID') || msg.includes('PERMISSION_DENIED')) {
         res.status(403).json({
           error:
@@ -1557,9 +1616,17 @@ async function startServer() {
         return;
       }
       if (msg.includes('RESOURCE_EXHAUSTED') || msg.includes('429')) {
+        let detail = '';
+        const retryMatch = msg.match(/retry in\s+([0-9.]+s)/i);
+        if (/limit:\s*0\b/i.test(msg)) {
+          detail = ' Your attached API key currently has 0 free-tier quota on this project — select a billing-enabled API key in Settings > Secrets.';
+        } else if (retryMatch) {
+          detail = ` Please wait ~${retryMatch[1]} and retry, or attach a billing-enabled API key in Settings > Secrets.`;
+        } else {
+          detail = ' Try again shortly or select a billing-enabled API key in Settings > Secrets.';
+        }
         res.status(429).json({
-          error:
-            'Gemini API quota limit reached. Try again shortly or attach a billed API key in Settings > Secrets.',
+          error: `Gemini API quota limit reached.${detail}`,
         });
         return;
       }

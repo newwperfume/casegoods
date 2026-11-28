@@ -230,10 +230,18 @@ export interface MortiseWallController {
   toggleProps: () => void;
   warmLightingOn: boolean;
   toggleWarmLighting: () => void;
+  hasLightableItems: boolean;
+  hasPropItems: boolean;
   lightKelvin: LightKelvin;
   setLightKelvin: (kelvin: LightKelvin) => void;
   rearrange: () => void;
   clearWall: () => void;
+  syncWallState: (state: {
+    hasLightableItems: boolean;
+    hasPropItems: boolean;
+    anyLit: boolean;
+    anyPropsOn: boolean;
+  }) => void;
   registerActions: (actions: {
     rearrange: () => void;
     clearWall: () => void;
@@ -266,10 +274,14 @@ export function useMortiseWallController(
   });
   const [activePillar, setActivePillarState] = useState<PillarColorKey>(initialPillar);
   const [motionOn, setMotionOn] = useState<boolean>(!prefersReduced);
-  const [showProps, setShowProps] = useState<boolean>(true);
-  const showPropsRef = useRef<boolean>(true);
-  const [warmLightingOn, setWarmLightingOn] = useState<boolean>(true);
-  const warmLightingRef = useRef<boolean>(true);
+  const [showProps, setShowProps] = useState<boolean>(false);
+  const showPropsRef = useRef<boolean>(false);
+  const [warmLightingOn, setWarmLightingOn] = useState<boolean>(false);
+  const warmLightingRef = useRef<boolean>(false);
+  const [hasLightableItems, setHasLightableItems] = useState<boolean>(false);
+  const hasLightableItemsRef = useRef<boolean>(false);
+  const [hasPropItems, setHasPropItems] = useState<boolean>(false);
+  const hasPropItemsRef = useRef<boolean>(false);
   const [lightKelvin, setLightKelvinState] = useState<LightKelvin>(2700);
 
   const actionsRef = useRef<{
@@ -324,14 +336,39 @@ export function useMortiseWallController(
     []
   );
 
+  const syncWallState = useCallback(
+    (wallState: {
+      hasLightableItems: boolean;
+      hasPropItems: boolean;
+      anyLit: boolean;
+      anyPropsOn: boolean;
+    }) => {
+      hasLightableItemsRef.current = wallState.hasLightableItems;
+      setHasLightableItems(wallState.hasLightableItems);
+      hasPropItemsRef.current = wallState.hasPropItems;
+      setHasPropItems(wallState.hasPropItems);
+
+      const nextLit = wallState.hasLightableItems && wallState.anyLit;
+      warmLightingRef.current = nextLit;
+      setWarmLightingOn(nextLit);
+
+      const nextProps = wallState.hasPropItems && wallState.anyPropsOn;
+      showPropsRef.current = nextProps;
+      setShowProps(nextProps);
+    },
+    []
+  );
+
   const toggleMotion = useCallback(() => setMotionOn((v) => !v), []);
   const toggleProps = useCallback(() => {
+    if (!hasPropItemsRef.current) return;
     const next = !showPropsRef.current;
     showPropsRef.current = next;
     setShowProps(next);
     actionsRef.current.setAllProps(next);
   }, []);
   const toggleWarmLighting = useCallback(() => {
+    if (!hasLightableItemsRef.current) return;
     const next = !warmLightingRef.current;
     warmLightingRef.current = next;
     setWarmLightingOn(next);
@@ -339,11 +376,6 @@ export function useMortiseWallController(
   }, []);
   const setLightKelvin = useCallback((kelvin: LightKelvin) => {
     setLightKelvinState(kelvin);
-    if (!warmLightingRef.current) {
-      warmLightingRef.current = true;
-      setWarmLightingOn(true);
-      actionsRef.current.setAllLighting(true);
-    }
   }, []);
   const rearrange = useCallback(() => actionsRef.current.rearrange(), []);
   const clearWall = useCallback(() => actionsRef.current.clearWall(), []);
@@ -365,10 +397,13 @@ export function useMortiseWallController(
       toggleProps,
       warmLightingOn,
       toggleWarmLighting,
+      hasLightableItems,
+      hasPropItems,
       lightKelvin,
       setLightKelvin,
       rearrange,
       clearWall,
+      syncWallState,
       registerActions,
     }),
     [
@@ -383,10 +418,13 @@ export function useMortiseWallController(
       toggleProps,
       warmLightingOn,
       toggleWarmLighting,
+      hasLightableItems,
+      hasPropItems,
       lightKelvin,
       setLightKelvin,
       rearrange,
       clearWall,
+      syncWallState,
       registerActions,
     ]
   );
@@ -489,7 +527,6 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
     let cssH = window.innerHeight;
     let dpr = 1;
     let hasUserEdited = false;
-    let hasInitializedRandom = false;
     let nextItemId = 1;
 
     // Unlimited additive list of placed items — nothing is removed until Clear (or Reload/Rearrange)
@@ -760,8 +797,38 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       return null;
     };
 
+    const syncWallFlags = () => {
+      let hasLightable = false;
+      let hasProp = false;
+      let anyLit = false;
+      let anyPropsOn = false;
+      for (let i = 0; i < placedItems.length; i++) {
+        const item = placedItems[i];
+        if (item.type === 'sconce' || item.type === 'cubby') {
+          hasLightable = true;
+          if (item.lit) anyLit = true;
+        }
+        if (
+          item.type === 'wallShelf' ||
+          item.type === 'cradle' ||
+          item.type === 'shelf' ||
+          item.type === 'hook'
+        ) {
+          hasProp = true;
+          if (item.hasProps) anyPropsOn = true;
+        }
+      }
+      controller.syncWallState({
+        hasLightableItems: hasLightable,
+        hasPropItems: hasProp,
+        anyLit,
+        anyPropsOn,
+      });
+    };
+
     /**
      * Appends a new piece to the mortise wall without removing or overwriting any previously placed items.
+     * Lights and props always start off until toggled by clicking the placed object (or toolbar controls).
      */
     const addPlacedItem = (
       type: WallTool,
@@ -781,13 +848,10 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
         gy2,
         lift: withAnim ? 0.08 : 1,
         seed: id * 17 + gx1 * 7 + gx2 * 11 + gy1 * 13 + gy2 * 19,
-        lit:
-          type === 'sconce' || type === 'cubby'
-            ? stateRef.current.warmLightingOn
-            : undefined,
+        lit: type === 'sconce' || type === 'cubby' ? false : undefined,
         hasProps:
           type === 'wallShelf' || type === 'cradle' || type === 'shelf' || type === 'hook'
-            ? stateRef.current.showProps
+            ? false
             : undefined,
         doorOpen: type === 'cabinet' ? false : undefined,
         doorProgress: type === 'cabinet' ? 0 : undefined,
@@ -810,7 +874,7 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
         const lowerCy = m.centerY + item.gy2 * m.pitchY;
 
         if (item.type === 'hook') {
-          const itemHasProps = item.hasProps ?? stateRef.current.showProps;
+          const itemHasProps = Boolean(item.hasProps);
           const cols = Math.max(1, item.gx2 - item.gx1 + 1);
           const rows = Math.max(1, item.gy2 - item.gy1 + 1);
           const hookW = m.slotW * 0.857;
@@ -847,7 +911,7 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
             }
           }
 
-          // Include hanging simple backpack / hat props in hit-testing so clicking them toggles props cleanly
+          // Include hanging simple backpack / Stetson hat props in hit-testing so clicking them toggles props cleanly
           if (itemHasProps) {
             const props = getHookPropsLayout(
               item.gx1,
@@ -872,7 +936,7 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
             }
           }
         } else if (item.type === 'shelf') {
-          const itemHasProps = item.hasProps ?? stateRef.current.showProps;
+          const itemHasProps = Boolean(item.hasProps);
           const t = m.slotW * 0.857;
           const leftX = leftCx - t * 0.5;
           const rightX = rightCx + t * 0.5;
@@ -893,7 +957,7 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
             return item;
           }
         } else if (item.type === 'cradle') {
-          const itemHasProps = item.hasProps ?? stateRef.current.showProps;
+          const itemHasProps = Boolean(item.hasProps);
           const t = m.slotW * 0.857;
           const leftX = leftCx - t * 0.5;
           const rightX = rightCx + t * 0.5;
@@ -912,7 +976,7 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
             return item;
           }
         } else if (item.type === 'wallShelf') {
-          const itemHasProps = item.hasProps ?? stateRef.current.showProps;
+          const itemHasProps = Boolean(item.hasProps);
           const t = m.slotW * 0.857;
           const leftX = leftCx - t * 1.1;
           const rightX = rightCx + t * 1.1;
@@ -1402,18 +1466,18 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
             depth: hookDepth * 1.32,
           };
         } else {
-          // Exact real-world scale measured against the mortise wall photo (IMG_5141): ~1.06 pitchX wide × ~1.50 pitchY tall
-          const w = m.pitchX * 1.06;
-          const h = m.pitchY * 1.5;
+          // Simple 2D wide-brim Stetson felt hat hanging flat against the wall from the peg inside the upper crown
+          const w = m.pitchX * 1.74;
+          const h = m.pitchY * 1.54;
           return {
             kind,
             gx,
             cx,
             anchorY,
-            topY: anchorY - m.slotH * 0.04,
+            topY: anchorY - h * 0.22,
             w,
             h,
-            depth: hookDepth * 1.05,
+            depth: hookDepth * 0.82,
           };
         }
       });
@@ -1421,7 +1485,7 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
 
     /**
      * Traces the 2D front-elevation silhouette of the Filson Roll-Top Backpack (from IMG_5140)
-     * or the Backstrap-Hanging Cap with downward curved bill (from IMG_5141).
+     * or the simple flat 2D wide-brim Stetson felt hat hanging on the peg.
      */
     const appendHookPropSilhouette = (
       kind: 'backpack' | 'hat',
@@ -1451,132 +1515,14 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
         ctx.quadraticCurveTo(cx - flareW - 2, topY + rollH * 0.18, cx - flareW + 4, topY);
         ctx.closePath();
       } else {
-        // Baseball cap hanging by its backstrap: fuller rounded crown above + narrower downward-pointing curved bill below
-        const halfW = w * 0.5;
-        const crownBotY = topY + h * 0.6;
-        const billHalfW = w * 0.39;
-        const billBotY = topY + h;
-        const strapHalfW = w * 0.16;
-
-        ctx.moveTo(cx - strapHalfW, topY + h * 0.03);
-        ctx.quadraticCurveTo(cx, topY - h * 0.015, cx + strapHalfW, topY + h * 0.03);
-        ctx.bezierCurveTo(
-          cx + halfW * 0.72,
-          topY + h * 0.06,
-          cx + halfW * 1.04,
-          topY + h * 0.24,
-          cx + halfW,
-          topY + h * 0.44
-        );
-        ctx.quadraticCurveTo(cx + halfW * 0.94, crownBotY, cx + billHalfW, crownBotY + h * 0.04);
-        ctx.bezierCurveTo(
-          cx + billHalfW * 1.02,
-          crownBotY + h * 0.25,
-          cx + billHalfW * 0.58,
-          billBotY,
-          cx,
-          billBotY
-        );
-        ctx.bezierCurveTo(
-          cx - billHalfW * 0.58,
-          billBotY,
-          cx - billHalfW * 1.02,
-          crownBotY + h * 0.25,
-          cx - billHalfW,
-          crownBotY + h * 0.04
-        );
-        ctx.quadraticCurveTo(cx - halfW * 0.94, crownBotY, cx - halfW, topY + h * 0.44);
-        ctx.bezierCurveTo(
-          cx - halfW * 1.04,
-          topY + h * 0.24,
-          cx - halfW * 0.72,
-          topY + h * 0.06,
-          cx - strapHalfW,
-          topY + h * 0.03
-        );
+        // Wide-brim Stetson hat: clean, smooth 2D oval felt brim
+        const cy = topY + h * 0.5;
+        const rx = w * 0.5;
+        const ry = h * 0.5;
+        ctx.moveTo(cx + rx, cy);
+        ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
         ctx.closePath();
       }
-    };
-
-    /**
-     * Traces a wall-contact tapered cast shadow for the hanging cap:
-     * upper crown protrudes off the wall by (dx, dy) while the downward bill smoothly tapers
-     * down to z = 0 right where the tip of the bill rests flush against the mortise wall.
-     */
-    const appendHatWallContactShadow = (
-      cx: number,
-      topY: number,
-      w: number,
-      h: number,
-      dx: number,
-      dy: number
-    ) => {
-      const halfW = w * 0.5;
-      const crownBotY = topY + h * 0.6;
-      const billHalfW = w * 0.39;
-      const billBotY = topY + h;
-      const strapHalfW = w * 0.16;
-
-      // Upper strap & crown puff out off the wall; bill tip contacts the wall at z=0
-      const zStrap = 0.26;
-      const zCrown = 1.0;
-      const zBrow = 0.66;
-      const zMidBill = 0.24;
-      const zTip = 0.0;
-
-      ctx.moveTo(cx - strapHalfW + dx * zStrap, topY + h * 0.03 + dy * zStrap);
-      ctx.quadraticCurveTo(
-        cx + dx * zStrap,
-        topY - h * 0.015 + dy * zStrap,
-        cx + strapHalfW + dx * zStrap,
-        topY + h * 0.03 + dy * zStrap
-      );
-      ctx.bezierCurveTo(
-        cx + halfW * 0.72 + dx * (zCrown * 0.86),
-        topY + h * 0.06 + dy * (zCrown * 0.86),
-        cx + halfW * 1.04 + dx * zCrown,
-        topY + h * 0.24 + dy * zCrown,
-        cx + halfW + dx * zCrown,
-        topY + h * 0.44 + dy * zCrown
-      );
-      ctx.quadraticCurveTo(
-        cx + halfW * 0.94 + dx * zBrow,
-        crownBotY + dy * zBrow,
-        cx + billHalfW + dx * (zBrow * 0.85),
-        crownBotY + h * 0.04 + dy * (zBrow * 0.85)
-      );
-      // Bill tapers cleanly back into z=0 contact right at the bottom tip!
-      ctx.bezierCurveTo(
-        cx + billHalfW * 1.0 + dx * zMidBill,
-        crownBotY + h * 0.25 + dy * zMidBill,
-        cx + billHalfW * 0.56 + dx * (zTip + 0.04),
-        billBotY + dy * (zTip + 0.04),
-        cx + dx * zTip,
-        billBotY + dy * zTip
-      );
-      ctx.bezierCurveTo(
-        cx - billHalfW * 0.56 + dx * (zTip + 0.04),
-        billBotY + dy * (zTip + 0.04),
-        cx - billHalfW * 1.0 + dx * zMidBill,
-        crownBotY + h * 0.25 + dy * zMidBill,
-        cx - billHalfW + dx * (zBrow * 0.85),
-        crownBotY + h * 0.04 + dy * (zBrow * 0.85)
-      );
-      ctx.quadraticCurveTo(
-        cx - halfW * 0.94 + dx * zBrow,
-        crownBotY + dy * zBrow,
-        cx - halfW + dx * zCrown,
-        topY + h * 0.44 + dy * zCrown
-      );
-      ctx.bezierCurveTo(
-        cx - halfW * 1.04 + dx * zCrown,
-        topY + h * 0.24 + dy * zCrown,
-        cx - halfW * 0.72 + dx * (zCrown * 0.86),
-        topY + h * 0.06 + dy * (zCrown * 0.86),
-        cx - strapHalfW + dx * zStrap,
-        topY + h * 0.03 + dy * zStrap
-      );
-      ctx.closePath();
     };
 
     /**
@@ -1732,9 +1678,15 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
             const pdx = p.depth * LIGHT_KX;
             const pdy = p.depth * LIGHT_KY;
             if (p.kind === 'hat') {
-              // Hat cast shadow: puffed crown projects off wall while lower curved bill touches wall at z=0
-              appendHatWallContactShadow(p.cx, p.topY, p.w, p.h, pdx, pdy);
-              appendHatWallContactShadow(p.cx, p.topY, p.w * 0.96, p.h * 0.99, pdx * 0.48, pdy * 0.48);
+              // Clean simple flat 2D Stetson wide-brim cast shadow
+              appendHookPropSilhouette('hat', p.cx + pdx * 0.72, p.topY + pdy * 0.72, p.w, p.h);
+              appendHookPropSilhouette(
+                'hat',
+                p.cx + pdx * 0.34,
+                p.topY + pdy * 0.34,
+                p.w * 0.98,
+                p.h * 0.98
+              );
             } else {
               appendHookPropSilhouette('backpack', p.cx + pdx, p.topY + pdy, p.w, p.h);
               appendHookPropSilhouette(
@@ -2458,122 +2410,142 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
             ctx.lineWidth = isGhost ? 1.0 : 1.4;
             ctx.stroke();
           } else {
-            // Backstrap-Hanging Cap (matching IMG_5141 scale & pose: hanging from rear strap, curved bill touching wall)
-            const halfW = p.w * 0.5;
+            // Very simple flat 2D wide-brim Stetson felt hat hanging on the birch wall hook
             const y = p.topY;
-            const crownBotY = y + p.h * 0.6;
-            const billHalfW = p.w * 0.39;
-            const billBotY = y + p.h;
+            const cx = p.cx;
+            const cy = y + p.h * 0.5;
+            const rx = p.w * 0.5;
+            const ry = p.h * 0.5;
 
-            // Rear adjustment backstrap arch hooking visibly over the Baltic Birch hook peg
-            const strapW = Math.max(hookW * 1.15, p.w * 0.24);
-            const strapTopY = p.anchorY - Math.max(2.5, lowerH * 0.1);
-            ctx.beginPath();
-            ctx.moveTo(p.cx - strapW * 0.5, y + p.h * 0.08);
-            ctx.quadraticCurveTo(p.cx - strapW * 0.52, strapTopY, p.cx, strapTopY);
-            ctx.quadraticCurveTo(p.cx + strapW * 0.52, strapTopY, p.cx + strapW * 0.5, y + p.h * 0.08);
-            ctx.strokeStyle = isGhost ? 'rgba(0, 0, 0, 0.7)' : COLORS.black;
-            ctx.lineWidth = Math.max(3.2, p.w * 0.052);
-            ctx.lineCap = 'round';
-            ctx.stroke();
-            if (!isGhost) {
-              ctx.strokeStyle = '#383A40';
-              ctx.lineWidth = Math.max(1.5, p.w * 0.026);
-              ctx.stroke();
-            }
+            const tracePinchedCrown = (crx: number, cry: number) => {
+              // Classic Stetson pinched teardrop crown: rounded back (top), gently pinched front (bottom)
+              ctx.beginPath();
+              ctx.moveTo(cx, cy - cry);
+              ctx.bezierCurveTo(
+                cx + crx * 0.82,
+                cy - cry,
+                cx + crx * 1.06,
+                cy - cry * 0.35,
+                cx + crx * 0.98,
+                cy + cry * 0.14
+              );
+              ctx.bezierCurveTo(
+                cx + crx * 0.9,
+                cy + cry * 0.56,
+                cx + crx * 0.58,
+                cy + cry * 1.0,
+                cx,
+                cy + cry * 1.0
+              );
+              ctx.bezierCurveTo(
+                cx - crx * 0.58,
+                cy + cry * 1.0,
+                cx - crx * 0.9,
+                cy + cry * 0.56,
+                cx - crx * 0.98,
+                cy + cry * 0.14
+              );
+              ctx.bezierCurveTo(
+                cx - crx * 1.06,
+                cy - cry * 0.35,
+                cx - crx * 0.82,
+                cy - cry,
+                cx,
+                cy - cry
+              );
+              ctx.closePath();
+            };
 
-            // Full hanging cap silhouette filled in simplified matte deep charcoal (matching IMG_5141)
+            // 1. Flat 2D wide felt brim
             ctx.beginPath();
-            appendHookPropSilhouette('hat', p.cx, y, p.w, p.h);
-            ctx.fillStyle = isGhost ? '#7C7E82' : '#2E3034';
+            appendHookPropSilhouette('hat', cx, y, p.w, p.h);
+            ctx.fillStyle = isGhost ? '#DDD3C3' : '#C8B08E';
             ctx.fill();
 
             if (!isGhost) {
-              ctx.save();
-              ctx.clip();
-
-              // Soft upper-left studio dome highlight & lower-right volume shade (same graphic polish as plant)
-              const crownGrad = ctx.createLinearGradient(
-                p.cx - halfW,
-                y,
-                p.cx + halfW,
-                crownBotY
-              );
-              crownGrad.addColorStop(0.0, 'rgba(255, 255, 255, 0.14)');
-              crownGrad.addColorStop(0.45, 'rgba(255, 255, 255, 0.03)');
-              crownGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0.24)');
-              ctx.fillStyle = crownGrad;
-              ctx.fillRect(p.cx - halfW - 4, y, p.w + 8, p.h * 0.68);
-
-              // Subtle dark rear keyhole cutout right beneath the backstrap where it meets the crown
+              // Subtle bound-edge brim stitch line (pure flat 2D CAD detail)
               ctx.beginPath();
-              ctx.ellipse(p.cx, y + p.h * 0.055, strapW * 0.34, p.h * 0.038, 0, 0, Math.PI * 2);
-              ctx.fillStyle = '#18191C';
-              ctx.fill();
-
-              // Downward-pointing curved visor/bill panel resting flush against the wall
-              ctx.beginPath();
-              ctx.moveTo(p.cx - halfW, crownBotY - p.h * 0.02);
-              ctx.quadraticCurveTo(p.cx, crownBotY + p.h * 0.11, p.cx + halfW, crownBotY - p.h * 0.02);
-              ctx.lineTo(p.cx + halfW, billBotY + 4);
-              ctx.lineTo(p.cx - halfW, billBotY + 4);
-              ctx.closePath();
-              ctx.fillStyle = '#202125';
-              ctx.fill();
-
-              // Crisp curved brow-to-bill transition seam
-              ctx.beginPath();
-              ctx.moveTo(p.cx - halfW * 0.94, crownBotY - p.h * 0.01);
-              ctx.quadraticCurveTo(p.cx, crownBotY + p.h * 0.11, p.cx + halfW * 0.94, crownBotY - p.h * 0.01);
-              ctx.strokeStyle = 'rgba(0, 0, 0, 0.85)';
-              ctx.lineWidth = 1.25;
-              ctx.stroke();
-
-              // Subtle curved stitching arc on the downward bill
-              ctx.beginPath();
-              ctx.moveTo(p.cx - billHalfW * 0.78, crownBotY + p.h * 0.17);
-              ctx.quadraticCurveTo(p.cx, billBotY - p.h * 0.055, p.cx + billHalfW * 0.78, crownBotY + p.h * 0.17);
-              ctx.strokeStyle = 'rgba(255, 255, 255, 0.14)';
+              ctx.ellipse(cx, cy, rx * 0.91, ry * 0.91, 0, 0, Math.PI * 2);
+              ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
               ctx.lineWidth = 0.85;
               ctx.stroke();
 
-              // 6-panel crown seams radiating gently from the crown button (~35% down from top backstrap)
-              const btnY = y + p.h * 0.34;
-              ctx.beginPath();
-              // Back panel seams up toward backstrap
-              ctx.moveTo(p.cx, btnY);
-              ctx.quadraticCurveTo(p.cx - halfW * 0.24, y + p.h * 0.18, p.cx - strapW * 0.45, y + p.h * 0.05);
-              ctx.moveTo(p.cx, btnY);
-              ctx.quadraticCurveTo(p.cx + halfW * 0.24, y + p.h * 0.18, p.cx + strapW * 0.45, y + p.h * 0.05);
-              // Side panel seams sweeping to left & right crown edges
-              ctx.moveTo(p.cx, btnY);
-              ctx.quadraticCurveTo(p.cx - halfW * 0.56, btnY + p.h * 0.05, p.cx - halfW * 0.96, crownBotY - p.h * 0.06);
-              ctx.moveTo(p.cx, btnY);
-              ctx.quadraticCurveTo(p.cx + halfW * 0.56, btnY + p.h * 0.05, p.cx + halfW * 0.96, crownBotY - p.h * 0.06);
-              // Center front seam running down to the curved brow
-              ctx.moveTo(p.cx, btnY);
-              ctx.lineTo(p.cx, crownBotY + p.h * 0.05);
-              ctx.strokeStyle = 'rgba(255, 255, 255, 0.16)';
-              ctx.lineWidth = 0.85;
+              // 2. Dark grosgrain hatband encircling crown base
+              const bandRx = rx * 0.54;
+              const bandRy = ry * 0.56;
+              tracePinchedCrown(bandRx, bandRy);
+              ctx.fillStyle = '#2B241E';
+              ctx.fill();
+              ctx.strokeStyle = COLORS.black;
+              ctx.lineWidth = 1.1;
               ctx.stroke();
 
-              // Minimal crown apex button seated naturally on the hanging dome
-              ctx.beginPath();
-              ctx.arc(p.cx, btnY, Math.max(2.0, p.w * 0.036), 0, Math.PI * 2);
-              ctx.fillStyle = '#3B3D42';
+              // Minimal flat side ribbon keeper/bow accent on left edge of hatband
+              const bowW = Math.max(4.5, rx * 0.11);
+              const bowH = Math.max(6.5, ry * 0.14);
+              drawRoundRect(cx - bandRx - bowW * 0.42, cy - bowH * 0.5, bowW, bowH, 1.4);
+              ctx.fillStyle = '#2B241E';
               ctx.fill();
               ctx.strokeStyle = COLORS.black;
               ctx.lineWidth = 0.95;
               ctx.stroke();
 
-              ctx.restore();
+              // 3. Flat pinched Stetson felt crown
+              const crownRx = rx * 0.46;
+              const crownRy = ry * 0.48;
+              tracePinchedCrown(crownRx, crownRy);
+              ctx.fillStyle = '#D5BF9E';
+              ctx.fill();
+              ctx.strokeStyle = COLORS.black;
+              ctx.lineWidth = 1.1;
+              ctx.stroke();
+
+              // 4. Simple flat 2D Stetson center teardrop / cattleman crease
+              const creaseTopY = cy - crownRy * 0.62;
+              const creaseBotY = cy + crownRy * 0.68;
+              const creaseTopW = crownRx * 0.44;
+              const creaseBotW = crownRx * 0.24;
+              ctx.beginPath();
+              ctx.moveTo(cx, creaseTopY);
+              ctx.bezierCurveTo(
+                cx + creaseTopW,
+                creaseTopY,
+                cx + creaseTopW * 0.96,
+                cy + crownRy * 0.12,
+                cx + creaseBotW,
+                creaseBotY - crownRy * 0.12
+              );
+              ctx.quadraticCurveTo(cx, creaseBotY + crownRy * 0.04, cx - creaseBotW, creaseBotY - crownRy * 0.12);
+              ctx.bezierCurveTo(
+                cx - creaseTopW * 0.96,
+                cy + crownRy * 0.12,
+                cx - creaseTopW,
+                creaseTopY,
+                cx,
+                creaseTopY
+              );
+              ctx.closePath();
+              ctx.fillStyle = '#B49A77';
+              ctx.fill();
+              ctx.strokeStyle = 'rgba(0, 0, 0, 0.72)';
+              ctx.lineWidth = 1.0;
+              ctx.stroke();
+
+              // Minimal center crease line
+              ctx.beginPath();
+              ctx.moveTo(cx, cy - crownRy * 0.4);
+              ctx.lineTo(cx, cy + crownRy * 0.44);
+              ctx.strokeStyle = 'rgba(0, 0, 0, 0.35)';
+              ctx.lineWidth = 0.85;
+              ctx.lineCap = 'round';
+              ctx.stroke();
             }
 
-            // Crisp architectural CAD ink outline
+            // Crisp architectural black CAD ink outer brim outline
             ctx.beginPath();
-            appendHookPropSilhouette('hat', p.cx, y, p.w, p.h);
+            appendHookPropSilhouette('hat', cx, y, p.w, p.h);
             ctx.strokeStyle = isGhost ? 'rgba(0, 0, 0, 0.72)' : COLORS.black;
-            ctx.lineWidth = isGhost ? 1.0 : 1.4;
+            ctx.lineWidth = isGhost ? 1.0 : 1.35;
             ctx.stroke();
           }
 
@@ -5869,7 +5841,7 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
           item.lift,
           0,
           0,
-          item.lit ?? warmLightingOn,
+          Boolean(item.lit),
           lightKelvin
         );
       }
@@ -5946,7 +5918,7 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
           ox,
           oy,
           item.seed,
-          item.hasProps ?? showProps
+          Boolean(item.hasProps)
         );
       }
 
@@ -5965,8 +5937,8 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
           oy,
           false,
           item.seed,
-          item.lit ?? warmLightingOn,
-          item.hasProps ?? showProps,
+          Boolean(item.lit),
+          Boolean(item.hasProps),
           item.doorProgress ?? 0,
           item.doorOpenSide ?? 'left',
           lightKelvin
@@ -5976,8 +5948,8 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       // Pass 3: While dragging an existing item, show its magnetic snap target + lifted floating piece
       if (activeDrag && draggedItem) {
         const snap = activeDrag.snapRect;
-        const draggedProps = draggedItem.hasProps ?? showProps;
-        const draggedLit = draggedItem.lit ?? warmLightingOn;
+        const draggedProps = Boolean(draggedItem.hasProps);
+        const draggedLit = Boolean(draggedItem.lit);
         drawItemBody(
           draggedItem.type,
           snap.gx1,
@@ -6071,8 +6043,8 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
           hs.oy * 0.4,
           true,
           0,
-          warmLightingOn,
-          showProps,
+          false,
+          false,
           0,
           'left',
           lightKelvin
@@ -6108,11 +6080,6 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       canvas.height = Math.round(cssH * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       rebuildGrid();
-      // Arrange exactly ONCE on initial page load/reload — never auto-rearrange again unless Rearrange is pressed
-      if (!hasInitializedRandom) {
-        hasInitializedRandom = true;
-        applyRandomArrangement(INITIAL_RANDOM_COUNT, false);
-      }
       if (!stateRef.current.motionOn) renderFrame(performance.now());
     };
 
@@ -6128,12 +6095,14 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
         cancelActiveDrag();
         hasUserEdited = false;
         applyRandomArrangement(INITIAL_RANDOM_COUNT, true);
+        syncWallFlags();
         if (!stateRef.current.motionOn) renderFrame(performance.now());
       },
       clearWall: () => {
         cancelActiveDrag();
         hasUserEdited = true;
         placedItems = [];
+        syncWallFlags();
         triggerRipple(0.5, 0.5);
         if (!stateRef.current.motionOn) renderFrame(performance.now());
       },
@@ -6150,6 +6119,7 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
             item.hasProps = show;
           }
         }
+        syncWallFlags();
         if (!stateRef.current.motionOn) renderFrame(performance.now());
         else ensureLoop();
       },
@@ -6160,6 +6130,7 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
             item.lit = on;
           }
         }
+        syncWallFlags();
         if (!stateRef.current.motionOn) renderFrame(performance.now());
         else ensureLoop();
       },
@@ -6333,8 +6304,9 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       const hitExisting = findItemAtPoint(clickX, clickY);
       if (hitExisting) {
         if (hitExisting.type === 'sconce' || hitExisting.type === 'cubby') {
-          hitExisting.lit = !(hitExisting.lit ?? stateRef.current.warmLightingOn);
+          hitExisting.lit = !Boolean(hitExisting.lit);
           hitExisting.lift = 0.88;
+          syncWallFlags();
         } else if (hitExisting.type === 'cabinet') {
           const wasOpen = Boolean(hitExisting.doorOpen);
           if (!wasOpen) {
@@ -6352,8 +6324,9 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
           hitExisting.type === 'shelf' ||
           hitExisting.type === 'hook'
         ) {
-          hitExisting.hasProps = !(hitExisting.hasProps ?? stateRef.current.showProps);
+          hitExisting.hasProps = !Boolean(hitExisting.hasProps);
           hitExisting.lift = 0.88;
+          syncWallFlags();
         } else {
           hitExisting.lift = 0.84;
         }
@@ -6382,6 +6355,7 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       if (cand) {
         hasUserEdited = true;
         addPlacedItem(activeTool, cand.gx1, cand.gx2, cand.gy1, cand.gy2, true);
+        syncWallFlags();
         triggerRipple(clickX / Math.max(1, cssW), clickY / Math.max(1, cssH));
       }
 
@@ -6404,11 +6378,13 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       cancelActiveDrag();
       hasUserEdited = true;
       placedItems = placedItems.filter((it) => it.id !== hit.id);
+      syncWallFlags();
       triggerRipple(e.clientX / Math.max(1, cssW), e.clientY / Math.max(1, cssH));
       if (!stateRef.current.motionOn) renderFrame(performance.now());
     };
 
     sizeCanvas();
+    syncWallFlags();
     renderFrame(performance.now());
     if (stateRef.current.motionOn) ensureLoop();
 
@@ -6467,7 +6443,7 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
         cleanupHero.style.transformOrigin = '';
       }
     };
-  }, [desktopInteractive, controller.registerActions, heroSelector, headerSelector, footerSelector]);
+  }, [desktopInteractive, controller.registerActions, controller.syncWallState, heroSelector, headerSelector, footerSelector]);
 
   useEffect(() => {
     if (!desktopInteractive) return;
@@ -6649,6 +6625,8 @@ export const MortiseWallToolbar: React.FC<{
     toggleProps,
     warmLightingOn,
     toggleWarmLighting,
+    hasLightableItems,
+    hasPropItems,
     lightKelvin,
     setLightKelvin,
     rearrange,
@@ -6774,9 +6752,14 @@ export const MortiseWallToolbar: React.FC<{
               type="button"
               className="wall-light-btn"
               aria-pressed={warmLightingOn}
+              disabled={!hasLightableItems}
               onClick={toggleWarmLighting}
               style={{ '--light-swatch': activeLightSwatch } as React.CSSProperties}
-              title={`Toggle ${lightKelvin}K ambient lighting for Open Cube and Wall Sconce objects`}
+              title={
+                hasLightableItems
+                  ? `Toggle ${lightKelvin}K ambient lighting for placed Open Cube and Wall Sconce objects`
+                  : 'Place a Wall Sconce or Open Cube on the wall to toggle lighting'
+              }
             >
               <svg
                 className="wall-light-icon"
@@ -6823,8 +6806,13 @@ export const MortiseWallToolbar: React.FC<{
             type="button"
             className="text-action-link"
             aria-pressed={showProps}
+            disabled={!hasPropItems}
             onClick={toggleProps}
-            title="Toggle plant, hangers, books, and hook backpack/hat props on or off"
+            title={
+              hasPropItems
+                ? 'Toggle plant, hangers, books, backpack, and Stetson hat props on or off'
+                : 'Place a Hook, Shelf, or Book Shelf on the wall to toggle props'
+            }
           >
             Props: {showProps ? 'On' : 'Off'}
           </button>

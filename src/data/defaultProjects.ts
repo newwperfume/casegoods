@@ -105,6 +105,73 @@ export const DEFAULT_PORTFOLIO_PROJECTS: PortfolioProject[] = [
     sortOrder: 0,
   },
   {
+    id: 'residential-kitchen-cad',
+    code: 'A101-A103',
+    pillarCode: 'PILLAR 01 / ARCHITECTURAL MILLWORK',
+    pillarBg: 'bg-[#EF6922]',
+    tolerance: '± 1/32" 2D CAD',
+    title: 'RESIDENTIAL KITCHEN MILLWORK & ISLAND — CAD SUBMITTAL',
+    recipient: 'RESIDENTIAL COMMISSION — OMAHA, NE',
+    category: 'ARCHITECTURAL KITCHEN MILLWORK',
+    categoryTag: 'architectural',
+    materials: 'PAINTED WHITE SHAKER · VERTICAL-GRAIN WALNUT · 1.5" QUARTZ SLAB',
+    dimensions: '9\'-0" CEILING DATUM · 72" BASE ISLAND + 12" L-OVERHANG',
+    description:
+      'Coordinated 3-sheet architectural CAD submittal detailing painted white Shaker perimeter cabinetry, a full-height pantry tower and refrigerator alcove, stacked upper cabinets flanking a vertical-grain walnut range hood and floating shelves, and a 72" working island with a continuous 12" L-shaped quartz bar-top overhang.',
+    images: [
+      {
+        src: '/downloads/drawings/casegoods-A101-elevations-sections.png',
+        sheetNumber: 'SHEET A-101',
+        label: 'West & North wall elevations, Sections A / B / C & material specification schedule',
+        alt: 'Casegoods branded 2D architectural CAD Sheet A-101 showing West Wall pantry tower and refrigerator alcove elevation, North Wall stacked Shaker uppers, vertical-grain walnut hood and floating shelves, Sections A, B, C, and material schedule',
+        type: 'cad',
+      },
+      {
+        src: '/downloads/drawings/casegoods-A102-plan-isometric.png',
+        sheetNumber: 'SHEET A-102',
+        label: 'Floor plan with overhead dashed uppers, color-coded section cuts & 30° orthographic isometric',
+        alt: 'Casegoods branded 2D architectural CAD Sheet A-102 featuring kitchen floor plan with dashed overhead upper cabinets, color-coded Section A, B, and C cut markers, and true-proportion 30-degree orthographic isometric line drawing',
+        type: 'cad',
+      },
+      {
+        src: '/downloads/drawings/casegoods-A103-island-details.png',
+        sheetNumber: 'SHEET A-103',
+        label: 'Island working & seating elevations, Cross Section D thru sink & horizontal plan',
+        alt: 'Casegoods branded 2D architectural CAD Sheet A-103 detailing kitchen island working side with 24-inch dishwasher, 30-inch sink base, and 18-inch trash pull-out, paneled seating side, Section D cross section, and horizontal plan with 12-inch L-shaped quartz overhang',
+        type: 'cad',
+      },
+    ] as ProjectImage[],
+    specs: [
+      {
+        label: 'PERIMETER CABINETRY',
+        value:
+          'Painted white Shaker base cabinetry, full-height pantry tower, refrigerator alcove & stacked upper cabinets to 9\'-0" ceiling datum',
+      },
+      {
+        label: 'WALNUT FEATURE MILLWORK',
+        value:
+          'Custom vertical-grain American Black Walnut range hood & floating open shelving paired with matte black bar pulls',
+      },
+      {
+        label: 'COUNTERTOPS & TILE',
+        value:
+          '1.5" quartz slab countertops paired with vertical stacked tile backsplash across range and buffet walls',
+      },
+      {
+        label: 'ISLAND CONFIGURATION',
+        value:
+          '72" working base carcass (24" dishwasher, 30" undermount sink base, 18" trash pull-out), paneled seating back & 12" L-shaped quartz overhang',
+      },
+      {
+        label: 'ARCHITECTURAL SUBMITTAL',
+        value:
+          '3-sheet coordinated 2D CAD package: A-101 Elevations & Sections, A-102 Floor Plan & 30° Isometric, A-103 Island Details',
+      },
+    ],
+    published: true,
+    sortOrder: 1,
+  },
+  {
     id: 'wet-bar',
     code: '1064HEM-WB',
     pillarCode: 'PILLAR 02 / SPATIAL & COMMERCIAL FABRICATION',
@@ -161,7 +228,7 @@ export const DEFAULT_PORTFOLIO_PROJECTS: PortfolioProject[] = [
       },
     ],
     published: true,
-    sortOrder: 1,
+    sortOrder: 2,
   },
   {
     id: 'kids-kitchen',
@@ -213,6 +280,6 @@ export const DEFAULT_PORTFOLIO_PROJECTS: PortfolioProject[] = [
       },
     ],
     published: true,
-    sortOrder: 2,
+    sortOrder: 3,
   },
 ];

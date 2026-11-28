@@ -356,9 +356,14 @@ body.wall-dragging * {
   transition: background-color 140ms ease, color 140ms ease;
 }
 
-.wall-light-btn:hover {
+.wall-light-btn:hover:not(:disabled) {
   background-color: var(--cg-black);
   color: var(--cg-white);
+}
+
+.wall-light-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .wall-light-btn[aria-pressed="true"] {
@@ -540,8 +545,13 @@ body.wall-dragging * {
   white-space: nowrap;
 }
 
-.text-action-link:hover {
+.text-action-link:hover:not(:disabled) {
   border-bottom-color: var(--cg-black);
+}
+
+.text-action-link:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
 }
 
 /* Compact 430px Variant — Frameless & Rescaled Flush with Email & Website Buttons Above */
