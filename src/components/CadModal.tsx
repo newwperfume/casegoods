@@ -294,48 +294,57 @@ export const CadModal: React.FC<CadModalProps> = ({
         </div>
 
         {/* Borderless Bottom Controls & Sheet Selector Bar */}
-        <div className="pt-0.5 flex flex-wrap items-center justify-between gap-2.5 text-[0.74rem] tracking-cad transition-colors duration-300">
-          <div className="flex items-center gap-2">
-            <span className="text-black/75 uppercase hidden sm:inline font-light">ZOOM:</span>
-            <button
-              type="button"
-              onClick={() => handleZoom(0.25)}
-              className={`p-2 border border-black rounded-[9px] bg-white text-black ${activeTheme.hoverBg} ${activeTheme.hoverText} transition-all cursor-pointer`}
-              title="Zoom In"
-            >
-              <ZoomIn className="w-3.5 h-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => handleZoom(-0.25)}
-              className={`p-2 border border-black rounded-[9px] bg-white text-black ${activeTheme.hoverBg} ${activeTheme.hoverText} transition-all cursor-pointer`}
-              title="Zoom Out"
-            >
-              <ZoomOut className="w-3.5 h-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={resetZoom}
-              className={`px-3 py-1.5 border border-black rounded-[9px] bg-white text-black ${activeTheme.hoverBg} ${activeTheme.hoverText} transition-all cursor-pointer text-[0.70rem] font-light`}
-              title="Reset Zoom"
-            >
-              {Math.round(zoomLevel * 100)}%
-            </button>
-            {!isSpecsOpen && (
+        <div className="pt-0.5 flex flex-wrap items-center justify-between gap-2 text-[0.74rem] tracking-cad transition-colors duration-300">
+          <div className="flex items-center gap-1.5 sm:gap-2 w-full md:w-auto justify-between md:justify-start">
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <span className="text-black/75 uppercase hidden sm:inline font-light">ZOOM:</span>
               <button
                 type="button"
-                onClick={handleSavePortfolioSheet}
-                className="px-3 py-1.5 border border-black rounded-[9px] bg-[#FDCB33] hover:bg-black text-black hover:text-white transition-all cursor-pointer text-[0.70rem] font-medium inline-flex items-center gap-1.5"
-                title="Save Watermarked Sheet PNG"
+                onClick={() => handleZoom(0.25)}
+                className={`p-2 border border-black rounded-[9px] bg-white text-black ${activeTheme.hoverBg} ${activeTheme.hoverText} transition-all cursor-pointer`}
+                title="Zoom In"
               >
-                <Download className="w-3.5 h-3.5" />
-                <span>SAVE PNG</span>
+                <ZoomIn className="w-3.5 h-3.5" />
               </button>
-            )}
+              <button
+                type="button"
+                onClick={() => handleZoom(-0.25)}
+                className={`p-2 border border-black rounded-[9px] bg-white text-black ${activeTheme.hoverBg} ${activeTheme.hoverText} transition-all cursor-pointer`}
+                title="Zoom Out"
+              >
+                <ZoomOut className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={resetZoom}
+                className={`px-2.5 sm:px-3 py-1.5 border border-black rounded-[9px] bg-white text-black ${activeTheme.hoverBg} ${activeTheme.hoverText} transition-all cursor-pointer text-[0.70rem] font-light`}
+                title="Reset Zoom"
+              >
+                {Math.round(zoomLevel * 100)}%
+              </button>
+              {!isSpecsOpen && (
+                <button
+                  type="button"
+                  onClick={handleSavePortfolioSheet}
+                  className="px-2.5 sm:px-3 py-1.5 border border-black rounded-[9px] bg-[#FDCB33] hover:bg-black text-black hover:text-white transition-all cursor-pointer text-[0.70rem] font-medium inline-flex items-center gap-1.5 whitespace-nowrap"
+                  title="Save Watermarked Sheet PNG"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>SAVE PNG</span>
+                </button>
+              )}
+            </div>
+
+            {/* Mobile: Current Image Name Pill Directly to the Right of SAVE PNG */}
+            <span
+              className={`md:hidden ${activeTheme.barBg} text-black border border-black rounded-[9px] px-3 py-1.5 text-[0.70rem] tracking-cad uppercase font-medium whitespace-nowrap truncate`}
+            >
+              {isSpecsOpen ? 'SPEC SHEET' : activeImage?.sheetNumber || 'SHEET'}
+            </span>
           </div>
 
-          {/* Sheet Selector Buttons + SPEC SHEET Button — Black Outline/Text Until Selected */}
-          <div className="flex flex-wrap items-center gap-2">
+          {/* Desktop: Sheet Selector Buttons + SPEC SHEET Button — Black Outline/Text Until Selected */}
+          <div className="hidden md:flex flex-wrap items-center gap-2">
             {project.images.map((img, idx) => {
               const isSheetActive = !isSpecsOpen && currentIndex === idx;
               return (
