@@ -135,7 +135,7 @@ export const DEFAULT_PORTFOLIO_PROJECTS: PortfolioProject[] = [
   },
   {
     id: 'residential-kitchen-cad',
-    code: 'A101-A103',
+    code: '1036HEI',
     pillarCode: 'PILLAR 01 / ARCHITECTURAL MILLWORK',
     pillarBg: 'bg-[#EF6922]',
     tolerance: '± 1/32" 2D CAD',

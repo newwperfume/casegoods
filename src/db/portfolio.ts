@@ -118,11 +118,21 @@ async function backfillLateDefaultProjects(): Promise<void> {
       .select({
         id: portfolioProjects.id,
         slug: portfolioProjects.slug,
+        code: portfolioProjects.code,
         sortOrder: portfolioProjects.sortOrder,
       })
       .from(portfolioProjects)
       .orderBy(asc(portfolioProjects.sortOrder), asc(portfolioProjects.id));
-    if (rows.some((r) => r.slug === slug)) continue;
+    const existing = rows.find((r) => r.slug === slug);
+    if (existing) {
+      if (slug === 'residential-kitchen-cad' && existing.code === 'A101-A103' && proj.code !== 'A101-A103') {
+        await db
+          .update(portfolioProjects)
+          .set({ code: proj.code, updatedAt: new Date() })
+          .where(eq(portfolioProjects.id, existing.id));
+      }
+      continue;
+    }
 
     const anchorIdx = rows.findIndex((r) => r.slug === 'family-room');
     const insertAt = anchorIdx >= 0 ? anchorIdx + 1 : rows.length;
