@@ -3,6 +3,7 @@ import { db } from './index.ts';
 import { portfolioProjects } from './schema.ts';
 import {
   DEFAULT_PORTFOLIO_PROJECTS,
+  FAMILY_ROOM_CAD_SHEETS,
   type PortfolioCategoryTag,
   type PortfolioProject,
 } from '../data/defaultProjects.ts';
@@ -53,6 +54,31 @@ function rowToPortfolioProject(
 
 let seedPromise: Promise<void> | null = null;
 
+/**
+ * Appends the 1064HEM A-101 – A-103 construction document sheets to an already-seeded
+ * `family-room` project. Skips if the row is missing or already contains any of the sheets.
+ */
+async function backfillFamilyRoomCadSheets(): Promise<void> {
+  const [row] = await db
+    .select({ id: portfolioProjects.id, imagesJson: portfolioProjects.imagesJson })
+    .from(portfolioProjects)
+    .where(eq(portfolioProjects.slug, 'family-room'));
+  if (!row) return;
+
+  const images = safeParseJson<ProjectImage[]>(row.imagesJson, []);
+  const current = Array.isArray(images) ? images : [];
+  const existingSrcs = new Set(current.map((img) => img?.src));
+  if (FAMILY_ROOM_CAD_SHEETS.some((sheet) => existingSrcs.has(sheet.src))) return;
+
+  await db
+    .update(portfolioProjects)
+    .set({
+      imagesJson: JSON.stringify([...current, ...FAMILY_ROOM_CAD_SHEETS]),
+      updatedAt: new Date(),
+    })
+    .where(eq(portfolioProjects.id, row.id));
+}
+
 export async function ensureDefaultPortfolioProjectsSeeded(): Promise<void> {
   if (seedPromise) return seedPromise;
 
@@ -62,7 +88,10 @@ export async function ensureDefaultPortfolioProjectsSeeded(): Promise<void> {
         .select({ value: count() })
         .from(portfolioProjects);
 
-      if (Number(existingCount) > 0) return;
+      if (Number(existingCount) > 0) {
+        await backfillFamilyRoomCadSheets();
+        return;
+      }
 
       for (let i = 0; i < DEFAULT_PORTFOLIO_PROJECTS.length; i++) {
         const proj = DEFAULT_PORTFOLIO_PROJECTS[i];
