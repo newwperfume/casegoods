@@ -299,7 +299,7 @@ body.wall-dragging * {
 
   .wall-controls-panel {
     gap: 6px 8px;
-    justify-content: center;
+    justify-content: space-between;
   }
 
   .wall-micro-hint {

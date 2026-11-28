@@ -1882,8 +1882,10 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
         )}
       </main>
 
-      {/* Architectural Business Card Footer (4-icon strip omitted on landing page for interactive wall room) */}
-      <Footer showBrandIcons={!isCover} compact={isCover} />
+      {/* Architectural Business Card Footer (hidden on mobile cover so the object bar sits at the very bottom) */}
+      <div className={isCover ? 'hidden md:block' : ''}>
+        <Footer showBrandIcons={!isCover} compact={isCover} />
+      </div>
 
       {/* High-Resolution CAD & Render Lightbox Modal */}
       <CadModal

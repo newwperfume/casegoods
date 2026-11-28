@@ -450,6 +450,31 @@ export function useDesktopInteractiveWall(): boolean {
   return enabled;
 }
 
+const MOBILE_WALL_TOOLS: WallTool[] = ['hook', 'wallShelf', 'cubby', 'cabinet'];
+
+const MOBILE_FIXED_SIZES: Record<WallTool, PieceSize> = {
+  hook: { cols: 1, rows: 1 },
+  wallShelf: { cols: 2, rows: 1 },
+  cubby: { cols: 2, rows: 2 },
+  cabinet: { cols: 3, rows: 2 },
+  shelf: { cols: 2, rows: 1 },
+  cradle: { cols: 2, rows: 2 },
+  sconce: { cols: 2, rows: 1 },
+};
+
+function useIsMobileWall(): boolean {
+  const [mobile, setMobile] = useState<boolean>(() =>
+    typeof window !== 'undefined' ? window.innerWidth < 768 : false
+  );
+  useEffect(() => {
+    const update = () => setMobile(window.innerWidth < 768);
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
+  return mobile;
+}
+
 interface MortiseWallCanvasProps {
   controller: MortiseWallController;
   /** CSS selector for the centered landing stack to keep unobstructed (e.g. "#hero-center-stack") */
@@ -670,10 +695,12 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
     const measureClearanceZones = () => {
       const headerEl = headerSelector ? document.querySelector(headerSelector) : null;
       const footerEl = footerSelector ? document.querySelector(footerSelector) : null;
+      const toolbarEl = cssW < 768 ? document.querySelector('.wall-toolbar') : null;
       const edgeY = Math.max(8, Math.min(14, cssH * 0.012));
       topSafeY = headerEl ? Math.max(edgeY, headerEl.getBoundingClientRect().bottom + 10) : edgeY;
-      const footerTop = footerEl ? footerEl.getBoundingClientRect().top - 10 : cssH - edgeY;
-      bottomSafeY = Math.min(cssH - edgeY, Math.max(topSafeY + 220, footerTop));
+      const bottomEl = toolbarEl ?? footerEl;
+      const bottomElTop = bottomEl ? bottomEl.getBoundingClientRect().top - 10 : cssH - edgeY;
+      bottomSafeY = Math.min(cssH - edgeY, Math.max(topSafeY + 220, bottomElTop));
       edgeSafeX = Math.max(8, Math.min(14, cssW * 0.008));
 
       const heroEl = heroSelector ? (document.querySelector(heroSelector) as HTMLElement | null) : null;
@@ -4769,6 +4796,46 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       );
       if (openSlots.length === 0) return;
 
+      // Simplified, uncluttered mobile wall arrangement: curated compact pieces only, no lighting or props
+      if (cssW < 768) {
+        const mobilePlan: Array<{ type: WallTool; cols: number; rows: number }> = [
+          { type: 'cabinet', ...MOBILE_FIXED_SIZES.cabinet },
+          { type: 'cubby', ...MOBILE_FIXED_SIZES.cubby },
+          { type: 'wallShelf', ...MOBILE_FIXED_SIZES.wallShelf },
+          { type: 'hook', ...MOBILE_FIXED_SIZES.hook },
+          { type: 'hook', ...MOBILE_FIXED_SIZES.hook },
+        ];
+        // Shuffle order slightly so Rearrange produces fresh aesthetic layouts
+        for (let i = mobilePlan.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          const tmp = mobilePlan[i];
+          mobilePlan[i] = mobilePlan[j];
+          mobilePlan[j] = tmp;
+        }
+        const placed: Array<{ gx1: number; gx2: number; gy1: number; gy2: number }> = [];
+        for (const spec of mobilePlan) {
+          if (placed.length >= 4) break;
+          const candidates: Array<{ gx1: number; gx2: number; gy1: number; gy2: number }> = [];
+          for (const s of openSlots) {
+            const gx1 = s.gx;
+            const gx2 = gx1 + spec.cols - 1;
+            const gy1 = s.gy;
+            const gy2 = gy1 + spec.rows - 1;
+            if (!canPlaceRect(gx1, gx2, gy1, gy2)) continue;
+            const overlaps = placed.some(
+              (p) => gx1 <= p.gx2 + 1 && gx2 >= p.gx1 - 1 && gy1 <= p.gy2 + 1 && gy2 >= p.gy1 - 1
+            );
+            if (!overlaps) candidates.push({ gx1, gx2, gy1, gy2 });
+          }
+          if (candidates.length === 0) continue;
+          const pick = candidates[Math.floor(Math.random() * candidates.length)];
+          placed.push(pick);
+          addPlacedItem(spec.type, pick.gx1, pick.gx2, pick.gy1, pick.gy2, withPulse);
+        }
+        if (withPulse) triggerRipple(0.5, 0.5);
+        return;
+      }
+
       const AESTHETIC_WEIGHT = 0.6;
       const FUNCTIONAL_WEIGHT = 0.4;
 
@@ -6360,11 +6427,13 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       if (!best) return;
 
       // Purely additive placement — unlimited items stay on the wall until removed or cleared
-      const size = toolSizes[activeTool];
+      const effectiveTool: WallTool =
+        cssW < 768 && !MOBILE_WALL_TOOLS.includes(activeTool) ? 'hook' : activeTool;
+      const size = cssW < 768 ? MOBILE_FIXED_SIZES[effectiveTool] : toolSizes[effectiveTool];
       const cand = getCandidateForSlot(best, size.cols, size.rows);
       if (cand) {
         hasUserEdited = true;
-        addPlacedItem(activeTool, cand.gx1, cand.gx2, cand.gy1, cand.gy2, true);
+        addPlacedItem(effectiveTool, cand.gx1, cand.gx2, cand.gy1, cand.gy2, true);
         syncWallFlags();
         triggerRipple(clickX / Math.max(1, cssW), clickY / Math.max(1, cssH));
       }
@@ -6630,6 +6699,7 @@ export const MortiseWallToolbar: React.FC<{
   variant?: 'default' | 'compact';
 }> = ({ controller, variant = 'default' }) => {
   const isDesktopInteractive = useDesktopInteractiveWall();
+  const isMobileWall = useIsMobileWall();
   const [objectMenuOpen, setObjectMenuOpen] = useState(false);
   const [lightMenuOpen, setLightMenuOpen] = useState(false);
   const toolbarRef = useRef<HTMLDivElement | null>(null);
@@ -6672,10 +6742,15 @@ export const MortiseWallToolbar: React.FC<{
     rearrange,
     clearWall,
   } = controller;
+
+  const visibleTools = isMobileWall ? MOBILE_WALL_TOOLS : ALL_WALL_TOOLS;
+  const effectiveTool: WallTool =
+    isMobileWall && !MOBILE_WALL_TOOLS.includes(activeTool) ? 'hook' : activeTool;
+
   const activeLightSwatch = LIGHT_KELVIN_PRESETS[lightKelvin].uiBg;
-  const currentSize = toolSizes[activeTool];
-  const currentLimits = TOOL_SIZE_LIMITS[activeTool];
-  const activeLabel = TOOL_LABELS[activeTool];
+  const currentSize = toolSizes[effectiveTool];
+  const currentLimits = TOOL_SIZE_LIMITS[effectiveTool];
+  const activeLabel = TOOL_LABELS[effectiveTool];
 
   if (!isDesktopInteractive) return null;
 
@@ -6701,11 +6776,13 @@ export const MortiseWallToolbar: React.FC<{
                 setLightMenuOpen(false);
               }}
             >
-              {renderToolIcon(activeTool)}
+              {renderToolIcon(effectiveTool)}
               <span>{activeLabel}</span>
-              <span className="wall-tool-size">
-                {currentSize.cols}×{currentSize.rows}
-              </span>
+              {!isMobileWall && (
+                <span className="wall-tool-size">
+                  {currentSize.cols}×{currentSize.rows}
+                </span>
+              )}
               <svg
                 className={`wall-chevron${objectMenuOpen ? ' is-open' : ''}`}
                 viewBox="0 0 16 16"
@@ -6726,8 +6803,8 @@ export const MortiseWallToolbar: React.FC<{
                 role="listbox"
                 aria-label="Select modular piece to place"
               >
-                {ALL_WALL_TOOLS.map((tool) => {
-                  const selected = activeTool === tool;
+                {visibleTools.map((tool) => {
+                  const selected = effectiveTool === tool;
                   return (
                     <button
                       key={tool}
@@ -6742,9 +6819,11 @@ export const MortiseWallToolbar: React.FC<{
                     >
                       {renderToolIcon(tool)}
                       <span>{TOOL_LABELS[tool]}</span>
-                      <span className="wall-tool-size">
-                        {toolSizes[tool].cols}×{toolSizes[tool].rows}
-                      </span>
+                      {!isMobileWall && (
+                        <span className="wall-tool-size">
+                          {toolSizes[tool].cols}×{toolSizes[tool].rows}
+                        </span>
+                      )}
                     </button>
                   );
                 })}
@@ -6752,168 +6831,173 @@ export const MortiseWallToolbar: React.FC<{
             )}
           </div>
 
-          {/* Inline W / H Size Steppers */}
-          <div className="wall-size-stepper">
-            <span className="wall-size-axis" title="Width in mortise cells">
-              W
-            </span>
-            <button
-              type="button"
-              className="wall-size-step-btn"
-              aria-label={`Make ${activeLabel} 1 cell narrower`}
-              disabled={currentSize.cols <= currentLimits.minCols}
-              onClick={() => adjustToolSize(activeTool, 'cols', -1)}
-            >
-              −
-            </button>
-            <span className="wall-size-val" aria-live="polite">
-              {currentSize.cols}
-            </span>
-            <button
-              type="button"
-              className="wall-size-step-btn"
-              aria-label={`Make ${activeLabel} 1 cell wider`}
-              disabled={currentSize.cols >= currentLimits.maxCols}
-              onClick={() => adjustToolSize(activeTool, 'cols', 1)}
-            >
-              +
-            </button>
-          </div>
-
-          {currentLimits.maxRows > currentLimits.minRows && (
-            <div className="wall-size-stepper">
-              <span className="wall-size-axis" title="Height in mortise cells">
-                H
-              </span>
-              <button
-                type="button"
-                className="wall-size-step-btn"
-                aria-label={`Make ${activeLabel} 1 cell shorter`}
-                disabled={currentSize.rows <= currentLimits.minRows}
-                onClick={() => adjustToolSize(activeTool, 'rows', -1)}
-              >
-                −
-              </button>
-              <span className="wall-size-val" aria-live="polite">
-                {currentSize.rows}
-              </span>
-              <button
-                type="button"
-                className="wall-size-step-btn"
-                aria-label={`Make ${activeLabel} 1 cell taller`}
-                disabled={currentSize.rows >= currentLimits.maxRows}
-                onClick={() => adjustToolSize(activeTool, 'rows', 1)}
-              >
-                +
-              </button>
-            </div>
-          )}
-
-          {/* Compact Pull-Down Lighting Control */}
-          <div className="wall-dropdown-wrap">
-            <button
-              type="button"
-              className="wall-light-trigger"
-              aria-expanded={lightMenuOpen}
-              aria-pressed={warmLightingOn}
-              disabled={!hasLightableItems}
-              style={{ '--light-swatch': activeLightSwatch } as React.CSSProperties}
-              onClick={() => {
-                setLightMenuOpen((prev) => !prev);
-                setObjectMenuOpen(false);
-              }}
-              title={
-                hasLightableItems
-                  ? `Lighting (${warmLightingOn ? `${lightKelvin}K` : 'Off'})`
-                  : 'Place a Wall Sconce or Open Cube on the wall to toggle lighting'
-              }
-            >
-              <svg
-                className="wall-light-icon"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.9"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <circle cx="12" cy="12" r="4" />
-                <line x1="12" y1="2.5" x2="12" y2="5.2" />
-                <line x1="12" y1="18.8" x2="12" y2="21.5" />
-                <line x1="2.5" y1="12" x2="5.2" y2="12" />
-                <line x1="18.8" y1="12" x2="21.5" y2="12" />
-                <line x1="5.3" y1="5.3" x2="7.2" y2="7.2" />
-                <line x1="16.8" y1="16.8" x2="18.7" y2="18.7" />
-                <line x1="18.7" y1="5.3" x2="16.8" y2="7.2" />
-                <line x1="7.2" y1="16.8" x2="5.3" y2="18.7" />
-              </svg>
-              <span>{warmLightingOn ? `${lightKelvin}K` : 'OFF'}</span>
-              <svg
-                className={`wall-chevron${lightMenuOpen ? ' is-open' : ''}`}
-                viewBox="0 0 16 16"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M4 6l4 4 4-4" />
-              </svg>
-            </button>
-
-            {lightMenuOpen && (
-              <div
-                className="wall-dropdown-menu wall-dropdown-menu--light"
-                role="menu"
-                aria-label="Lighting options"
-              >
+          {/* Desktop Only: Inline W / H Size Steppers & Lighting Pull-Down */}
+          {!isMobileWall && (
+            <>
+              <div className="wall-size-stepper">
+                <span className="wall-size-axis" title="Width in mortise cells">
+                  W
+                </span>
                 <button
                   type="button"
-                  className={`wall-dropdown-item${warmLightingOn ? ' is-selected' : ''}`}
-                  onClick={toggleWarmLighting}
+                  className="wall-size-step-btn"
+                  aria-label={`Make ${activeLabel} 1 cell narrower`}
+                  disabled={currentSize.cols <= currentLimits.minCols}
+                  onClick={() => adjustToolSize(effectiveTool, 'cols', -1)}
                 >
-                  <span>Lighting: {warmLightingOn ? 'ON' : 'OFF'}</span>
+                  −
                 </button>
-                <div className="wall-dropdown-divider" />
-                {LIGHT_KELVIN_OPTIONS.map((k) => (
-                  <button
-                    key={k}
-                    type="button"
-                    className={`wall-dropdown-item${lightKelvin === k ? ' is-selected' : ''}`}
-                    onClick={() => {
-                      setLightKelvin(k);
-                      setLightMenuOpen(false);
-                    }}
-                  >
-                    <span
-                      className="wall-kelvin-dot"
-                      style={{ backgroundColor: LIGHT_KELVIN_PRESETS[k].uiBg }}
-                    />
-                    <span>{k}K</span>
-                  </button>
-                ))}
+                <span className="wall-size-val" aria-live="polite">
+                  {currentSize.cols}
+                </span>
+                <button
+                  type="button"
+                  className="wall-size-step-btn"
+                  aria-label={`Make ${activeLabel} 1 cell wider`}
+                  disabled={currentSize.cols >= currentLimits.maxCols}
+                  onClick={() => adjustToolSize(effectiveTool, 'cols', 1)}
+                >
+                  +
+                </button>
               </div>
-            )}
-          </div>
+
+              {currentLimits.maxRows > currentLimits.minRows && (
+                <div className="wall-size-stepper">
+                  <span className="wall-size-axis" title="Height in mortise cells">
+                    H
+                  </span>
+                  <button
+                    type="button"
+                    className="wall-size-step-btn"
+                    aria-label={`Make ${activeLabel} 1 cell shorter`}
+                    disabled={currentSize.rows <= currentLimits.minRows}
+                    onClick={() => adjustToolSize(effectiveTool, 'rows', -1)}
+                  >
+                    −
+                  </button>
+                  <span className="wall-size-val" aria-live="polite">
+                    {currentSize.rows}
+                  </span>
+                  <button
+                    type="button"
+                    className="wall-size-step-btn"
+                    aria-label={`Make ${activeLabel} 1 cell taller`}
+                    disabled={currentSize.rows >= currentLimits.maxRows}
+                    onClick={() => adjustToolSize(effectiveTool, 'rows', 1)}
+                  >
+                    +
+                  </button>
+                </div>
+              )}
+
+              <div className="wall-dropdown-wrap">
+                <button
+                  type="button"
+                  className="wall-light-trigger"
+                  aria-expanded={lightMenuOpen}
+                  aria-pressed={warmLightingOn}
+                  disabled={!hasLightableItems}
+                  style={{ '--light-swatch': activeLightSwatch } as React.CSSProperties}
+                  onClick={() => {
+                    setLightMenuOpen((prev) => !prev);
+                    setObjectMenuOpen(false);
+                  }}
+                  title={
+                    hasLightableItems
+                      ? `Lighting (${warmLightingOn ? `${lightKelvin}K` : 'Off'})`
+                      : 'Place a Wall Sconce or Open Cube on the wall to toggle lighting'
+                  }
+                >
+                  <svg
+                    className="wall-light-icon"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.9"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <circle cx="12" cy="12" r="4" />
+                    <line x1="12" y1="2.5" x2="12" y2="5.2" />
+                    <line x1="12" y1="18.8" x2="12" y2="21.5" />
+                    <line x1="2.5" y1="12" x2="5.2" y2="12" />
+                    <line x1="18.8" y1="12" x2="21.5" y2="12" />
+                    <line x1="5.3" y1="5.3" x2="7.2" y2="7.2" />
+                    <line x1="16.8" y1="16.8" x2="18.7" y2="18.7" />
+                    <line x1="18.7" y1="5.3" x2="16.8" y2="7.2" />
+                    <line x1="7.2" y1="16.8" x2="5.3" y2="18.7" />
+                  </svg>
+                  <span>{warmLightingOn ? `${lightKelvin}K` : 'OFF'}</span>
+                  <svg
+                    className={`wall-chevron${lightMenuOpen ? ' is-open' : ''}`}
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M4 6l4 4 4-4" />
+                  </svg>
+                </button>
+
+                {lightMenuOpen && (
+                  <div
+                    className="wall-dropdown-menu wall-dropdown-menu--light"
+                    role="menu"
+                    aria-label="Lighting options"
+                  >
+                    <button
+                      type="button"
+                      className={`wall-dropdown-item${warmLightingOn ? ' is-selected' : ''}`}
+                      onClick={toggleWarmLighting}
+                    >
+                      <span>Lighting: {warmLightingOn ? 'ON' : 'OFF'}</span>
+                    </button>
+                    <div className="wall-dropdown-divider" />
+                    {LIGHT_KELVIN_OPTIONS.map((k) => (
+                      <button
+                        key={k}
+                        type="button"
+                        className={`wall-dropdown-item${lightKelvin === k ? ' is-selected' : ''}`}
+                        onClick={() => {
+                          setLightKelvin(k);
+                          setLightMenuOpen(false);
+                        }}
+                      >
+                        <span
+                          className="wall-kelvin-dot"
+                          style={{ backgroundColor: LIGHT_KELVIN_PRESETS[k].uiBg }}
+                        />
+                        <span>{k}K</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </div>
 
         <div className="mortise-actions">
-          <button
-            type="button"
-            className="text-action-link"
-            aria-pressed={showProps}
-            disabled={!hasPropItems}
-            onClick={toggleProps}
-            title={
-              hasPropItems
-                ? 'Toggle props on or off'
-                : 'Place a Hook, Shelf, or Book Shelf on the wall to toggle props'
-            }
-          >
-            Props: {showProps ? 'On' : 'Off'}
-          </button>
+          {!isMobileWall && (
+            <button
+              type="button"
+              className="text-action-link"
+              aria-pressed={showProps}
+              disabled={!hasPropItems}
+              onClick={toggleProps}
+              title={
+                hasPropItems
+                  ? 'Toggle props on or off'
+                  : 'Place a Hook, Shelf, or Book Shelf on the wall to toggle props'
+              }
+            >
+              Props: {showProps ? 'On' : 'Off'}
+            </button>
+          )}
           <button type="button" className="text-action-link" onClick={rearrange}>
             Rearrange
           </button>
