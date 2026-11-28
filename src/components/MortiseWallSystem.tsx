@@ -431,22 +431,10 @@ export function useMortiseWallController(
 }
 
 /**
- * Returns true for desktop web browsers (macOS, Windows, Linux with fine pointer and wide viewport)
- * and false for iOS (iPhone/iPad), Android, mobile UAs, or narrow mobile-width viewports.
+ * Enables the interactive mortise wall across both desktop and mobile viewports.
  */
 export function isDesktopInteractiveWall(): boolean {
-  if (typeof window === 'undefined') return true;
-  const ua = navigator.userAgent || '';
-  const isIOSDevice =
-    /iPhone|iPad|iPod/i.test(ua) ||
-    (/Macintosh/i.test(ua) && (navigator.maxTouchPoints || 0) > 1);
-  const isMobileUA = /Android|webOS|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(ua);
-  const hasFinePointer =
-    typeof window.matchMedia === 'function' &&
-    window.matchMedia('(any-hover: hover) and (any-pointer: fine)').matches;
-  const isWideViewport = window.innerWidth >= 640;
-
-  return !isIOSDevice && !isMobileUA && hasFinePointer && isWideViewport;
+  return typeof window !== 'undefined';
 }
 
 export function useDesktopInteractiveWall(): boolean {
@@ -548,6 +536,7 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
     };
 
     let heroRect = { left: 0, right: 0, top: 0, bottom: 0 };
+    let blockedRects: Array<{ left: number; right: number; top: number; bottom: number }> = [];
     let heroCutout: {
       gxMin: number;
       gxMax: number;
@@ -724,9 +713,18 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
           gy <= heroCutout.gyMax
         );
       }
-      const halfW = slotW * 0.5 + 6;
-      const halfH = slotH * 0.5 + 6;
+      const halfW = slotW * 0.5 + 4;
+      const halfH = slotH * 0.5 + 4;
       if (cy - halfH < topSafeY || cy + halfH > bottomSafeY) return true;
+      if (blockedRects.length > 0) {
+        return blockedRects.some(
+          (r) =>
+            cx + halfW > r.left &&
+            cx - halfW < r.right &&
+            cy + halfH > r.top &&
+            cy - halfH < r.bottom
+        );
+      }
       return (
         cx + halfW > heroRect.left &&
         cx - halfW < heroRect.right &&
@@ -1117,6 +1115,7 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
         }
 
         if (best) {
+          blockedRects = [];
           // Match horizontal grid parity to kx so left & right flanking columns are 100% symmetric
           centerX = best.kx % 2 === 0 ? midX + 0.5 * pitchX : midX;
           const gxMin = best.kx % 2 === 0 ? -(best.kx / 2) : -((best.kx - 1) / 2);
@@ -1149,7 +1148,7 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
             bottom: midY + scaledH * 0.5,
           };
         } else {
-          // Graceful fallback on ultra-narrow portrait desktop panes
+          // Mobile / portrait layout: measure each UI surface individually so mortise holes fill in around the 50%-width buttons
           if (heroEl.style.transform) {
             heroEl.style.transform = '';
             heroEl.style.transformOrigin = '';
@@ -1158,11 +1157,21 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
           heroAppliedDy = 0;
           const hr = heroEl.getBoundingClientRect();
           heroRect = {
-            left: hr.left - 8,
-            right: hr.right + 8,
-            top: hr.top - 8,
-            bottom: hr.bottom + 8,
+            left: hr.left - 4,
+            right: hr.right + 4,
+            top: hr.top - 4,
+            bottom: hr.bottom + 4,
           };
+          const surfaces = Array.from(heroEl.querySelectorAll('.ui-surface')) as HTMLElement[];
+          blockedRects = surfaces
+            .map((el) => el.getBoundingClientRect())
+            .filter((r) => r.width > 0 && r.height > 0)
+            .map((r) => ({
+              left: r.left - 4,
+              right: r.right + 4,
+              top: r.top - 4,
+              bottom: r.bottom + 4,
+            }));
         }
       }
 

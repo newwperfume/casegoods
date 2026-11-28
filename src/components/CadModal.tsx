@@ -276,7 +276,7 @@ export const CadModal: React.FC<CadModalProps> = ({
               <button
                 type="button"
                 onClick={prevImage}
-                className={`fixed sm:absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-[9px] bg-white/95 ${activeTheme.hoverBg} ${activeTheme.hoverText} text-black border-[0.75px] border-black flex items-center justify-center shadow-md transition-all cursor-pointer`}
+                className={`absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 w-9 h-9 sm:w-10 sm:h-10 rounded-[9px] bg-white/95 ${activeTheme.hoverBg} ${activeTheme.hoverText} text-black border border-black flex items-center justify-center shadow-md transition-all cursor-pointer`}
                 aria-label="Previous sheet"
               >
                 <ChevronLeft className="w-5 h-5" />
@@ -284,7 +284,7 @@ export const CadModal: React.FC<CadModalProps> = ({
               <button
                 type="button"
                 onClick={nextImage}
-                className={`fixed sm:absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-[9px] bg-white/95 ${activeTheme.hoverBg} ${activeTheme.hoverText} text-black border-[0.75px] border-black flex items-center justify-center shadow-md transition-all cursor-pointer`}
+                className={`absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 w-9 h-9 sm:w-10 sm:h-10 rounded-[9px] bg-white/95 ${activeTheme.hoverBg} ${activeTheme.hoverText} text-black border border-black flex items-center justify-center shadow-md transition-all cursor-pointer`}
                 aria-label="Next sheet"
               >
                 <ChevronRight className="w-5 h-5" />

@@ -627,9 +627,13 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
                 <button
                   type="button"
                   onClick={() => navigateToPage('inquire')}
-                  className="shrink-0 bg-black text-white text-[0.70rem] tracking-cad uppercase py-2.5 px-3.5 rounded-[9px] border-[1.5px] border-black font-medium whitespace-nowrap text-center cursor-pointer"
+                  className={`shrink-0 text-[0.70rem] tracking-cad uppercase py-2.5 px-3.5 rounded-[9px] border-[1.5px] border-black font-medium whitespace-nowrap text-center transition-colors cursor-pointer ${
+                    activePage === 'inquire'
+                      ? 'bg-[#FDCB33] text-black hover:bg-[#EF6922]'
+                      : 'bg-black text-white hover:bg-[#EF6922] hover:text-black'
+                  }`}
                 >
-                  INQUIRE
+                  COMMISSION →
                 </button>
               </div>
 
@@ -667,7 +671,7 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
       <main
         className={`flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 ${
           activePage === 'cover'
-            ? 'py-4 sm:py-0 flex flex-col justify-center'
+            ? 'pt-3 pb-3 md:py-0 flex flex-col justify-start md:justify-center'
             : 'pt-8 pb-16 flex flex-col justify-between'
         }`}
       >

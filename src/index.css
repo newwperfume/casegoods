@@ -147,15 +147,60 @@ body.wall-dragging * {
   pointer-events: auto;
 }
 
-/* Keep the interactive mortise pegboard strictly desktop-only */
-@media (max-width: 639px), (hover: none), (pointer: coarse) {
-  .mortise-wall-canvas,
+/* Responsive compact sizing for the interactive mortise wall toolbar on mobile */
+@media (max-width: 767px) {
   .wall-toolbar {
-    display: none !important;
+    gap: 6px;
   }
 
-  .mortise-page-shell {
-    pointer-events: auto;
+  .wall-tool-rows {
+    gap: 5px;
+  }
+
+  .wall-tool-row--3 {
+    gap: 6px;
+  }
+
+  .wall-tool-row--4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .wall-tool-btn,
+  .wall-tool-row--4 .wall-tool-btn {
+    height: 28px;
+    padding: 0 6px;
+    gap: 4px;
+    font-size: 0.56rem;
+    letter-spacing: 0.04em;
+  }
+
+  .wall-tool-icon {
+    width: 12px;
+    height: 12px;
+  }
+
+  .wall-tool-size {
+    font-size: 0.5rem;
+  }
+
+  .wall-controls-panel {
+    gap: 6px 8px;
+  }
+
+  .wall-micro-hint {
+    display: none;
+  }
+
+  .wall-stl-btn,
+  .wall-light-group {
+    height: 28px;
+  }
+
+  .wall-stl-btn,
+  .wall-light-btn {
+    font-size: 0.56rem;
+    padding: 0 7px;
   }
 }
 
