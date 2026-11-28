@@ -172,6 +172,11 @@ export const DEFAULT_PORTFOLIO_PROJECTS: PortfolioProject[] = [
     ] as ProjectImage[],
     specs: [
       {
+        label: 'KITCHEN LAYOUT',
+        value:
+          'L-shaped perimeter: West Wall 5-lite door, refrigerator alcove & full-height pantry tower; North Wall range under walnut hood, stacked uppers, floating shelves & buffet base run; freestanding working island',
+      },
+      {
         label: 'PERIMETER CABINETRY',
         value:
           'Painted white Shaker base cabinetry, full-height pantry tower, refrigerator alcove & stacked upper cabinets to 9\'-0" ceiling datum',

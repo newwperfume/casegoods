@@ -102,6 +102,66 @@ async function backfillFamilyRoomCadSheets(): Promise<void> {
     .where(eq(portfolioProjects.id, row.id));
 }
 
+/** Default projects added after the original seed that should be inserted into existing databases. */
+const LATE_DEFAULT_PROJECT_SLUGS = ['residential-kitchen-cad'];
+
+/**
+ * Inserts any LATE_DEFAULT_PROJECT_SLUGS project that is missing from an already-seeded database.
+ * Each is placed directly after the `family-room` project (later projects are shifted down by one).
+ */
+async function backfillLateDefaultProjects(): Promise<void> {
+  for (const slug of LATE_DEFAULT_PROJECT_SLUGS) {
+    const proj = DEFAULT_PORTFOLIO_PROJECTS.find((p) => p.id === slug);
+    if (!proj) continue;
+
+    const rows = await db
+      .select({
+        id: portfolioProjects.id,
+        slug: portfolioProjects.slug,
+        sortOrder: portfolioProjects.sortOrder,
+      })
+      .from(portfolioProjects)
+      .orderBy(asc(portfolioProjects.sortOrder), asc(portfolioProjects.id));
+    if (rows.some((r) => r.slug === slug)) continue;
+
+    const anchorIdx = rows.findIndex((r) => r.slug === 'family-room');
+    const insertAt = anchorIdx >= 0 ? anchorIdx + 1 : rows.length;
+
+    // Normalize sort order so the new project lands exactly at `insertAt`.
+    for (let i = 0; i < rows.length; i++) {
+      const desired = i < insertAt ? i : i + 1;
+      if (rows[i].sortOrder !== desired) {
+        await db
+          .update(portfolioProjects)
+          .set({ sortOrder: desired })
+          .where(eq(portfolioProjects.id, rows[i].id));
+      }
+    }
+
+    await db
+      .insert(portfolioProjects)
+      .values({
+        slug: proj.id,
+        code: proj.code,
+        title: proj.title,
+        recipient: proj.recipient || '',
+        category: proj.category,
+        categoryTag: proj.categoryTag,
+        pillarBg: proj.pillarBg,
+        pillarCode: proj.pillarCode,
+        tolerance: proj.tolerance,
+        materials: proj.materials,
+        dimensions: proj.dimensions,
+        description: proj.description,
+        imagesJson: JSON.stringify(proj.images || []),
+        specsJson: JSON.stringify(proj.specs || []),
+        published: true,
+        sortOrder: insertAt,
+      })
+      .onConflictDoNothing({ target: portfolioProjects.slug });
+  }
+}
+
 export async function ensureDefaultPortfolioProjectsSeeded(): Promise<void> {
   if (seedPromise) return seedPromise;
 
@@ -113,6 +173,7 @@ export async function ensureDefaultPortfolioProjectsSeeded(): Promise<void> {
 
       if (Number(existingCount) > 0) {
         await backfillFamilyRoomCadSheets();
+        await backfillLateDefaultProjects();
         return;
       }
 
