@@ -70,24 +70,25 @@ export const FrontCoverOptions: React.FC<FrontCoverOptionsProps> = ({
         </div>
       </div>
 
-      {/* 4. 3 Bauhaus Entry Doors — 50% Scaled & Centered on Mobile so Mortise Holes Fill Around Them */}
-      <div className="w-1/2 mx-auto md:w-full grid grid-cols-1 md:grid-cols-3 gap-2 md:gap-3.5 my-auto py-3 md:my-0 md:py-0">
+      {/* 4. 3 Bauhaus Entry Doors — Balanced 50%-Scale Centered Stack on Mobile Surrounded by Mortise Holes */}
+      <div className="w-[54%] max-w-[210px] mx-auto md:w-full md:max-w-none grid grid-cols-1 md:grid-cols-3 gap-2.5 md:gap-3.5 my-auto py-5 md:my-0 md:py-0">
         <button
           type="button"
           onClick={() => onNavigate('methodology')}
           onMouseEnter={(e) => triggerPillarAccent('01', e.currentTarget)}
           onFocus={(e) => triggerPillarAccent('01', e.currentTarget)}
-          className="ui-surface bg-[#EF6922] text-black border border-black rounded-[7px] md:rounded-[9px] px-2.5 py-2 md:p-4 flex items-center justify-between text-left hover:bg-black hover:text-white transition-colors cursor-pointer group"
+          className="ui-surface bg-[#EF6922] text-black border border-black rounded-[8px] md:rounded-[9px] px-3 py-2 md:p-4 flex items-center justify-between gap-2 text-left hover:bg-black hover:text-white transition-colors cursor-pointer group"
         >
           <div className="min-w-0">
-            <div className="text-[0.42rem] md:text-[0.62rem] tracking-cad uppercase font-medium opacity-80 leading-tight truncate">
-              01 / DESIGN &amp; METHODOLOGY
+            <div className="text-[0.46rem] md:text-[0.62rem] tracking-cad uppercase font-medium opacity-80 leading-tight">
+              <span className="md:hidden">01 / METHODOLOGY</span>
+              <span className="hidden md:inline">01 / DESIGN &amp; METHODOLOGY</span>
             </div>
-            <div className="text-[0.54rem] md:text-[0.80rem] tracking-cad uppercase font-medium mt-0.5 leading-tight">
+            <div className="text-[0.60rem] md:text-[0.80rem] tracking-cad uppercase font-medium mt-0.5 leading-tight">
               ENTER STUDIO
             </div>
           </div>
-          <ArrowRight className="w-3 h-3 md:w-4 md:h-4 shrink-0 transition-transform group-hover:translate-x-1" />
+          <ArrowRight className="w-3.5 h-3.5 md:w-4 md:h-4 shrink-0 transition-transform group-hover:translate-x-1" />
         </button>
 
         <button
@@ -95,17 +96,18 @@ export const FrontCoverOptions: React.FC<FrontCoverOptionsProps> = ({
           onClick={() => onNavigate('work')}
           onMouseEnter={(e) => triggerPillarAccent('02', e.currentTarget)}
           onFocus={(e) => triggerPillarAccent('02', e.currentTarget)}
-          className="ui-surface bg-[#27AAE0] text-black border border-black rounded-[7px] md:rounded-[9px] px-2.5 py-2 md:p-4 flex items-center justify-between text-left hover:bg-black hover:text-white transition-colors cursor-pointer group"
+          className="ui-surface bg-[#27AAE0] text-black border border-black rounded-[8px] md:rounded-[9px] px-3 py-2 md:p-4 flex items-center justify-between gap-2 text-left hover:bg-black hover:text-white transition-colors cursor-pointer group"
         >
           <div className="min-w-0">
-            <div className="text-[0.42rem] md:text-[0.62rem] tracking-cad uppercase font-medium opacity-80 leading-tight truncate">
+            <div className="text-[0.46rem] md:text-[0.62rem] tracking-cad uppercase font-medium opacity-80 leading-tight">
               02 / SELECTED WORK
             </div>
-            <div className="text-[0.54rem] md:text-[0.80rem] tracking-cad uppercase font-medium mt-0.5 leading-tight">
-              3D RENDERS &amp; 2D CAD
+            <div className="text-[0.60rem] md:text-[0.80rem] tracking-cad uppercase font-medium mt-0.5 leading-tight">
+              <span className="md:hidden">RENDERS &amp; CAD</span>
+              <span className="hidden md:inline">3D RENDERS &amp; 2D CAD</span>
             </div>
           </div>
-          <ArrowRight className="w-3 h-3 md:w-4 md:h-4 shrink-0 transition-transform group-hover:translate-x-1" />
+          <ArrowRight className="w-3.5 h-3.5 md:w-4 md:h-4 shrink-0 transition-transform group-hover:translate-x-1" />
         </button>
 
         <button
@@ -113,22 +115,23 @@ export const FrontCoverOptions: React.FC<FrontCoverOptionsProps> = ({
           onClick={() => onNavigate('visualizer')}
           onMouseEnter={(e) => triggerPillarAccent('06', e.currentTarget)}
           onFocus={(e) => triggerPillarAccent('06', e.currentTarget)}
-          className="ui-surface bg-[#FDCB33] text-black border border-black rounded-[7px] md:rounded-[9px] px-2.5 py-2 md:p-4 flex items-center justify-between text-left hover:bg-black hover:text-white transition-colors cursor-pointer group"
+          className="ui-surface bg-[#FDCB33] text-black border border-black rounded-[8px] md:rounded-[9px] px-3 py-2 md:p-4 flex items-center justify-between gap-2 text-left hover:bg-black hover:text-white transition-colors cursor-pointer group"
         >
           <div className="min-w-0">
-            <div className="text-[0.42rem] md:text-[0.62rem] tracking-cad uppercase font-medium opacity-80 leading-tight truncate">
-              06 / CONCEPT VISUALIZER
+            <div className="text-[0.46rem] md:text-[0.62rem] tracking-cad uppercase font-medium opacity-80 leading-tight">
+              <span className="md:hidden">06 / VISUALIZER</span>
+              <span className="hidden md:inline">06 / CONCEPT VISUALIZER</span>
             </div>
-            <div className="text-[0.54rem] md:text-[0.80rem] tracking-cad uppercase font-medium mt-0.5 leading-tight">
+            <div className="text-[0.60rem] md:text-[0.80rem] tracking-cad uppercase font-medium mt-0.5 leading-tight">
               BUILD YOUR IDEA
             </div>
           </div>
-          <ArrowRight className="w-3 h-3 md:w-4 md:h-4 shrink-0 transition-transform group-hover:translate-x-1" />
+          <ArrowRight className="w-3.5 h-3.5 md:w-4 md:h-4 shrink-0 transition-transform group-hover:translate-x-1" />
         </button>
       </div>
 
-      {/* 5. Compact Bauhaus Modular Wall Toolbar */}
-      <div className="w-full mt-auto md:mt-0">
+      {/* 5. Single-Row Pull-Down Modular Wall Toolbar */}
+      <div className="w-full mt-auto md:mt-0 relative z-30">
         <MortiseWallToolbar controller={wall} />
       </div>
     </section>

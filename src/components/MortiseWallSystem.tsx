@@ -671,8 +671,9 @@ export const MortiseWallCanvas: React.FC<MortiseWallCanvasProps> = ({
       const headerEl = headerSelector ? document.querySelector(headerSelector) : null;
       const footerEl = footerSelector ? document.querySelector(footerSelector) : null;
       const edgeY = Math.max(8, Math.min(14, cssH * 0.012));
-      topSafeY = headerEl ? headerEl.getBoundingClientRect().bottom + 12 : edgeY;
-      bottomSafeY = footerEl ? footerEl.getBoundingClientRect().top - 14 : cssH - edgeY;
+      topSafeY = headerEl ? Math.max(edgeY, headerEl.getBoundingClientRect().bottom + 10) : edgeY;
+      const footerTop = footerEl ? footerEl.getBoundingClientRect().top - 10 : cssH - edgeY;
+      bottomSafeY = Math.min(cssH - edgeY, Math.max(topSafeY + 220, footerTop));
       edgeSafeX = Math.max(8, Math.min(14, cssW * 0.008));
 
       const heroEl = heroSelector ? (document.querySelector(heroSelector) as HTMLElement | null) : null;
@@ -6614,17 +6615,47 @@ const renderToolIcon = (tool: WallTool) => {
   }
 };
 
-const COMPACT_ROW_1_TOOLS: WallTool[] = ['hook', 'shelf', 'cabinet'];
-const COMPACT_ROW_2_TOOLS: WallTool[] = ['cubby', 'wallShelf'];
-const COMPACT_ROW_3_TOOLS: WallTool[] = ['cradle', 'sconce'];
-const DESKTOP_ROW_1_TOOLS: WallTool[] = ['hook', 'shelf', 'cabinet'];
-const DESKTOP_ROW_2_TOOLS: WallTool[] = ['cubby', 'wallShelf', 'cradle', 'sconce'];
+const ALL_WALL_TOOLS: WallTool[] = [
+  'hook',
+  'shelf',
+  'cabinet',
+  'cubby',
+  'wallShelf',
+  'cradle',
+  'sconce',
+];
 
 export const MortiseWallToolbar: React.FC<{
   controller: MortiseWallController;
   variant?: 'default' | 'compact';
 }> = ({ controller, variant = 'default' }) => {
   const isDesktopInteractive = useDesktopInteractiveWall();
+  const [objectMenuOpen, setObjectMenuOpen] = useState(false);
+  const [lightMenuOpen, setLightMenuOpen] = useState(false);
+  const toolbarRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!objectMenuOpen && !lightMenuOpen) return;
+    const handleOutside = (e: PointerEvent) => {
+      if (toolbarRef.current && !toolbarRef.current.contains(e.target as Node)) {
+        setObjectMenuOpen(false);
+        setLightMenuOpen(false);
+      }
+    };
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setObjectMenuOpen(false);
+        setLightMenuOpen(false);
+      }
+    };
+    window.addEventListener('pointerdown', handleOutside);
+    window.addEventListener('keydown', handleKey);
+    return () => {
+      window.removeEventListener('pointerdown', handleOutside);
+      window.removeEventListener('keydown', handleKey);
+    };
+  }, [objectMenuOpen, lightMenuOpen]);
+
   const {
     activeTool,
     setActiveTool,
@@ -6648,54 +6679,80 @@ export const MortiseWallToolbar: React.FC<{
 
   if (!isDesktopInteractive) return null;
 
-  const renderToolButton = (tool: WallTool) => (
-    <button
-      key={tool}
-      type="button"
-      className="wall-tool-btn"
-      aria-pressed={activeTool === tool}
-      onClick={() => setActiveTool(tool)}
-    >
-      {renderToolIcon(tool)}
-      <span>{TOOL_LABELS[tool]}</span>
-      <span className="wall-tool-size">
-        {toolSizes[tool].cols}×{toolSizes[tool].rows}
-      </span>
-    </button>
-  );
-
   return (
     <div
-      className={`wall-toolbar ui-surface${variant === 'compact' ? ' wall-toolbar--compact' : ''}`}
+      ref={toolbarRef}
+      className={`wall-toolbar wall-toolbar--dropdown ui-surface${
+        variant === 'compact' ? ' wall-toolbar--compact' : ''
+      }`}
       aria-label="Interactive modular wall controls"
     >
-      {variant === 'compact' ? (
-        <div
-          className="wall-tool-rows"
-          role="group"
-          aria-label="Select modular piece to place"
-        >
-          <div className="wall-tool-row--3">{COMPACT_ROW_1_TOOLS.map(renderToolButton)}</div>
-          <div className="wall-tool-row--2">{COMPACT_ROW_2_TOOLS.map(renderToolButton)}</div>
-          <div className="wall-tool-row--2">{COMPACT_ROW_3_TOOLS.map(renderToolButton)}</div>
-        </div>
-      ) : (
-        <div
-          className="wall-tool-rows"
-          role="group"
-          aria-label="Select modular piece to place"
-        >
-          <div className="wall-tool-row--3">{DESKTOP_ROW_1_TOOLS.map(renderToolButton)}</div>
-          <div className="wall-tool-row--4">{DESKTOP_ROW_2_TOOLS.map(renderToolButton)}</div>
-        </div>
-      )}
-
       <div className="wall-controls-panel">
-        <div
-          className="wall-size-controls"
-          role="group"
-          aria-label={`Adjust ${activeLabel} cell width and height`}
-        >
+        <div className="wall-size-controls" role="group" aria-label="Object and size controls">
+          {/* Pull-Down Object Selector Menu */}
+          <div className="wall-dropdown-wrap">
+            <button
+              type="button"
+              className="wall-tool-btn wall-dropdown-trigger"
+              aria-expanded={objectMenuOpen}
+              aria-haspopup="listbox"
+              onClick={() => {
+                setObjectMenuOpen((prev) => !prev);
+                setLightMenuOpen(false);
+              }}
+            >
+              {renderToolIcon(activeTool)}
+              <span>{activeLabel}</span>
+              <span className="wall-tool-size">
+                {currentSize.cols}×{currentSize.rows}
+              </span>
+              <svg
+                className={`wall-chevron${objectMenuOpen ? ' is-open' : ''}`}
+                viewBox="0 0 16 16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M4 6l4 4 4-4" />
+              </svg>
+            </button>
+
+            {objectMenuOpen && (
+              <div
+                className="wall-dropdown-menu"
+                role="listbox"
+                aria-label="Select modular piece to place"
+              >
+                {ALL_WALL_TOOLS.map((tool) => {
+                  const selected = activeTool === tool;
+                  return (
+                    <button
+                      key={tool}
+                      type="button"
+                      role="option"
+                      aria-selected={selected}
+                      className={`wall-dropdown-item${selected ? ' is-selected' : ''}`}
+                      onClick={() => {
+                        setActiveTool(tool);
+                        setObjectMenuOpen(false);
+                      }}
+                    >
+                      {renderToolIcon(tool)}
+                      <span>{TOOL_LABELS[tool]}</span>
+                      <span className="wall-tool-size">
+                        {toolSizes[tool].cols}×{toolSizes[tool].rows}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Inline W / H Size Steppers */}
           <div className="wall-size-stepper">
             <span className="wall-size-axis" title="Width in mortise cells">
               W
@@ -6752,21 +6809,22 @@ export const MortiseWallToolbar: React.FC<{
             </div>
           )}
 
-          <div
-            className={`wall-light-group${warmLightingOn ? '' : ' wall-light-group--off'}`}
-            role="group"
-            aria-label="Toggle lighting and select color temperature"
-          >
+          {/* Compact Pull-Down Lighting Control */}
+          <div className="wall-dropdown-wrap">
             <button
               type="button"
-              className="wall-light-btn"
+              className="wall-light-trigger"
+              aria-expanded={lightMenuOpen}
               aria-pressed={warmLightingOn}
               disabled={!hasLightableItems}
-              onClick={toggleWarmLighting}
               style={{ '--light-swatch': activeLightSwatch } as React.CSSProperties}
+              onClick={() => {
+                setLightMenuOpen((prev) => !prev);
+                setObjectMenuOpen(false);
+              }}
               title={
                 hasLightableItems
-                  ? `Toggle ${lightKelvin}K ambient lighting for placed Open Cube and Wall Sconce objects`
+                  ? `Lighting (${warmLightingOn ? `${lightKelvin}K` : 'Off'})`
                   : 'Place a Wall Sconce or Open Cube on the wall to toggle lighting'
               }
             >
@@ -6790,23 +6848,54 @@ export const MortiseWallToolbar: React.FC<{
                 <line x1="18.7" y1="5.3" x2="16.8" y2="7.2" />
                 <line x1="7.2" y1="16.8" x2="5.3" y2="18.7" />
               </svg>
-              <span>Lighting</span>
+              <span>{warmLightingOn ? `${lightKelvin}K` : 'OFF'}</span>
+              <svg
+                className={`wall-chevron${lightMenuOpen ? ' is-open' : ''}`}
+                viewBox="0 0 16 16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M4 6l4 4 4-4" />
+              </svg>
             </button>
-            <div className="wall-kelvin-group" role="group" aria-label="Lighting color temperature">
-              {LIGHT_KELVIN_OPTIONS.map((k) => (
+
+            {lightMenuOpen && (
+              <div
+                className="wall-dropdown-menu wall-dropdown-menu--light"
+                role="menu"
+                aria-label="Lighting options"
+              >
                 <button
-                  key={k}
                   type="button"
-                  className="wall-kelvin-btn"
-                  aria-pressed={lightKelvin === k}
-                  onClick={() => setLightKelvin(k)}
-                  style={{ '--kelvin-swatch': LIGHT_KELVIN_PRESETS[k].uiBg } as React.CSSProperties}
-                  title={`Set ambient light color temperature to ${k}K`}
+                  className={`wall-dropdown-item${warmLightingOn ? ' is-selected' : ''}`}
+                  onClick={toggleWarmLighting}
                 >
-                  {k}K
+                  <span>Lighting: {warmLightingOn ? 'ON' : 'OFF'}</span>
                 </button>
-              ))}
-            </div>
+                <div className="wall-dropdown-divider" />
+                {LIGHT_KELVIN_OPTIONS.map((k) => (
+                  <button
+                    key={k}
+                    type="button"
+                    className={`wall-dropdown-item${lightKelvin === k ? ' is-selected' : ''}`}
+                    onClick={() => {
+                      setLightKelvin(k);
+                      setLightMenuOpen(false);
+                    }}
+                  >
+                    <span
+                      className="wall-kelvin-dot"
+                      style={{ backgroundColor: LIGHT_KELVIN_PRESETS[k].uiBg }}
+                    />
+                    <span>{k}K</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -6819,7 +6908,7 @@ export const MortiseWallToolbar: React.FC<{
             onClick={toggleProps}
             title={
               hasPropItems
-                ? 'Toggle plant, hangers, books, backpack, and Stetson hat props on or off'
+                ? 'Toggle props on or off'
                 : 'Place a Hook, Shelf, or Book Shelf on the wall to toggle props'
             }
           >
