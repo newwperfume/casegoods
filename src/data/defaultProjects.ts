@@ -130,22 +130,22 @@ export const COFFEE_TABLE_CAD_SHEETS: ProjectImage[] = [
   {
     src: '/downloads/drawings/casegoods-CG-CT01-A101-elevations-sections.png',
     sheetNumber: 'A-101',
-    label: 'Construction documents — short & long elevations, sections A / B / C & joinery schedule',
-    alt: '2D CAD sheet A-101 showing 32-inch short side and 56-inch long side elevations of the 18-inch-high solid White Oak coffee table with 0.75-inch floating shadow reveal, twin mortise-and-tenon joinery, sections A, B, C, and material schedule',
+    label: 'Construction documents — short & long elevations, stepped L-legs, sections A / B / C & schedule',
+    alt: '2D CAD sheet A-101 showing 32-inch short side and 56-inch long side elevations of the 18-inch-high solid White Oak coffee table with stepped L-legs, 1/4-inch edge roundovers, 5 upper and 5 lower 1.5-by-0.75-inch slats with 1/2-by-1-by-1/2-inch tenons, sections A, B, C, and schedule',
     type: 'cad',
   },
   {
     src: '/downloads/drawings/casegoods-CG-CT01-A102-plan-isometric.png',
     sheetNumber: 'A-102',
-    label: 'Construction documents — structural sub-frame plan (5× upper & 4× lower stretchers) & 30° isometric',
-    alt: '2D CAD sheet A-102 showing structural sub-frame plan with 5 upper mortise-and-tenon cross-stretchers with seasonal movement slots, 4 lower cross-stretchers, 56-inch by 32-inch tabletop overhang, and 30-degree orthographic isometric',
+    label: 'Construction documents — structural sub-frame plan & 30° exploded part drawing',
+    alt: '2D CAD sheet A-102 showing structural sub-frame plan and full 30-degree exploded part drawing of the White Oak coffee table including stepped L-legs, twin-doweled end aprons, 5 upper and 5 lower tenoned cross-slats, corner-notched shelf, and leveling glides',
     type: 'cad',
   },
   {
     src: '/downloads/drawings/casegoods-CG-CT01-A103-joinery-details.png',
     sheetNumber: 'A-103',
-    label: 'Construction documents — exploded mortise & tenon assembly, floating corner section D & 1:1 details',
-    alt: '2D CAD sheet A-103 detailing exploded 30-degree isometric of the mortise-and-tenon base assembly, enlarged Section D floating corner twin tenon, lower shelf corner-notch plan and elevation, and 1:1 joinery shop details',
+    label: 'Construction documents — assembled isometric, stepped L-leg section D & 1:1 tenon & roundover details',
+    alt: '2D CAD sheet A-103 detailing assembled 30-degree isometric, enlarged Section D stepped L-leg with twin floating dowels, 1.5-by-0.75-inch slat with 1/2-by-1-by-1/2-inch tenon detail, corner-notched overhanging lower shelf, and 1:1 1/4-inch roundover profiles',
     type: 'cad',
   },
 ];
@@ -398,54 +398,54 @@ export const DEFAULT_PORTFOLIO_PROJECTS: PortfolioProject[] = [
     materials: 'SOLID WHITE OAK · TWIN MORTISE & TENON BASE · NOTCHED LOWER SHELF',
     dimensions: '56.00" L × 32.00" W × 18.00" H',
     description:
-      'Heirloom solid White Oak coffee table engineered around an exposed mortise-and-tenon structural ladder base, featuring 0.75" floating corner shadow reveals, 5× upper and 4× lower tenoned cross-stretchers, a corner-notched lower shelf with flush oak edge dowels, and adjustable leveling glides.',
+      'Heirloom solid White Oak coffee table engineered with stepped L-shaped legs, twin-doweled 3.00" end aprons, 5× upper and 5× lower 1.50" × 3/4" slats joined with 1/2" × 1" × 1/2" mortise-and-tenons, a corner-notched lower shelf, and 1/4" roundovers on every edge.',
     images: [
       ...COFFEE_TABLE_CAD_SHEETS,
       {
         src: '/assets/photo_coffee_table_1.jpg',
         sheetNumber: 'PHOTO 01',
-        label: 'Finished build — 3/4 view showing 1.50" solid White Oak top & floating corner reveals',
-        alt: 'Finished solid White Oak coffee table on studio workbench showing 1.50-inch tabletop, 0.75-inch floating shadow gap above 1.50-inch square legs, corner-notched lower shelf, and adjustable leveling feet',
+        label: 'Finished build — 3/4 view showing 1.50" solid White Oak top, R 1/4" edges & stepped L-legs',
+        alt: 'Finished solid White Oak coffee table on studio workbench showing 1.50-inch tabletop with 1/4-inch edge roundovers, stepped L-shaped legs, corner-notched lower shelf, and adjustable leveling feet',
         type: 'photo',
       },
       {
         src: '/assets/photo_coffee_table_2.jpg',
         sheetNumber: 'PHOTO 02',
-        label: 'Under-frame detail — 3.00" floating end apron, twin mortise-and-tenon rails & 5× cross-stretchers',
-        alt: 'Low-angle studio photograph looking beneath the solid White Oak coffee table showing the 5 upper mortise-and-tenon cross-stretchers, 3-inch floating end apron, and 4 flush-plugged oak edge dowels along the notched lower shelf',
+        label: 'Under-frame detail — stepped L-legs, 3.00" end apron & 5× upper mortise-and-tenon slats',
+        alt: 'Low-angle studio photograph looking beneath the solid White Oak coffee table showing the 5 upper mortise-and-tenon slats, stepped L-legs with 3-inch end apron, and 4 flush-plugged oak edge dowels along the notched lower shelf',
         type: 'photo',
       },
       {
         src: '/assets/photo_coffee_table_3.jpg',
         sheetNumber: 'PHOTO 03',
-        label: 'Shop assembly — inverted mortise-and-tenon ladder frame with slotted top mounting holes',
-        alt: 'Inverted solid White Oak coffee table base frame in the workshop showing mortise-and-tenon joinery throughout the 5 upper and 4 lower cross-stretchers, 1.50-inch square legs, and elongated seasonal-movement mounting slots',
+        label: 'Shop assembly — inverted mortise-and-tenon ladder frame (5× upper & 5× lower slats)',
+        alt: 'Inverted solid White Oak coffee table base frame in the workshop showing mortise-and-tenon joinery throughout the 5 upper and 5 lower 1.5-by-0.75-inch slats and stepped L-shaped legs',
         type: 'photo',
       },
     ] as ProjectImage[],
     specs: [
       {
-        label: 'PRIMARY HARDWOOD',
-        value: 'Select Quarter & Rift-Sawn Solid White Oak with natural oil finish',
+        label: 'PRIMARY HARDWOOD & EDGES',
+        value: 'Select Quarter & Rift-Sawn Solid White Oak with 1/4" roundover on all exposed edges',
       },
       {
         label: 'OVERALL DIMENSIONS',
         value: '56.00" L × 32.00" W × 18.00" H (1.50" solid slab top · 50.00" × 29.00" base)',
       },
       {
-        label: 'BASE & CORNER JOINERY',
+        label: 'STEPPED L-LEGS & APRONS',
         value:
-          '1.50" × 1.50" square legs with twin mortise-and-tenon joints into 3.00" floating end aprons creating a 0.75" shadow reveal',
+          '1.50" square leg shafts stepping inward to 3.00" upper ears, twin-doweled into 23.00" × 3.00" short end aprons',
       },
       {
-        label: 'SUB-FRAME STRETCHERS',
+        label: 'SLATS & MORTISE-TENONS',
         value:
-          '5× upper and 4× lower mortise-and-tenon cross-stretchers with elongated slotted fasteners for seasonal wood movement',
+          '5× upper and 5× lower slats (1.50" H × 3/4" W) each machined with 1/2" L × 1" H × 1/2" W tenons on both ends',
       },
       {
         label: 'LOWER SHELF & HARDWARE',
         value:
-          '0.75" solid White Oak lower shelf corner-notched cleanly around all four legs with flush oak edge dowels and adjustable leveling glides',
+          '0.75" solid White Oak lower shelf notched around all four legs with 0.50" overhang, flush oak edge plugs & leveling glides',
       },
     ],
     published: true,
