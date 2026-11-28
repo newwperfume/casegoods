@@ -4,6 +4,8 @@ import { portfolioProjects } from './schema.ts';
 import {
   DEFAULT_PORTFOLIO_PROJECTS,
   FAMILY_ROOM_CAD_SHEETS,
+  WET_BAR_CAD_SHEETS,
+  KIDS_KITCHEN_CAD_SHEETS,
   type PortfolioCategoryTag,
   type PortfolioProject,
 } from '../data/defaultProjects.ts';
@@ -54,52 +56,60 @@ function rowToPortfolioProject(
 
 let seedPromise: Promise<void> | null = null;
 
+const PROJECT_CAD_BACKFILLS: Array<{ slug: string; sheets: ProjectImage[] }> = [
+  { slug: 'family-room', sheets: FAMILY_ROOM_CAD_SHEETS },
+  { slug: 'wet-bar', sheets: WET_BAR_CAD_SHEETS },
+  { slug: 'kids-kitchen', sheets: KIDS_KITCHEN_CAD_SHEETS },
+];
+
 /**
- * Places the 1064HEM A-101 – A-103 construction document sheets at the front of an
- * already-seeded `family-room` project, ahead of the 3D renders.
+ * Places standardized A-101 – A-103 construction document sheets at the front of each
+ * already-seeded portfolio project (`family-room`, `wet-bar`, `kids-kitchen`).
  * - If none of the sheets are present, they are prepended.
  * - If they were previously appended at the end (earlier backfill), they are moved to the front.
  * - Otherwise (row missing, already first, or manually rearranged) nothing is changed.
  */
-async function backfillFamilyRoomCadSheets(): Promise<void> {
-  const [row] = await db
-    .select({ id: portfolioProjects.id, imagesJson: portfolioProjects.imagesJson })
-    .from(portfolioProjects)
-    .where(eq(portfolioProjects.slug, 'family-room'));
-  if (!row) return;
+async function backfillStandardizedCadSheets(): Promise<void> {
+  for (const { slug, sheets } of PROJECT_CAD_BACKFILLS) {
+    const [row] = await db
+      .select({ id: portfolioProjects.id, imagesJson: portfolioProjects.imagesJson })
+      .from(portfolioProjects)
+      .where(eq(portfolioProjects.slug, slug));
+    if (!row) continue;
 
-  const images = safeParseJson<ProjectImage[]>(row.imagesJson, []);
-  const current = Array.isArray(images) ? images : [];
-  const sheetSrcs = FAMILY_ROOM_CAD_SHEETS.map((sheet) => sheet.src);
-  const isSheet = (img: ProjectImage | undefined) => !!img && sheetSrcs.includes(img.src);
+    const images = safeParseJson<ProjectImage[]>(row.imagesJson, []);
+    const current = Array.isArray(images) ? images : [];
+    const sheetSrcs = sheets.map((sheet) => sheet.src);
+    const isSheet = (img: ProjectImage | undefined) => !!img && sheetSrcs.includes(img.src);
 
-  let next: ProjectImage[] | null = null;
+    let next: ProjectImage[] | null = null;
 
-  if (!current.some(isSheet)) {
-    next = [...FAMILY_ROOM_CAD_SHEETS, ...current];
-  } else {
-    const tail = current.slice(-sheetSrcs.length).map((img) => img?.src);
-    const appendedAtEnd =
-      current.length > sheetSrcs.length &&
-      !isSheet(current[0]) &&
-      tail.every((src, i) => src === sheetSrcs[i]);
-    if (appendedAtEnd) {
-      next = [
-        ...current.slice(-sheetSrcs.length),
-        ...current.slice(0, current.length - sheetSrcs.length),
-      ];
+    if (!current.some(isSheet)) {
+      next = [...sheets, ...current];
+    } else {
+      const tail = current.slice(-sheetSrcs.length).map((img) => img?.src);
+      const appendedAtEnd =
+        current.length > sheetSrcs.length &&
+        !isSheet(current[0]) &&
+        tail.every((src, i) => src === sheetSrcs[i]);
+      if (appendedAtEnd) {
+        next = [
+          ...current.slice(-sheetSrcs.length),
+          ...current.slice(0, current.length - sheetSrcs.length),
+        ];
+      }
     }
+
+    if (!next) continue;
+
+    await db
+      .update(portfolioProjects)
+      .set({
+        imagesJson: JSON.stringify(next),
+        updatedAt: new Date(),
+      })
+      .where(eq(portfolioProjects.id, row.id));
   }
-
-  if (!next) return;
-
-  await db
-    .update(portfolioProjects)
-    .set({
-      imagesJson: JSON.stringify(next),
-      updatedAt: new Date(),
-    })
-    .where(eq(portfolioProjects.id, row.id));
 }
 
 /** Default projects added after the original seed that should be inserted into existing databases. */
@@ -182,7 +192,7 @@ export async function ensureDefaultPortfolioProjectsSeeded(): Promise<void> {
         .from(portfolioProjects);
 
       if (Number(existingCount) > 0) {
-        await backfillFamilyRoomCadSheets();
+        await backfillStandardizedCadSheets();
         await backfillLateDefaultProjects();
         return;
       }
