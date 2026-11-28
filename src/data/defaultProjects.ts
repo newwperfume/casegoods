@@ -335,24 +335,7 @@ export const DEFAULT_PORTFOLIO_PROJECTS: PortfolioProject[] = [
     dimensions: '48 1/4" W KITCHENETTE + 72 3/4" W × 101" H BUILT-IN',
     description:
       'Dimensioned 2D Rhino CAD elevation and section shop drawings for a solid walnut heirloom play kitchen featuring lathe-turned stacked-ball legs, a continuous scalloped apron, and full-height adjacent storage.',
-    images: [
-      ...KIDS_KITCHEN_CAD_SHEETS,
-      {
-        src: '/assets/cad_1070MCG_elevation.png',
-        sheetNumber: 'ELEVATION A1',
-        label:
-          'Kids kitchen elevation drawing — full fractional dimensions (48 1/4" width / 101" height)',
-        alt: 'Rhino 2D CAD elevation drawing showing 48.25-inch overall countertop span and stacked-ball lathe legs',
-        type: 'cad',
-      },
-      {
-        src: '/assets/cad_1070MCG_section.png',
-        sheetNumber: 'SECTION B1',
-        label: 'Section view through kids kitchen & plumbing clearance detail',
-        alt: 'Rhino 2D CAD section B1 shop drawing detailing 30.5-inch countertop height, 9.75-inch stacked-ball lathe leg tenon joinery, continuous scalloped apron profile, and 72.75-inch by 101-inch built-in storage wall',
-        type: 'cad',
-      },
-    ] as ProjectImage[],
+    images: [...KIDS_KITCHEN_CAD_SHEETS] as ProjectImage[],
     specs: [
       {
         label: 'ENGINEERING SOFTWARE',

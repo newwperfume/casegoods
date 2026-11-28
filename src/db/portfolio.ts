@@ -56,21 +56,30 @@ function rowToPortfolioProject(
 
 let seedPromise: Promise<void> | null = null;
 
-const PROJECT_CAD_BACKFILLS: Array<{ slug: string; sheets: ProjectImage[] }> = [
+const PROJECT_CAD_BACKFILLS: Array<{
+  slug: string;
+  sheets: ProjectImage[];
+  removeSrcs?: string[];
+}> = [
   { slug: 'family-room', sheets: FAMILY_ROOM_CAD_SHEETS },
   { slug: 'wet-bar', sheets: WET_BAR_CAD_SHEETS },
-  { slug: 'kids-kitchen', sheets: KIDS_KITCHEN_CAD_SHEETS },
+  {
+    slug: 'kids-kitchen',
+    sheets: KIDS_KITCHEN_CAD_SHEETS,
+    removeSrcs: ['/assets/cad_1070MCG_elevation.png', '/assets/cad_1070MCG_section.png'],
+  },
 ];
 
 /**
  * Places standardized A-101 – A-103 construction document sheets at the front of each
- * already-seeded portfolio project (`family-room`, `wet-bar`, `kids-kitchen`).
+ * already-seeded portfolio project (`family-room`, `wet-bar`, `kids-kitchen`) and
+ * removes superseded legacy sheets where configured.
  * - If none of the sheets are present, they are prepended.
  * - If they were previously appended at the end (earlier backfill), they are moved to the front.
  * - Otherwise (row missing, already first, or manually rearranged) nothing is changed.
  */
 async function backfillStandardizedCadSheets(): Promise<void> {
-  for (const { slug, sheets } of PROJECT_CAD_BACKFILLS) {
+  for (const { slug, sheets, removeSrcs } of PROJECT_CAD_BACKFILLS) {
     const [row] = await db
       .select({ id: portfolioProjects.id, imagesJson: portfolioProjects.imagesJson })
       .from(portfolioProjects)
@@ -78,11 +87,17 @@ async function backfillStandardizedCadSheets(): Promise<void> {
     if (!row) continue;
 
     const images = safeParseJson<ProjectImage[]>(row.imagesJson, []);
-    const current = Array.isArray(images) ? images : [];
+    const original = Array.isArray(images) ? images : [];
+    const removeSet = new Set(removeSrcs ?? []);
+    const current = removeSet.size
+      ? original.filter((img) => !img || !removeSet.has(img.src))
+      : original;
+    const removedAny = current.length !== original.length;
+
     const sheetSrcs = sheets.map((sheet) => sheet.src);
     const isSheet = (img: ProjectImage | undefined) => !!img && sheetSrcs.includes(img.src);
 
-    let next: ProjectImage[] | null = null;
+    let next: ProjectImage[] | null = removedAny ? current : null;
 
     if (!current.some(isSheet)) {
       next = [...sheets, ...current];
