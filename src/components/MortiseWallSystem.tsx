@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import balticBirchEdgeUrl from '../assets/images/baltic_birch_edge_1795173686278.jpg';
 
 const MAPLE_TEXTURE_URL =
-  '/assets/aistudio/watermarked_img_13606778923742787615_7e162b39.webp';
+  '/assets/textures/baltic-birch-grain.webp';
 
 // Consistent directional studio light from upper-left projecting 3D wall depth Z down & right
 const LIGHT_KX = 0.54;

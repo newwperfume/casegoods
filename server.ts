@@ -875,21 +875,30 @@ async function startServer() {
     res.download(filePath, `casegoods-${safeName}`);
   });
 
-  // POST /api/save-watermarked-concept — Overwrites the server concept file with the Casegoods-watermarked sheet PNG
+  // POST /api/save-watermarked-concept — Overwrites an existing generated concept file with its Casegoods-watermarked PNG
+  const SAFE_CONCEPT_FILENAME_RE = /^concept-[a-zA-Z0-9-]+\.(png|jpe?g|webp)$/;
   app.post('/api/save-watermarked-concept', (req, res) => {
     try {
       const { filename, watermarkedDataUrl } = req.body || {};
-      const safeName = path.basename(filename || '');
-      if (!safeName || typeof watermarkedDataUrl !== 'string') {
-        res.status(400).json({ error: 'Missing filename or watermarkedDataUrl' });
+      const safeName = path.basename(typeof filename === 'string' ? filename : '');
+      if (
+        !safeName ||
+        !SAFE_CONCEPT_FILENAME_RE.test(safeName) ||
+        typeof watermarkedDataUrl !== 'string'
+      ) {
+        res.status(400).json({ error: 'Invalid concept filename or watermarkedDataUrl' });
         return;
       }
-      const match = watermarkedDataUrl.match(/^data:[^;]+;base64,(.+)$/);
+      const match = watermarkedDataUrl.match(/^data:image\/png;base64,([A-Za-z0-9+/=]+)$/);
       if (!match) {
-        res.status(400).json({ error: 'Invalid data URL format' });
+        res.status(400).json({ error: 'Invalid PNG data URL format' });
         return;
       }
       const filePath = path.join(GENERATED_DIR, safeName);
+      if (!fs.existsSync(filePath)) {
+        res.status(404).json({ error: 'Generated concept file not found' });
+        return;
+      }
       fs.writeFileSync(filePath, Buffer.from(match[1], 'base64'));
       res.json({ ok: true });
     } catch (err) {
@@ -1735,8 +1744,8 @@ async function startServer() {
     }
   });
 
-  // GET /api/generated-concepts — Returns all concepts generated through the visualizer (Cloud SQL + local fallback)
-  app.get('/api/generated-concepts', async (_req, res) => {
+  // GET /api/generated-concepts — Owner-only archive of concepts generated through the visualizer (Cloud SQL + local fallback)
+  app.get('/api/generated-concepts', requireOwner, async (_req: AuthRequest, res) => {
     try {
       const dbRecords = await getRecentConceptsFromDb(50);
       if (dbRecords.length > 0) {

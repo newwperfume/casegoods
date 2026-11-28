@@ -367,7 +367,7 @@ body.wall-dragging * {
   background-color: #eadbc4;
   background-image:
     linear-gradient(rgba(255, 255, 255, 0.36), rgba(255, 255, 255, 0.36)),
-    url('/assets/aistudio/watermarked_img_13606778923742787615_7e162b39.webp');
+    url('/assets/textures/baltic-birch-grain.webp');
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
@@ -385,12 +385,12 @@ body.wall-dragging * {
   border-color: var(--cg-black);
   background-image:
     linear-gradient(rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.14)),
-    url('/assets/aistudio/watermarked_img_13606778923742787615_7e162b39.webp');
+    url('/assets/textures/baltic-birch-grain.webp');
 }
 
 .wall-tool-btn[aria-pressed="true"] {
   border-color: var(--cg-black);
-  background-image: url('/assets/aistudio/watermarked_img_13606778923742787615_7e162b39.webp');
+  background-image: url('/assets/textures/baltic-birch-grain.webp');
   color: var(--cg-black);
   font-weight: 600;
 }

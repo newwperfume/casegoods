@@ -404,10 +404,19 @@ export const ConceptVisualizer: React.FC<ConceptVisualizerProps> = ({
         activeConcept.visualStyle !== state.visualStyle)
   );
 
+  const isStudioOwner = Boolean(
+    user?.email && user.email.toLowerCase() === 'jmheinke1@gmail.com'
+  );
+
   const fetchServerArchive = async () => {
     setLoadingArchive(true);
     try {
-      const res = await fetch('/api/generated-concepts');
+      const token = await getFreshToken();
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+      const res = await fetch('/api/generated-concepts', { headers });
       if (res.ok) {
         const data = await res.json();
         setArchiveList(Array.isArray(data.concepts) ? data.concepts : []);
@@ -767,15 +776,17 @@ Concept Image Link: ${imageLink}`;
                 GOOGLE SIGN IN
               </button>
             )}
-            <button
-              type="button"
-              onClick={() => setShowArchiveModal(true)}
-              className="bg-white hover:bg-black text-black hover:text-white border border-black rounded-[9px] px-3 py-1 text-[0.66rem] tracking-cad uppercase font-medium transition-colors cursor-pointer inline-flex items-center gap-1.5"
-              title="View all customer concepts generated through this visualizer"
-            >
-              <FolderOpen className="w-3.5 h-3.5" />
-              <span>STUDIO CONCEPT LOG</span>
-            </button>
+            {isStudioOwner && (
+              <button
+                type="button"
+                onClick={() => setShowArchiveModal(true)}
+                className="bg-white hover:bg-black text-black hover:text-white border border-black rounded-[9px] px-3 py-1 text-[0.66rem] tracking-cad uppercase font-medium transition-colors cursor-pointer inline-flex items-center gap-1.5"
+                title="View all customer concepts generated through this visualizer"
+              >
+                <FolderOpen className="w-3.5 h-3.5" />
+                <span>STUDIO CONCEPT LOG</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -788,8 +799,9 @@ Concept Image Link: ${imageLink}`;
                 DESCRIBE A PIECE OR UPLOAD A ROOM PHOTO / HAND SKETCH
               </p>
               <p className="text-[0.90rem] font-light text-black max-w-[68ch]">
-                Choose a signature studio template or write your own idea, pick your primary timber,
-                design style, and added cabinetry details, and generate a visual concept that is shared with Josh.
+                Sketch out a custom piece in 3D or 2D CAD—choose a studio template or write your
+                own idea, pick your primary timber, direction, and joinery details, or upload a
+                photo of your room to see it in place.
               </p>
             </div>
 

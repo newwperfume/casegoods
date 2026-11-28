@@ -79,19 +79,18 @@ export const FrontCoverOptions: React.FC<FrontCoverOptionsProps> = ({
             onClick={() => onNavigate('methodology')}
             onMouseEnter={(e) => triggerPillarAccent('01', e.currentTarget)}
             onFocus={(e) => triggerPillarAccent('01', e.currentTarget)}
-            className="ui-surface bg-[#EF6922] text-black border border-black rounded-[8px] md:rounded-[9px] px-2 py-2 md:p-4 flex items-center justify-between gap-1 text-left hover:bg-black hover:text-white transition-colors cursor-pointer group"
+            className="ui-surface bg-[#EF6922] text-black border border-black rounded-[8px] md:rounded-[9px] px-2.5 py-2.5 md:p-4 flex items-center justify-between gap-1 text-left hover:bg-black hover:text-white transition-colors cursor-pointer group"
           >
             <div className="min-w-0">
-              <div className="text-[0.45rem] md:text-[0.62rem] tracking-cad uppercase font-medium opacity-80 leading-tight truncate">
-                <span className="md:hidden">01 / STUDIO</span>
-                <span className="hidden md:inline">01 / DESIGN &amp; METHODOLOGY</span>
+              <div className="hidden md:block text-[0.62rem] tracking-cad uppercase font-medium opacity-80 leading-tight truncate">
+                DESIGN &amp; METHODOLOGY
               </div>
-              <div className="text-[0.58rem] md:text-[0.80rem] tracking-cad uppercase font-medium mt-0.5 leading-tight truncate">
-                <span className="md:hidden">ENTER</span>
+              <div className="text-[0.66rem] md:text-[0.80rem] tracking-cad uppercase font-medium md:mt-0.5 leading-tight truncate">
+                <span className="md:hidden">STUDIO</span>
                 <span className="hidden md:inline">ENTER STUDIO</span>
               </div>
             </div>
-            <ArrowRight className="w-3 h-3 md:w-4 md:h-4 shrink-0 transition-transform group-hover:translate-x-1" />
+            <ArrowRight className="w-3.5 h-3.5 md:w-4 md:h-4 shrink-0 transition-transform group-hover:translate-x-1" />
           </button>
 
           <button
@@ -99,19 +98,18 @@ export const FrontCoverOptions: React.FC<FrontCoverOptionsProps> = ({
             onClick={() => onNavigate('work')}
             onMouseEnter={(e) => triggerPillarAccent('02', e.currentTarget)}
             onFocus={(e) => triggerPillarAccent('02', e.currentTarget)}
-            className="ui-surface bg-[#27AAE0] text-black border border-black rounded-[8px] md:rounded-[9px] px-2 py-2 md:p-4 flex items-center justify-between gap-1 text-left hover:bg-black hover:text-white transition-colors cursor-pointer group"
+            className="ui-surface bg-[#27AAE0] text-black border border-black rounded-[8px] md:rounded-[9px] px-2.5 py-2.5 md:p-4 flex items-center justify-between gap-1 text-left hover:bg-black hover:text-white transition-colors cursor-pointer group"
           >
             <div className="min-w-0">
-              <div className="text-[0.45rem] md:text-[0.62rem] tracking-cad uppercase font-medium opacity-80 leading-tight truncate">
-                <span className="md:hidden">02 / WORK</span>
-                <span className="hidden md:inline">02 / SELECTED WORK</span>
+              <div className="hidden md:block text-[0.62rem] tracking-cad uppercase font-medium opacity-80 leading-tight truncate">
+                SELECTED WORK
               </div>
-              <div className="text-[0.58rem] md:text-[0.80rem] tracking-cad uppercase font-medium mt-0.5 leading-tight truncate">
-                <span className="md:hidden">PROJECTS</span>
+              <div className="text-[0.66rem] md:text-[0.80rem] tracking-cad uppercase font-medium md:mt-0.5 leading-tight truncate">
+                <span className="md:hidden">WORK</span>
                 <span className="hidden md:inline">3D RENDERS &amp; 2D CAD</span>
               </div>
             </div>
-            <ArrowRight className="w-3 h-3 md:w-4 md:h-4 shrink-0 transition-transform group-hover:translate-x-1" />
+            <ArrowRight className="w-3.5 h-3.5 md:w-4 md:h-4 shrink-0 transition-transform group-hover:translate-x-1" />
           </button>
 
           <button
@@ -119,19 +117,18 @@ export const FrontCoverOptions: React.FC<FrontCoverOptionsProps> = ({
             onClick={() => onNavigate('visualizer')}
             onMouseEnter={(e) => triggerPillarAccent('06', e.currentTarget)}
             onFocus={(e) => triggerPillarAccent('06', e.currentTarget)}
-            className="ui-surface bg-[#FDCB33] text-black border border-black rounded-[8px] md:rounded-[9px] px-2 py-2 md:p-4 flex items-center justify-between gap-1 text-left hover:bg-black hover:text-white transition-colors cursor-pointer group"
+            className="ui-surface bg-[#FDCB33] text-black border border-black rounded-[8px] md:rounded-[9px] px-2.5 py-2.5 md:p-4 flex items-center justify-between gap-1 text-left hover:bg-black hover:text-white transition-colors cursor-pointer group"
           >
             <div className="min-w-0">
-              <div className="text-[0.45rem] md:text-[0.62rem] tracking-cad uppercase font-medium opacity-80 leading-tight truncate">
-                <span className="md:hidden">06 / BUILD</span>
-                <span className="hidden md:inline">06 / CONCEPT VISUALIZER</span>
+              <div className="hidden md:block text-[0.62rem] tracking-cad uppercase font-medium opacity-80 leading-tight truncate">
+                CONCEPT VISUALIZER
               </div>
-              <div className="text-[0.58rem] md:text-[0.80rem] tracking-cad uppercase font-medium mt-0.5 leading-tight truncate">
-                <span className="md:hidden">IDEA</span>
+              <div className="text-[0.66rem] md:text-[0.80rem] tracking-cad uppercase font-medium md:mt-0.5 leading-tight truncate">
+                <span className="md:hidden">VISUALIZE</span>
                 <span className="hidden md:inline">BUILD YOUR IDEA</span>
               </div>
             </div>
-            <ArrowRight className="w-3 h-3 md:w-4 md:h-4 shrink-0 transition-transform group-hover:translate-x-1" />
+            <ArrowRight className="w-3.5 h-3.5 md:w-4 md:h-4 shrink-0 transition-transform group-hover:translate-x-1" />
           </button>
         </div>
 

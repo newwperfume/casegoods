@@ -27,6 +27,26 @@ export const Footer: React.FC<FooterProps> = ({
         </div>
       )}
 
+      {!compact && (
+        <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[0.68rem] tracking-cad uppercase text-black/80 font-normal">
+          <span>OMAHA, NEBRASKA</span>
+          <span aria-hidden="true">·</span>
+          <a
+            href="tel:+14028308782"
+            className="hover:text-[#EF6922] transition-colors"
+          >
+            402-830-8782
+          </a>
+          <span aria-hidden="true">·</span>
+          <a
+            href="mailto:josh@casegoodsomaha.com"
+            className="hover:text-[#EF6922] transition-colors"
+          >
+            JOSH@CASEGOODSOMAHA.COM
+          </a>
+        </div>
+      )}
+
       {/* Mobile Business Card Action */}
       <div>
         <a

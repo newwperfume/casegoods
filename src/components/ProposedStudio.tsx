@@ -162,19 +162,19 @@ const INSPECTION_LENSES: LensItem[] = [
     id: 'joint',
     code: '01 / THE JOINT',
     title: 'EXPOSED FINGER-JOINTED WHITE OAK',
-    dwgRef: 'DWG-1064HEM-S04',
+    dwgRef: 'DWG-1064HEM-R04',
     image: ASSETS.familyRoom.sheet4JoineryDetail,
-    imageAlt: 'Exposed finger-jointed white oak and custom fluted walnut joinery',
+    imageAlt: 'Exposed finger-jointed white oak and horizontally fluted walnut joinery',
     headline: 'Where structural engineering becomes the visual signature.',
     detail:
-      'Precision 3/4" box finger-joints machined along solid Rift White Oak case corners, paired with custom scalloped drawer fronts and hand-fluted American Black Walnut.',
+      'Precision 3/4" box finger-joints machined along solid Rift White Oak case corners, paired with horizontally fluted American Black Walnut drawer fronts.',
     targetProjectId: 'project-family-room',
   },
   {
     id: 'grain',
     code: '02 / THE TEXTURE',
     title: 'DEEP-FLUTED BLACK WALNUT & TURNED PULLS',
-    dwgRef: 'DWG-1064HEM-S03',
+    dwgRef: 'DWG-1064HEM-R03',
     image: ASSETS.familyRoom.sheet3FlutedDetail,
     imageAlt: 'Macro detail of fluted walnut doors and bespoke turned pulls',
     headline: 'Tactile shadow lines carved into solid domestic hardwood.',
@@ -186,25 +186,25 @@ const INSPECTION_LENSES: LensItem[] = [
     id: 'line',
     code: '03 / THE DRAWING',
     title: 'DIMENSIONED 2D RHINO SHOP DRAWINGS',
-    dwgRef: 'DWG-1070MCG-B1',
-    image: ASSETS.kidsKitchen.sectionB1,
-    imageAlt: '2D Rhino CAD Section Shop Drawing with fractional tolerances',
+    dwgRef: 'DWG-1070MCG-A101',
+    image: '/downloads/drawings/casegoods-1070MCG-A101-elevations-sections.png',
+    imageAlt: 'Casegoods 2D Rhino CAD Sheet A-101 showing elevations, plumbing rough-in, and sections with fractional callouts',
     isCad: true,
-    headline: 'Resolved to 1/32 of an inch before a single board is cut.',
+    headline: 'Engineered to 1/32" so site coordination never stalls.',
     detail:
-      'Every commission begins as a full 3D Rhino model and fractional 2D architectural shop submittal so clearances, plumbing, and joinery leave nothing to guesswork.',
+      'Full-scale architectural shop submittals with fractional callouts, plumbing rough-ins, and joinery sections—so electrical, plumbing, and site clearances align cleanly on install day.',
     targetProjectId: 'project-kids-kitchen',
   },
   {
     id: 'color',
     code: '04 / THE UNEXPECTED',
-    title: 'TAMBOUR DOORS & BAUHAUS COLOR-BLOCKING',
-    dwgRef: 'DWG-1064HEM-S07',
+    title: 'BAUHAUS COLOR-BLOCKING & FLUTED ISLANDS',
+    dwgRef: 'DWG-1064HEM-WB-R02',
     image: ASSETS.wetBar.sheet7ColorBlockedDrawers,
-    imageAlt: 'Custom wet bar with tambour doors and Bauhaus color-blocked drawer fronts',
+    imageAlt: 'Wet bar peninsula island working elevation with bar sink, walnut doors, and Bauhaus color-blocked drawer stack',
     headline: 'Furniture and millwork that refuses to blend into the wall.',
     detail:
-      'Book-matched walnut cabinetry and radiused white oak tambour islands accented with Bauhaus Orange, Fabrication Blue, and CAD Gray dovetail drawer stacks.',
+      'Book-matched walnut cabinetry and radiused white oak fluted islands accented with Bauhaus Orange, Fabrication Blue, and CAD Gray dovetail drawer stacks.',
     targetProjectId: 'project-wet-bar',
   },
 ];
@@ -216,8 +216,27 @@ interface AttachedFile {
   previewUrl?: string;
 }
 
+const VALID_STUDIO_PAGES: ProposedPageId[] = [
+  'cover',
+  'methodology',
+  'work',
+  'capabilities',
+  'process',
+  'inquire',
+  'visualizer',
+];
+
+function getInitialStudioPage(): ProposedPageId {
+  if (typeof window === 'undefined') return 'cover';
+  const hash = window.location.hash.replace(/^#/, '').trim().toLowerCase();
+  if (VALID_STUDIO_PAGES.includes(hash as ProposedPageId)) {
+    return hash as ProposedPageId;
+  }
+  return 'cover';
+}
+
 export const ProposedStudio: React.FC = () => {
-  const [activePage, setActivePage] = useState<ProposedPageId>('cover');
+  const [activePage, setActivePage] = useState<ProposedPageId>(getInitialStudioPage);
   const wall = useMortiseWallController('01');
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeLens, setActiveLens] = useState<TeaserLensId>('joint');
@@ -247,6 +266,7 @@ export const ProposedStudio: React.FC = () => {
   const [attachments, setAttachments] = useState<AttachedFile[]>([]);
   const [submitState, setSubmitState] = useState<'idle' | 'modal'>('idle');
   const [submitMode, setSubmitMode] = useState<'sms' | 'email'>('sms');
+  const [inquiryError, setInquiryError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   // Shared Custom Concept Visualizer State (Synced across Page 06 and Page 05)
@@ -340,6 +360,18 @@ export const ProposedStudio: React.FC = () => {
     return () => cancelAnimationFrame(rafId);
   }, [activePage]);
 
+  useEffect(() => {
+    const syncPageFromHash = () => {
+      setActivePage(getInitialStudioPage());
+    };
+    window.addEventListener('popstate', syncPageFromHash);
+    window.addEventListener('hashchange', syncPageFromHash);
+    return () => {
+      window.removeEventListener('popstate', syncPageFromHash);
+      window.removeEventListener('hashchange', syncPageFromHash);
+    };
+  }, []);
+
   const navigateToPage = (pageId: ProposedPageId, targetElementId?: string) => {
     setMenuOpen(false);
     // Blur the clicked bottom button so mobile browsers do not keep scroll anchored at the bottom
@@ -351,6 +383,13 @@ export const ProposedStudio: React.FC = () => {
     }
     pendingTargetRef.current = targetElementId;
     setActivePage(pageId);
+
+    if (typeof window !== 'undefined') {
+      const nextUrl = pageId === 'cover' ? '/' : `/#${pageId}`;
+      if (window.location.pathname + window.location.hash !== nextUrl) {
+        window.history.pushState({ pageId }, '', nextUrl);
+      }
+    }
 
     if (!targetElementId) {
       scrollToTopImmediate();
@@ -454,6 +493,15 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
 
   const handleSubmit = async (e: React.FormEvent, mode: 'sms' | 'email') => {
     e.preventDefault();
+
+    if (!formData.name.trim() || !formData.contact.trim() || !formData.details.trim()) {
+      setInquiryError(
+        'Please enter your name, phone or email, and a brief project explanation before sending.'
+      );
+      return;
+    }
+
+    setInquiryError(null);
     setSubmitMode(mode);
     const summary = formatSummary();
 
@@ -461,6 +509,10 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
       visualizerState.history.find((c) => c.id === visualizerState.activeConceptId) ||
       visualizerState.history[0] ||
       null;
+
+    const locationNote = formData.location.trim()
+      ? `Location: ${formData.location.trim()}\n\n`
+      : '';
 
     // Persist inquiry to Cloud SQL in the background
     getFreshToken()
@@ -473,13 +525,13 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
           method: 'POST',
           headers,
           body: JSON.stringify({
-            name: formData.name || 'Studio Visitor',
-            email: formData.contact || 'Not provided',
-            phone: formData.contact || '',
+            name: formData.name.trim(),
+            email: formData.contact.trim(),
+            phone: formData.contact.trim(),
             projectType: formData.projectType,
-            timeline: formData.timeline,
-            dimensions: formData.location,
-            description: formData.details || summary,
+            timeline: formData.timeline.trim(),
+            dimensions: '',
+            description: `${locationNote}${formData.details.trim()}`,
             conceptId: activeConcept?.id || '',
           }),
         });
@@ -489,7 +541,7 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
     if (mode === 'sms') {
       window.location.href = `sms:${OWNER_PHONE}?&body=${encodeURIComponent(summary)}`;
     } else {
-      const subject = `Commission Inquiry: ${formData.projectType} — ${formData.name}`;
+      const subject = `Commission Inquiry: ${formData.projectType} — ${formData.name.trim()}`;
       window.location.href = `mailto:${OWNER_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(summary)}`;
     }
     setSubmitState('modal');
@@ -712,9 +764,9 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
                         we make the things that have never been made before
                       </h1>
                       <p className="text-[0.94rem] sm:text-[1.0rem] font-light leading-relaxed text-black max-w-[62ch]">
-                        Every commission in our Omaha studio starts as a dimensioned 2D &amp; 3D Rhino
-                        CAD proposal—resolving every reveal, finger-joint, and spatial clearance to
-                        1/32 of an inch before a single board of domestic hardwood is cut.
+                        Every commission in our Omaha studio starts in 3D Rhino CAD—resolving
+                        every joint, reveal, and clearance to 1/32&quot; before we cut the first
+                        board of domestic hardwood.
                       </p>
                     </div>
 
@@ -729,7 +781,7 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
                           02 / SELECTED WORK →
                         </span>
                         <span className="text-[0.88rem] font-normal mt-0.5">
-                          Explore Completed Proposals &amp; Sheets
+                          Explore Proposals, Drawings &amp; Builds
                         </span>
                       </button>
                       <button
@@ -753,32 +805,32 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
                           04 / PROCESS &amp; TRADE →
                         </span>
                         <span className="text-[0.88rem] font-normal mt-0.5">
-                          6-Step Workflow &amp; Trade Program
+                          4-Step Workflow &amp; Trade Program
                         </span>
                       </button>
                     </div>
                   </div>
 
-                  {/* Section Subheading Above Sheet A1 & Sheet 04 */}
+                  {/* Section Subheading Above Sheet A-101 & Render 04 */}
                   <div className="pt-1 text-left">
                     <span className="text-[0.74rem] tracking-cad uppercase font-medium text-black">
                       TECHNICAL CAD DRAWINGS &amp; PHOTOREALISTIC PROPOSALS:
                     </span>
                   </div>
 
-                  {/* Aligned 2-Column Flush Sheet Cards (Sheet A1 & Sheet 04) */}
+                  {/* Aligned 2-Column Flush Sheet Cards (Sheet A-101 & Render 04) */}
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
                     {/* Left Card: 2D Rhino CAD */}
                     <div className="border border-black rounded-[9px] bg-white overflow-hidden flex flex-col">
                       <div className="bg-[#CBCBCB] text-black border-b border-black px-4 py-2.5 flex items-center justify-between text-[0.70rem] tracking-cad uppercase font-medium">
-                        <span>SHEET A1 · 2D RHINO ELEVATION</span>
+                        <span>SHEET A-101 · 2D RHINO CAD SUBMITTAL</span>
                         <span>DWG-1070MCG</span>
                       </div>
 
                       <div className="bg-white border-b border-black p-3 sm:p-4 flex items-center justify-center h-[280px] sm:h-[320px] overflow-hidden">
                         <img
-                          src={ASSETS.kidsKitchen.elevationA1}
-                          alt="Rhino 2D CAD Elevation Shop Drawing with Fractional Callouts"
+                          src="/downloads/drawings/casegoods-1070MCG-A101-elevations-sections.png"
+                          alt="Casegoods 2D Rhino CAD Sheet A-101 showing elevations, plumbing rough-in, and sections"
                           className="w-full h-full object-contain block select-none"
                           referrerPolicy="no-referrer"
                         />
@@ -795,7 +847,7 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
                     {/* Right Card: 3D Proposal */}
                     <div className="border border-black rounded-[9px] bg-white overflow-hidden flex flex-col">
                       <div className="bg-[#EF6922] text-black border-b border-black px-4 py-2.5 flex items-center justify-between text-[0.70rem] tracking-cad uppercase font-medium">
-                        <span>SHEET 04 · 3D HARDWOOD PROPOSAL</span>
+                        <span>RENDER 04 · 3D HARDWOOD PROPOSAL</span>
                         <span>DWG-1064HEM</span>
                       </div>
 
@@ -1283,7 +1335,7 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
                       onClick={() => navigateToPage('work')}
                       className="shrink-0 bg-black text-white hover:bg-[#FDCB33] hover:text-black text-[0.72rem] tracking-cad uppercase py-3 px-5 rounded-[9px] border border-black transition-colors cursor-pointer font-medium whitespace-nowrap"
                     >
-                      VIEW COMPLETED WORK (02) →
+                      VIEW SELECTED WORK (02) →
                     </button>
                   </div>
 
@@ -1296,8 +1348,8 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
                         items: [
                           'Custom alcove & living room cabinetry',
                           'Integrated window benches & drawers',
-                          'Wet bars & fluted tambour islands',
-                          'Library walls, pole wraps & mouldings',
+                          'Wet bars & fluted hardwood islands',
+                          'Library walls, pole wraps & moldings',
                         ],
                       },
                       {
@@ -1396,7 +1448,7 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
                         step: '02 / 3D CAD & DRAWINGS',
                         headerBg: 'bg-[#EF6922]',
                         description:
-                          'Your idea is translated into photorealistic 3D renderings and dimensioned 2D Rhino shop drawings before a board is cut.',
+                          'Your concept is translated into photorealistic 3D renderings and dimensioned 2D Rhino shop drawings for sign-off prior to fabrication.',
                       },
                       {
                         step: '03 / FABRICATION',
@@ -1463,24 +1515,28 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
                       </div>
                     </div>
 
-                    {/* Flush-Header Submittal Sheet Card (Matching Sheet A1 Style) */}
+                    {/* Flush-Header Submittal Sheet Card (Matching Sheet A-101 Style) */}
                     <div className="lg:col-span-5 border border-black rounded-[9px] bg-white overflow-hidden flex flex-col">
                       <div className="bg-[#CBCBCB] text-black border-b border-black px-4 py-2.5 text-[0.70rem] tracking-cad uppercase font-medium flex items-center justify-between select-none">
                         <span>SAMPLE SUBMITTAL — 1070MCG</span>
-                        <span>SECTION B1</span>
+                        <span>SHEET A-101</span>
                       </div>
                       <div
-                        onClick={() =>
-                          setLightboxState({
-                            project: projects[2],
-                            imageIndex: 1,
-                          })
-                        }
+                        onClick={() => {
+                          const kidsKitchenProject =
+                            projects.find((p) => p.id === 'kids-kitchen') || projects[0] || null;
+                          if (kidsKitchenProject) {
+                            setLightboxState({
+                              project: kidsKitchenProject,
+                              imageIndex: 0,
+                            });
+                          }
+                        }}
                         className="bg-white p-4 flex items-center justify-center cursor-zoom-in h-[240px]"
                       >
                         <img
-                          src={ASSETS.kidsKitchen.sectionB1}
-                          alt="Sample Rhino 2D CAD Section & Plumbing Submittal"
+                          src="/downloads/drawings/casegoods-1070MCG-A101-elevations-sections.png"
+                          alt="Sample Casegoods 2D Rhino CAD Sheet A-101 showing elevations, plumbing rough-in, and sections"
                           loading="lazy"
                           className="w-full h-full object-contain block select-none"
                           referrerPolicy="no-referrer"
@@ -1516,7 +1572,8 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
                   <div className="border-b border-black/20 pb-6 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5 text-left">
                     <p className="text-[0.95rem] sm:text-[1.0rem] font-light text-black leading-relaxed max-w-[64ch]">
                       Have a custom furniture piece, architectural built-in, or commercial build in
-                      mind? Enter your project details below to text Josh directly at{' '}
+                      mind? No formal plans required—a rough sketch, room photo, or quick dimension
+                      is plenty to start. Enter your details below to text Josh directly at{' '}
                       <strong className="font-medium">{OWNER_PHONE_DISPLAY}</strong> or email{' '}
                       <strong className="font-medium">{OWNER_EMAIL}</strong>.
                     </p>
@@ -1700,9 +1757,13 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
                             className="w-full h-[48px] px-4 bg-white hover:bg-[#CBCBCB] text-[0.86rem] text-black flex items-center justify-center gap-2 transition-colors cursor-pointer font-normal"
                           >
                             <Upload className="w-4 h-4 text-black" />
-                            <span>Attach photos, sketches, or PDF plans</span>
+                            <span>List photos, sketches, or PDF plans</span>
                           </button>
                         </div>
+                        <p className="text-[0.74rem] font-light text-black/70 leading-snug px-0.5">
+                          Browser SMS &amp; email links can&apos;t auto-attach local files—you&apos;ll
+                          attach selected files in your messaging/mail app, or paste a shared link in Step 07.
+                        </p>
 
                         {attachments.length > 0 && (
                           <div className="flex flex-wrap gap-2 pt-1">
@@ -1761,11 +1822,23 @@ Details: ${formData.details || 'Custom woodworking commission'}`;
                         required
                         rows={4}
                         value={formData.details}
-                        onChange={(e) => setFormData({ ...formData, details: e.target.value })}
+                        onChange={(e) => {
+                          setFormData({ ...formData, details: e.target.value });
+                          if (inquiryError) setInquiryError(null);
+                        }}
                         placeholder="Tell me briefly about the piece, room dimensions, or idea you have in mind..."
                         className="w-full bg-white text-black text-[0.94rem] p-4 font-light focus:outline-none focus:bg-[#EF6922]/5 resize-y placeholder:text-black/45 leading-relaxed"
                       />
                     </div>
+
+                    {inquiryError && (
+                      <div
+                        role="alert"
+                        className="p-3.5 rounded-[9px] border border-black bg-[#EF6922] text-black text-[0.84rem] font-medium text-left"
+                      >
+                        {inquiryError}
+                      </div>
+                    )}
 
                     {/* Row 5: Dual Submission Triggers */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
