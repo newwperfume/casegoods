@@ -155,15 +155,20 @@ export const CadModal: React.FC<CadModalProps> = ({
     );
   };
 
+  const isStandardCadSheet =
+    !isSpecsOpen &&
+    activeImage?.type === 'cad' &&
+    activeImage.src.startsWith('/downloads/drawings/casegoods-');
+
   return (
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-6 bg-black/85 backdrop-blur-sm animate-fadeIn"
+      className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-sm animate-fadeIn"
       onClick={onClose}
     >
       <div
-        className={`relative w-full max-w-6xl bg-white border-[1.5px] border-black rounded-[9px] p-3 sm:p-5 shadow-2xl flex flex-col gap-3.5 max-h-[94vh] transition-colors duration-300`}
+        className={`relative w-full max-w-6xl bg-white border-[1.5px] border-black rounded-[9px] p-3 sm:p-4 shadow-2xl flex flex-col gap-3 max-h-[96vh] transition-colors duration-300`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Top 3-Zone Architectural Header:
@@ -207,9 +212,25 @@ export const CadModal: React.FC<CadModalProps> = ({
           </div>
         </div>
 
-        {/* High-Resolution Image or Spec Sheet Stage — Outlined with Matching Spacing */}
+        {/* High-Resolution Image or Spec Sheet Stage — Edge-to-Edge Framed */}
         <div
-          className={`relative flex-1 min-h-[360px] sm:min-h-[500px] overflow-auto flex items-center justify-center bg-white rounded-[9px] border border-black p-4 sm:p-8 transition-colors duration-300`}
+          style={
+            isStandardCadSheet
+              ? {
+                  width: 'min(100%, calc((96vh - 175px) * 1556 / 956))',
+                  aspectRatio: '1556 / 956',
+                }
+              : undefined
+          }
+          className={`relative mx-auto bg-white rounded-[9px] border border-black transition-colors duration-300 flex items-center justify-center ${
+            isSpecsOpen
+              ? 'w-full flex-1 min-h-[360px] sm:min-h-[500px] overflow-auto p-4 sm:p-8'
+              : isStandardCadSheet
+              ? `shrink-0 p-0 ${zoomLevel > 1 ? 'overflow-auto' : 'overflow-hidden'}`
+              : `w-full flex-1 min-h-[360px] sm:min-h-[500px] p-0 ${
+                  zoomLevel > 1 ? 'overflow-auto' : 'overflow-hidden'
+                }`
+          }`}
         >
           <div
             style={{
@@ -223,7 +244,21 @@ export const CadModal: React.FC<CadModalProps> = ({
               <img
                 src={activeImage.src}
                 alt={activeImage.alt}
-                className="max-w-full max-h-[64vh] w-auto h-auto object-contain select-none"
+                style={
+                  isStandardCadSheet
+                    ? {
+                        width: '102.83%',
+                        height: '104.6%',
+                        maxWidth: 'none',
+                        maxHeight: 'none',
+                      }
+                    : undefined
+                }
+                className={
+                  isStandardCadSheet
+                    ? 'shrink-0 object-fill select-none block'
+                    : 'w-full h-full max-h-[calc(96vh-175px)] object-contain select-none block'
+                }
                 referrerPolicy="no-referrer"
               />
             ) : (
